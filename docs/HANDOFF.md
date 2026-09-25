@@ -208,3 +208,9 @@ Decision on record: once a new city is proven on the shared setup, Miami stays o
 
 ## Duplicate listings (since v15.91)
 Listings with the same name + phone + address show once on the site: the kept copy is chosen claimed → Plus → paid → most reviews. The other copies are hidden (table `dup_hidden`), and their old URLs 301 to the kept one. This runs after every sync pass. You can also run it now at `/admin/duplicates`. `/admin/duplicates?csv=1` downloads the list so the CRM team can merge or delete copies in GoHighLevel. Claimed or paid copies are never hidden. First run on 25 Sep: Orlando hid 837 copies, Miami 3,003.
+
+## Listing data cleanup (v15.92–v15.93)
+- **Wrong or dead pictures.** Some listing pictures are images shared by many unrelated businesses (Instagram's icon, a booking site's logo…); others no longer load. Both are hidden at display time, and those listings show their category photo instead. `/admin/logos` shows the counts; about 120 images are checked every hour (table `logo_check`).
+- **Junk emails and websites.** Scraped addresses that aren't the business's (error trackers, template placeholders, font credits, platform support addresses), the literal "No Website", and bare platform home pages are hidden. Claim invites are never sent to junk emails. The CRM still holds the bad values, so the team can clean them there.
+- **Neighbourhood queue.** For Orlando (no `CITY_VALID_ZIPS`), only zips whose first 3 digits cover at least 5% of the city's listings can enter the queue. Aventura, Kendall, Miami Gardens and Westchester were removed from Orlando on 25 Sep.
+- **Missing zip codes.** Most listings without a zip have no address at all: service-area businesses that Google shows without an address. This is expected.
