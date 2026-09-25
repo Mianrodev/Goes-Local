@@ -8096,7 +8096,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (u.pathname === "/debug") {
       if (!await isAdmin(env, req, u)) return Response.redirect(AUTH.SITE_URL + "/admin/login", 302);
       const o = [];
-      o.push("VERSION: v15.82-shared");
+      o.push("VERSION: v15.83-shared");
       o.push("TOKEN: " + (env.GHL_API_TOKEN ? `present (len ${env.GHL_API_TOKEN.length})` : "MISSING"));
       o.push("LOCATION: " + (env.GHL_LOCATION_ID || "MISSING"));
       o.push("ADMIN_LOGIN_KEY: " + (env.ADMIN_LOGIN_KEY ? "present" : "MISSING"));
@@ -10623,8 +10623,16 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     }
     if (p.length && p.length <= 2 && !d.cats.some(x => x.slug === p[0])) {
       const want = p[p.length - 1];
-      const home = d.cats.find(x => (x.subs || []).some(sb => SLUG(sb.name) === want));
+      let home = null, best = 0;
+      for (const x of d.cats) for (const sb of x.subs || []) if (SLUG(sb.name) === want && sb.n > best) {
+        home = x;
+        best = sb.n;
+      }
       if (home) return Response.redirect(AUTH.SITE_URL + `/${home.slug}/${want}` + u.search, 301);
+      if (p.length === 1 && DB) try {
+        const moved = await DB.prepare("SELECT b.cs FROM slug_redirects r JOIN businesses b ON b.ghl_id=r.ghl_id WHERE r.cs=?1 GROUP BY b.cs ORDER BY COUNT(*) DESC LIMIT 1").bind(p[0]).first();
+        if (moved && moved.cs) return Response.redirect(AUTH.SITE_URL + `/${moved.cs}` + u.search, 301);
+      } catch {}
     }
     return R(NOTICE(d, "We couldn't find that page", "The page you're looking for doesn't exist or has moved.", "Back to " + S.brand, "/"), 404);
   }
