@@ -1414,6 +1414,9 @@ async function migrate(DB, env) {
     await DB.prepare("CREATE TABLE IF NOT EXISTS category_map(sub_slug TEXT PRIMARY KEY, sub TEXT DEFAULT '', main TEXT NOT NULL, updated_at INTEGER)").run();
   } catch {}
   try {
+    await DB.prepare("CREATE TABLE IF NOT EXISTS dup_hidden(ghl_id TEXT PRIMARY KEY, keep_id TEXT NOT NULL, cs TEXT, slug TEXT, name TEXT DEFAULT '', created_at INTEGER)").run();
+  } catch {}
+  try {
     await DB.prepare("ALTER TABLE pending_email_invites ADD COLUMN last_checked_at INTEGER").run();
   } catch {}
   for (const q of [ "CREATE INDEX IF NOT EXISTS ix_cs_hood_sub ON businesses(cs,hood,sub)", "CREATE INDEX IF NOT EXISTS ix_cs_sub_rank ON businesses(cs,sub,premium DESC,claimed DESC,rat DESC,rev DESC)", "CREATE INDEX IF NOT EXISTS ix_cs_rank ON businesses(cs,premium DESC,claimed DESC,rat DESC,rev DESC)", "CREATE INDEX IF NOT EXISTS ix_cs_related ON businesses(cs,plus DESC,premium DESC,rat DESC)" ]) try {
@@ -1846,6 +1849,10 @@ async function syncStep(env, DB, maxPages) {
     } catch (e) {
       console.log("existingSlugs prefetch failed (continuing without it): " + e.message);
     }
+    const dupHidden = new Map;
+    try {
+      for (const r of (await DB.prepare("SELECT ghl_id,keep_id,cs,slug FROM dup_hidden").all()).results || []) dupHidden.set(r.ghl_id, r);
+    } catch {}
     let touchedIds = new Set;
     if (KV) {
       try {
@@ -1865,7 +1872,19 @@ async function syncStep(env, DB, maxPages) {
       contactsThisCall += page.contacts.length;
       nextUrl = page.nextUrl;
       pagesFetched++;
-      const pageList = page.contacts.filter(c => (c.tags || []).some(t => String(t).toLowerCase() === S.tag) && !isPerson(c)).map(c => norm(c, m));
+      let pageList = page.contacts.filter(c => (c.tags || []).some(t => String(t).toLowerCase() === S.tag) && !isPerson(c)).map(c => norm(c, m));
+      if (dupHidden.size) {
+        const unhide = [];
+        pageList = pageList.filter(b => {
+          const h = dupHidden.get(b.id);
+          if (!h) return true;
+          if (!(b.claimed || b.premium || b.plus)) return false;
+          dupHidden.delete(b.id);
+          unhide.push(DB.prepare("DELETE FROM dup_hidden WHERE ghl_id=?1").bind(b.id), DB.prepare("DELETE FROM slug_redirects WHERE cs=?1 AND old_slug=?2 AND ghl_id=?3").bind(h.cs, h.slug, h.keep_id));
+          return true;
+        });
+        if (unhide.length) await DB.batch(unhide);
+      }
       for (const b of pageList) {
         const prior = priorByGhlId.get(b.id);
         const nameChanged = prior && (prior.name || "").trim() !== (b.name || "").trim();
@@ -1962,6 +1981,13 @@ async function syncStep(env, DB, maxPages) {
         }
       }
     }
+    let dups = null;
+    try {
+      dups = await dedupeListings(DB);
+      removed += dups.hidden;
+    } catch (e) {
+      console.log("dedupe failed: " + e.message);
+    }
     try {
       const ftsRow = await DB.prepare("SELECT v FROM meta WHERE k='fts_at'").first().catch(() => null);
       const ftsAt = ftsRow ? +ftsRow.v : 0;
@@ -1981,6 +2007,7 @@ async function syncStep(env, DB, maxPages) {
       count: touchedCount,
       ms: Date.now() - t0,
       removed: removed,
+      dups: dups,
       deletionSkipped: deletionSkipped,
       staleCount: stale.length,
       rawFetched: touchedCount,
@@ -2091,6 +2118,53 @@ async function recordSlugChange(DB, ghlId, oldCs, oldSlug, newCs, newSlug) {
   }
 }
 
+// Duplicate listings (same name + phone + address): keep the best one (claimed, then paid, then most reviews)
+// and hide the rest — their rows leave businesses (so lists, search, sitemaps and counts drop them) and their
+// old addresses 301 to the kept listing via slug_redirects. Claimed or paid copies are never hidden. The sync
+// skips hidden copies until one gets claimed/paid or its kept listing disappears; nothing changes in the CRM.
+const DUPKEY = r => {
+  const nm = String(r.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const ph = String(r.pr || r.ph || "").replace(/\D/g, "").slice(-10);
+  const ad = String(r.addr || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return nm && (ph || ad) ? nm + "|" + ph + "|" + ad : "";
+};
+
+async function dedupeListings(DB) {
+  let hidden = 0, released = 0;
+  const gone = (await DB.prepare("SELECT ghl_id,keep_id,cs,slug FROM dup_hidden WHERE keep_id NOT IN (SELECT ghl_id FROM businesses)").all()).results || [];
+  if (gone.length) {
+    const ops = gone.flatMap(g => [ DB.prepare("DELETE FROM dup_hidden WHERE ghl_id=?1").bind(g.ghl_id), DB.prepare("DELETE FROM slug_redirects WHERE cs=?1 AND old_slug=?2 AND ghl_id=?3").bind(g.cs, g.slug, g.keep_id) ]);
+    for (let i = 0; i < ops.length; i += 400) await DB.batch(ops.slice(i, i + 400));
+    released = gone.length;
+  }
+  const rows = (await DB.prepare("SELECT id,ghl_id,cs,slug,name,pr,ph,addr,claimed,premium,plus,rev,rat FROM businesses").all()).results || [];
+  const groups = new Map;
+  for (const r of rows) {
+    const k = DUPKEY(r);
+    if (!k) continue;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  const rank = (a, b) => (b.claimed || 0) - (a.claimed || 0) || (b.plus || 0) - (a.plus || 0) || (b.premium || 0) - (a.premium || 0) || (b.rev || 0) - (a.rev || 0) || (b.rat || 0) - (a.rat || 0) || a.id - b.id;
+  const now = Date.now(), ops = [];
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    g.sort(rank);
+    const keep = g[0];
+    for (const r of g.slice(1)) {
+      if (r.claimed || r.premium || r.plus) continue;
+      ops.push(DB.prepare("INSERT OR REPLACE INTO dup_hidden(ghl_id,keep_id,cs,slug,name,created_at) VALUES(?1,?2,?3,?4,?5,?6)").bind(r.ghl_id, keep.ghl_id, r.cs, r.slug, r.name || "", now), DB.prepare("INSERT OR REPLACE INTO slug_redirects(ghl_id,cs,old_slug,created_at) VALUES(?1,?2,?3,?4)").bind(keep.ghl_id, r.cs, r.slug, now), DB.prepare("DELETE FROM businesses WHERE ghl_id=?1").bind(r.ghl_id));
+      hidden++;
+    }
+  }
+  for (let i = 0; i < ops.length; i += 399) await DB.batch(ops.slice(i, i + 399));
+  if (hidden) await DB.prepare("UPDATE slug_redirects SET ghl_id=(SELECT keep_id FROM dup_hidden h WHERE h.ghl_id=slug_redirects.ghl_id) WHERE ghl_id IN (SELECT ghl_id FROM dup_hidden)").run();
+  return {
+    hidden: hidden,
+    released: released
+  };
+}
+
 async function refreshOne(env, DB, ghlId, expect) {
   if (!DB || !ghlId) return false;
   await loadCatMap(DB);
@@ -2154,6 +2228,9 @@ async function insertOne(env, DB, ghlId, pre) {
   }
   if (!c) return false;
   const b = norm(c, m);
+  try {
+    await DB.prepare("DELETE FROM dup_hidden WHERE ghl_id=?1").bind(ghlId).run();
+  } catch {}
   const priorRow = await DB.prepare("SELECT cs,slug FROM businesses WHERE ghl_id=?1").bind(ghlId).first();
   const x = await uniqueSlug(DB, b.cs, b.slug, b.id);
   if (priorRow) await recordSlugChange(DB, ghlId, priorRow.cs, priorRow.slug, b.cs, x);
@@ -2592,7 +2669,7 @@ const contentItems = [ [ "/admin/comments", "Comments" ], [ "/admin/hero", "Home
 
 const seoItems = [ [ "/admin/seo", "SEO" ], [ "/admin/blog", "Blog" ], [ "/admin/news", "News" ], [ "/admin/faqs", "Category FAQs" ], [ "/admin/hoodfaqs", "Neighbourhood FAQs" ] ];
 
-const adminOnlyItems = [ [ "/admin/status", "Status" ], [ "/admin/import", "Import businesses" ], [ "/admin/sync", "Run sync" ], [ "/admin/urlsync", "Listing URL sync" ], [ "/admin/emailtemplates", "Email templates & test" ], [ "/admin/migrate", "Migrate" ], [ "/debug", "Debug" ] ];
+const adminOnlyItems = [ [ "/admin/status", "Status" ], [ "/admin/import", "Import businesses" ], [ "/admin/sync", "Run sync" ], [ "/admin/urlsync", "Listing URL sync" ], [ "/admin/emailtemplates", "Email templates & test" ], [ "/admin/migrate", "Migrate" ], [ "/admin/duplicates", "Hide duplicates" ], [ "/admin/duplicates?csv=1", "Duplicates list (CSV)" ], [ "/debug", "Debug" ] ];
 
 const IMG_AUTOCOMPRESS_JS = `document.addEventListener("DOMContentLoaded",function(){\nfunction compress(file){\nreturn new Promise(function(resolve){\nif(!file||!/^image\\/(jpeg|png|webp)$/.test(file.type)||file.size<400000){resolve(file);return}\nvar img=new Image();\nvar url=URL.createObjectURL(file);\nimg.onload=function(){\nURL.revokeObjectURL(url);\nvar maxDim=1920;\nvar w=img.width,h=img.height;\nif(w>maxDim||h>maxDim){\nif(w>h){h=Math.round(h*maxDim/w);w=maxDim}else{w=Math.round(w*maxDim/h);h=maxDim}\n}\nvar canvas=document.createElement("canvas");\ncanvas.width=w;canvas.height=h;\nvar ctx=canvas.getContext("2d");\nctx.drawImage(img,0,0,w,h);\ncanvas.toBlob(function(blob){\nif(!blob||blob.size>=file.size){resolve(file);return}\nresolve(new File([blob],file.name.replace(/\\.(png|jpe?g|webp)$/i,"")+".jpg",{type:"image/jpeg"}))\n},"image/jpeg",0.82)\n};\nimg.onerror=function(){URL.revokeObjectURL(url);resolve(file)};\nimg.src=url\n})\n}\ndocument.querySelectorAll('input[type="file"][accept*="image"]').forEach(function(input){\ninput.addEventListener("change",function(){\nvar file=input.files&&input.files[0];\nif(!file)return;\ncompress(file).then(function(out){\nif(out===file)return;\ntry{\nvar dt=new DataTransfer();\ndt.items.add(out);\ninput.files=dt.files\n}catch(e){}\n})\n})\n});\n});`;
 const ADMINNAV = (path, role) => {
@@ -5651,7 +5728,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.90-shared";
+const BUILD = "v15.91-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -5865,6 +5942,36 @@ const _export = {
         await migrate(DB, env);
         const t = (await DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()).results || [];
         return TXT("Migration OK.\nTables: " + t.map(x => x.name).join(", "));
+      }
+      if (p[1] === "duplicates") {
+        if (role !== "admin") return TXT("Duplicates needs full admin access — ask an admin.");
+        await migrate(DB, env);
+        if (u.searchParams.has("csv")) {
+          const rows = (await DB.prepare("SELECT h.name,h.ghl_id,h.cs,h.slug,h.keep_id,b.cs kcs,b.slug kslug FROM dup_hidden h LEFT JOIN businesses b ON b.ghl_id=h.keep_id ORDER BY h.name").all()).results || [];
+          const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+          const csv = "Business,Hidden copy (CRM contact id),Old web address,Kept listing (CRM contact id),Kept web address\n" + rows.map(r => [ r.name, r.ghl_id, S.dom + "/" + r.cs + "/" + r.slug, r.keep_id, r.kcs ? S.dom + "/" + r.kcs + "/" + r.kslug : "" ].map(q).join(",")).join("\n");
+          return new Response(csv, {
+            headers: {
+              "content-type": "text/csv; charset=utf-8",
+              "content-disposition": 'attachment; filename="duplicate-listings.csv"',
+              "cache-control": "no-store"
+            }
+          });
+        }
+        const r = await dedupeListings(DB);
+        if (r.hidden) {
+          await DB.prepare("INSERT INTO biz_fts(biz_fts) VALUES('rebuild')").run();
+          await DB.prepare("INSERT INTO meta(k,v) VALUES('fts_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(Date.now())).run();
+        }
+        C = {
+          t: 0,
+          d: null
+        };
+        SHELL_DIRTY = true;
+        const tot = await DB.prepare("SELECT COUNT(*) n FROM dup_hidden").first() || {
+          n: 0
+        };
+        return TXT(`Duplicates OK.\nHidden just now: ${r.hidden}. Brought back (their kept listing was gone): ${r.released}.\nHidden copies in total: ${tot.n}. Their old web addresses forward to the kept listing.\nDownload the list for the CRM team: ${S.dom}/admin/duplicates?csv=1\nThis also runs automatically at the end of every listing sync.`);
       }
       if (p[1] === "sync") {
         if (role !== "admin") return TXT("Sync needs full admin access — ask an admin.");
@@ -10855,7 +10962,7 @@ async function edgeKey(u, env) {
 async function edgeHandle(req, env, ctx, u) {
   if (!edgeCacheable(req, u)) {
     const res = await _base.handle(req, env, ctx);
-    if (res.status < 400 && (req.method === "POST" && /^\/(admin|manage|webhooks)(\/|$)/.test(u.pathname) || /^\/admin\/(seo\/reset|sync|urlsync|insertone|migrate)$/.test(u.pathname))) ctx.waitUntil(bumpCacheGen(env));
+    if (res.status < 400 && (req.method === "POST" && /^\/(admin|manage|webhooks)(\/|$)/.test(u.pathname) || /^\/admin\/(seo\/reset|sync|urlsync|insertone|migrate|duplicates)$/.test(u.pathname))) ctx.waitUntil(bumpCacheGen(env));
     return [ res, "BYPASS" ];
   }
   const cache = caches.default;
