@@ -1,6 +1,8 @@
 # Goes Local
 One Cloudflare Worker file (`worker.js`) runs the whole directory for every city. Deployed with Wrangler as `goes-local-miami-api` and `goes-local-orlando-api`; city differences come only from dashboard Variables (CITY_*) and each city's own D1. Full context: docs/HANDOFF.md. Deploy how-to: docs/DEPLOY.md.
 
+About Eric (read first): Eric is the owner but is NOT a developer and is new to Claude Code. Don't assume he knows technical terms (API, env var, deploy, repo, token, etc.). Do everything technical yourself. When he must do something, give numbered click-by-click steps saying exactly what to click and type, one small task at a time, and offer to walk him through it with screenshots. He shouldn't have to explain this again.
+
 Rules:
 - Never hardcode anything city-specific in worker.js (names, prices, GA IDs, image URLs, JSON-LD, links).
 - Deploy Orlando first, then Miami. After each: run the migration, check /debug VERSION, click through the change live. Nothing is done until seen working in a browser.
