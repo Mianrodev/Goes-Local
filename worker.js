@@ -1394,6 +1394,12 @@ async function migrate(DB, env) {
     await DB.prepare("CREATE TABLE IF NOT EXISTS category_map(sub_slug TEXT PRIMARY KEY, sub TEXT DEFAULT '', main TEXT NOT NULL, updated_at INTEGER)").run();
   } catch {}
   try {
+    await DB.prepare("ALTER TABLE pending_email_invites ADD COLUMN last_checked_at INTEGER").run();
+  } catch {}
+  for (const q of [ "CREATE INDEX IF NOT EXISTS ix_cs_hood_sub ON businesses(cs,hood,sub)", "CREATE INDEX IF NOT EXISTS ix_cs_sub_rank ON businesses(cs,sub,premium DESC,claimed DESC,rat DESC,rev DESC)", "CREATE INDEX IF NOT EXISTS ix_cs_rank ON businesses(cs,premium DESC,claimed DESC,rat DESC,rev DESC)", "CREATE INDEX IF NOT EXISTS ix_cs_related ON businesses(cs,plus DESC,premium DESC,rat DESC)" ]) try {
+    await DB.prepare(q).run();
+  } catch {}
+  try {
     await seedStarterContent(DB, env);
   } catch (e) {
     console.log("seedStarterContent failed: " + e.message);
@@ -1937,7 +1943,13 @@ async function syncStep(env, DB, maxPages) {
       }
     }
     try {
-      await DB.prepare("INSERT INTO biz_fts(biz_fts) VALUES('rebuild')").run();
+      const ftsRow = await DB.prepare("SELECT v FROM meta WHERE k='fts_at'").first().catch(() => null);
+      const ftsAt = ftsRow ? +ftsRow.v : 0;
+      const changed = removed > 0 || !ftsAt || await DB.prepare("SELECT 1 FROM businesses WHERE updated_at>?1 LIMIT 1").bind(ftsAt).first();
+      if (changed) {
+        await DB.prepare("INSERT INTO biz_fts(biz_fts) VALUES('rebuild')").run();
+        await DB.prepare("INSERT INTO meta(k,v) VALUES('fts_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(now)).run();
+      }
     } catch {}
     await DB.prepare("INSERT INTO meta(k,v) VALUES('synced_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(now)).run();
     if (KV) try {
@@ -2097,6 +2109,7 @@ async function refreshOne(env, DB, ghlId, expect) {
         t: 0,
         d: null
       };
+        SHELL_DIRTY = true;
     } catch (e) {
       console.log("refreshOne write failed: " + e.message);
       return false;
@@ -2127,13 +2140,11 @@ async function insertOne(env, DB, ghlId, pre) {
   b.slug = x;
   try {
     await DB.prepare(`INSERT INTO businesses\n(ghl_id,city,cat,cs,sub,slug,name,addr,area,state,zip,ph,pr,email,web,descr,hrs,svc,logo,map,ic,rat,rev,yrs,premium,claimed,hood,owner_email,code,labels,photos,slots,hrs2,updated_at,plus)\nVALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35)\nON CONFLICT(ghl_id) DO UPDATE SET\n city=excluded.city,cat=excluded.cat,cs=excluded.cs,sub=excluded.sub,slug=excluded.slug,name=excluded.name,\n addr=excluded.addr,area=excluded.area,state=excluded.state,zip=excluded.zip,ph=excluded.ph,pr=excluded.pr,\n email=excluded.email,web=excluded.web,descr=excluded.descr,hrs=excluded.hrs,svc=excluded.svc,logo=excluded.logo,\n map=excluded.map,ic=excluded.ic,rat=excluded.rat,rev=excluded.rev,yrs=excluded.yrs,premium=excluded.premium,\n claimed=excluded.claimed,hood=excluded.hood,owner_email=excluded.owner_email,\n labels=excluded.labels,photos=excluded.photos,slots=excluded.slots,hrs2=excluded.hrs2,updated_at=excluded.updated_at,plus=excluded.plus`).bind(b.id, S.city, b.cat, b.cs, b.sub || "", b.slug, b.name, b.addr || "", b.city || "", b.state || "", b.zip || "", b.ph || "", b.pr || "", b.email || "", b.web || "", b.desc || "", b.hrs || "", (b.svc || []).join(", "), b.logo || "", b.map || "", b.ic || "📍", b.rat || null, b.rev || null, b.yrs || null, b.premium ? 1 : 0, b.claimed ? 1 : 0, b.hood || "", b.owner || "", b.code || "", (b.labels || []).join(", "), JSON.stringify(b.photos || []), JSON.stringify(b.slots || {}), b.hrs2 || "", Date.now(), b.plus ? 1 : 0).run();
-    try {
-      await DB.prepare("INSERT INTO biz_fts(biz_fts) VALUES('rebuild')").run();
-    } catch {}
     C = {
       t: 0,
       d: null
     };
+        SHELL_DIRTY = true;
     return true;
   } catch (e) {
     console.log("insertOne write failed: " + e.message);
@@ -2337,9 +2348,25 @@ let C = {
   d: null
 };
 
+let SHELL_DIRTY = false;
+
 async function shell(DB) {
   const now = Date.now();
-  if (C.d && now - C.t < S.ttl * 1e3) return C.d;
+  if (C.d && now - C.t < S.ttl * 1e3 && !SHELL_DIRTY) return C.d;
+  if (!SHELL_DIRTY) try {
+    const row = await DB.prepare("SELECT v FROM meta WHERE k='shell_v1'").first();
+    const j = row ? JSON.parse(row.v) : null;
+    if (j && j.d && now - j.at < 1800 * 1e3) {
+      const syn = await DB.prepare("SELECT v FROM meta WHERE k='synced_at'").first().catch(() => null);
+      j.d.syncedAt = syn ? +syn.v : j.d.syncedAt;
+      C = {
+        t: now,
+        d: j.d
+      };
+      return j.d;
+    }
+  } catch {}
+  SHELL_DIRTY = false;
   const cats = (await DB.prepare(`SELECT cs slug,cat name,COUNT(*) n FROM businesses GROUP BY cs,cat ORDER BY n DESC`).all()).results || [];
   cats.sort((a, b) => a.name === "Other" ? 1 : b.name === "Other" ? -1 : 0);
   const subs = (await DB.prepare(`SELECT cs,sub,COUNT(*) n FROM businesses WHERE sub<>'' GROUP BY cs,sub ORDER BY n DESC`).all()).results || [];
@@ -2364,6 +2391,12 @@ async function shell(DB) {
     t: now,
     d: d
   };
+  try {
+    await DB.prepare("INSERT INTO meta(k,v) VALUES('shell_v1',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(JSON.stringify({
+      at: now,
+      d: d
+    })).run();
+  } catch {}
   return d;
 }
 
@@ -2785,10 +2818,17 @@ async function expireRecentlyClaimedBatch(env, DB, maxUpdates) {
 async function pendingEmailInviteBatch(env, DB, maxUpdates) {
   const staleCutoff = Date.now() - 90 * 24 * 60 * 60 * 1e3;
   await DB.prepare("DELETE FROM pending_email_invites WHERE created_at<?1").bind(staleCutoff).run().catch(() => {});
-  const rows = (await DB.prepare("SELECT ghl_id FROM pending_email_invites ORDER BY created_at ASC LIMIT ?1").bind(maxUpdates).all()).results || [];
+  const nowTs = Date.now();
+  let rows = [];
+  try {
+    rows = (await DB.prepare("SELECT ghl_id FROM pending_email_invites WHERE last_checked_at IS NULL OR last_checked_at<?2 ORDER BY last_checked_at IS NOT NULL, last_checked_at, created_at LIMIT ?1").bind(maxUpdates, nowTs - 6 * 3600 * 1e3).all()).results || [];
+  } catch {
+    rows = (await DB.prepare("SELECT ghl_id FROM pending_email_invites ORDER BY created_at ASC LIMIT ?1").bind(maxUpdates).all()).results || [];
+  }
   let sent = 0;
   for (const r of rows) {
     try {
+      await DB.prepare("UPDATE pending_email_invites SET last_checked_at=?1 WHERE ghl_id=?2").bind(nowTs, r.ghl_id).run().catch(() => {});
       await insertOne(env, DB, r.ghl_id);
       const biz = await DB.prepare("SELECT ghl_id,name,cs,slug,email,owner_email,claim_invited_at FROM businesses WHERE ghl_id=?1").bind(r.ghl_id).first();
       // claim_invited_at is the only reliable "already sent" signal here — see
@@ -5578,7 +5618,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.84-shared";
+const BUILD = "v15.85-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -5655,6 +5695,7 @@ const _export = {
           t: 0,
           d: null
         };
+        SHELL_DIRTY = true;
         console.log(r.done ? `cron: sync pass complete — ${r.count} listings, ${r.removed || 0} removed, in ${r.ms}ms` : `cron: sync in progress — fetched ${r.pagesFetched} more page(s) (${r.contactsThisCall} contacts), continuing next tick`);
       } catch (e) {
         console.log("cron sync failed: " + e.message);
@@ -5795,6 +5836,7 @@ const _export = {
             t: 0,
             d: null
           };
+        SHELL_DIRTY = true;
           if (!r.done) return TXT(`Sync in progress — fetched ${r.pagesFetched} more page(s) this call ` + `(${r.contactsThisCall} GHL contacts, ${r.businessesWrittenThisCall} written) in ${r.ms}ms.\n` + `Still more to fetch — cron will keep going automatically every 5 minutes, or click Run sync again ` + `to fetch the next chunk right now.`);
           return TXT(`Sync OK — pass complete.\n${r.count} listings written, ${r.removed || 0} removed, in ${r.ms}ms.\n` + `Fetched ${r.rawFetched} total GHL contacts across this full pass (cap is 100,000 per call, spread automatically — worth watching if any single pass gets close).${r.deletionSkipped ? `\n⚠ SAFETY GUARD TRIPPED: this pass only touched ${r.count} listings vs ${r.staleCount + r.count}+ expected — looks like a partial pull from GHL, so ${r.staleCount} "missing" listings were NOT deleted this run. Re-run sync; if the count comes back to normal, nothing was wrong. If it stays low repeatedly, something's actually failing in the GHL fetch (rate limit or token issue) — check the Worker logs.` : ""}`);
         } catch (e) {
@@ -6106,6 +6148,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
                 t: 0,
                 d: null
               };
+        SHELL_DIRTY = true;
             } catch (e) {
               console.log("remove-listing delete failed: " + e.message);
               return Response.redirect(AUTH.SITE_URL + "/admin/businesses?edit=" + encodeURIComponent(id) + "&err=" + encodeURIComponent("Couldn't remove — " + e.message), 302);
@@ -7534,6 +7577,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
                   t: 0,
                   d: null
                 };
+        SHELL_DIRTY = true;
               } catch (e) {
                 console.log("publish sync fail: " + e.message);
               }
@@ -8062,6 +8106,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
                 t: 0,
                 d: null
               };
+        SHELL_DIRTY = true;
             } catch (e) {
               console.log(e.message);
             }
@@ -9446,6 +9491,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
                   t: 0,
                   d: null
                 };
+        SHELL_DIRTY = true;
               } catch (e) {
                 console.log(e.message);
               }
@@ -9464,6 +9510,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
                   t: 0,
                   d: null
                 };
+        SHELL_DIRTY = true;
               }
             } catch (e) {
               console.log(e.message);
@@ -9485,6 +9532,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           t: 0,
           d: null
         };
+        SHELL_DIRTY = true;
         HOME_FEED_CACHE = {
           t: 0,
           d: null
@@ -10598,7 +10646,6 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         const rel = ((await DB.prepare(`SELECT * FROM businesses WHERE cs=?1 AND slug<>?2 ORDER BY plus DESC, premium DESC, rat DESC LIMIT ${relLimit}`).bind(p[0], p[1]).all()).results || []).map(ROWOF);
         const s = await session(env, req);
         const isOwner = s ? (await ownedIds(env, s.email)).includes(b.id) : false;
-        ctx.waitUntil(trackEvent(DB, b.id, "view"));
         const [reviews, following, myReview, photos, updates, blogPosts] = await Promise.all([ approvedReviews(DB, b.id), s ? isFollowing(DB, b.id, s.email) : false, s ? myReviewOn(DB, b.id, s.email) : null, approvedPhotos(DB, b.id), bizUpdates(DB, b.id), bizBlogPosts(DB, b.id) ]);
         return R(BIZPAGE(d, b, rel, {
           session: s,
@@ -10609,7 +10656,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           photos: photos,
           updates: updates,
           blogPosts: blogPosts
-        }));
+        }).replace("</body>", `<script>try{if(!navigator.webdriver&&!/bot|crawl|spider|slurp|headless|lighthouse|preview/i.test(navigator.userAgent)&&!sessionStorage.getItem("glv"+${SJ(b.id)})){sessionStorage.setItem("glv"+${SJ(b.id)},"1");navigator.sendBeacon("/api/track",new Blob([JSON.stringify({id:${SJ(b.id)},kind:"view"})],{type:"application/json"}))}}catch(e){}<\/script></body>`));
       }
       if (DB) {
         try {
