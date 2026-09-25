@@ -5578,6 +5578,8 @@ async function hoodCounts(DB) {
   }
 }
 
+const BUILD = "v15.84-shared";
+
 const APP_COOKIE = "gl_app";
 
 function isAppRequest(req, u) {
@@ -8096,7 +8098,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (u.pathname === "/debug") {
       if (!await isAdmin(env, req, u)) return Response.redirect(AUTH.SITE_URL + "/admin/login", 302);
       const o = [];
-      o.push("VERSION: v15.83-shared");
+      o.push("VERSION: " + BUILD);
       o.push("TOKEN: " + (env.GHL_API_TOKEN ? `present (len ${env.GHL_API_TOKEN.length})` : "MISSING"));
       o.push("LOCATION: " + (env.GHL_LOCATION_ID || "MISSING"));
       o.push("ADMIN_LOGIN_KEY: " + (env.ADMIN_LOGIN_KEY ? "present" : "MISSING"));
@@ -9478,7 +9480,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (!DB) return R(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Setup</title><style>${CSS}</style></head>\n<body><div class="wrap" style="padding:70px 24px;max-width:680px"><h1>Database not connected</h1>\n<p style="color:${T.body}">Add a D1 binding under Settings → Bindings, then run <a href="/admin/migrate">/admin/migrate</a>.</p>\n</div></body></html>`, 500);
     let d;
     try {
-      if (u.searchParams.has("refresh")) {
+      if (u.searchParams.has("refresh") && await isAdmin(env, req, u)) {
         C = {
           t: 0,
           d: null
@@ -10665,6 +10667,90 @@ function applyCityConfig(env) {
 
 const _base = _export;
 
+const EDGE_SKIP = /^\/(admin|debug|manage|account|login|signup|verify|code|auth|forgot|reset|logout|claim|add|api|webhooks|sw\.js)(\/|$)/;
+
+const EDGE_KEEP = /^(batch|biz|cat|claim|edit|email|err|hood|id|link|main|next|ok|page|page_key|paid|plan|q|rating|ref|resent|rqerr|rqok|sent|sort|sub|t|tab|warn)$/;
+
+let CACHE_GEN = {
+  t: 0,
+  v: "0"
+};
+
+async function cacheGen(env) {
+  const now = Date.now();
+  if (now - CACHE_GEN.t < 60 * 1e3) return CACHE_GEN.v;
+  const KV = KVOF(env);
+  let v = CACHE_GEN.v;
+  try {
+    v = KV ? await KV.get("cache_gen") || "0" : "0";
+  } catch {}
+  CACHE_GEN = {
+    t: now,
+    v: v
+  };
+  return v;
+}
+
+async function bumpCacheGen(env) {
+  const v = String(Date.now());
+  CACHE_GEN = {
+    t: Date.now(),
+    v: v
+  };
+  const KV = KVOF(env);
+  try {
+    if (KV) await KV.put("cache_gen", v);
+  } catch {}
+}
+
+function edgeTtl(path) {
+  if (path === "/") return 600;
+  if (/^\/(blog|news)(\/|$)/.test(path)) return 900;
+  if (/\.xml$|^\/(robots|llms)\.txt$/.test(path)) return 43200;
+  return 3600;
+}
+
+function edgeCacheable(req, u) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  if (EDGE_SKIP.test(u.pathname)) return false;
+  const ck = req.headers.get("Cookie") || "";
+  return !/(?:^|;\s*)(gl_sess|gl_adm)=[^;\s]/.test(ck);
+}
+
+async function edgeKey(u, env) {
+  const k = new URL(u.origin + u.pathname);
+  const ps = [ ...u.searchParams.entries() ].filter(([n]) => EDGE_KEEP.test(n)).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : 1);
+  for (const [n, v] of ps) k.searchParams.append(n, v);
+  k.searchParams.set("__b", BUILD);
+  k.searchParams.set("__g", await cacheGen(env));
+  return new Request(k.toString(), {
+    method: "GET"
+  });
+}
+
+async function edgeHandle(req, env, ctx, u) {
+  if (!edgeCacheable(req, u)) {
+    const res = await _base.handle(req, env, ctx);
+    if (res.status < 400 && (req.method === "POST" && /^\/(admin|manage|webhooks)(\/|$)/.test(u.pathname) || /^\/admin\/(seo\/reset|sync|urlsync|insertone|migrate)$/.test(u.pathname))) ctx.waitUntil(bumpCacheGen(env));
+    return [ res, "BYPASS" ];
+  }
+  const cache = caches.default;
+  const key = await edgeKey(u, env);
+  try {
+    const hit = await cache.match(key);
+    if (hit) return [ hit, "HIT" ];
+  } catch {}
+  const res = await _base.handle(req, env, ctx);
+  const cc = res.headers.get("cache-control") || "";
+  const ct = res.headers.get("content-type") || "";
+  const ok = res.status === 200 && !res.headers.has("set-cookie") && (/\bpublic\b/.test(cc) || /\.xml$|^\/(robots|llms)\.txt$/.test(u.pathname) && !/no-store|private/.test(cc)) && /text\/html|xml|text\/plain/.test(ct);
+  if (!ok) return [ res, "MISS" ];
+  const store = new Response(res.clone().body, res);
+  store.headers.set("cache-control", `public, max-age=${edgeTtl(u.pathname)}`);
+  ctx.waitUntil(cache.put(key, store).catch(() => {}));
+  return [ res, "MISS" ];
+}
+
 export default {
   async scheduled(event, env, ctx) {
     applyCityConfig(env);
@@ -10676,9 +10762,11 @@ export default {
     const cookieHas = new RegExp(`(?:^|; )${APP_COOKIE}=1(?:;|$)`).test(req.headers.get("Cookie") || "");
     const cameFromApp = u.searchParams.get("app") === "1";
     const isApp = isAppRequest(req, u);
-    const res = await _base.handle(req, env, ctx);
+    const [res, cacheState] = await edgeHandle(req, env, ctx, u);
     const out = isApp ? await asAppShell(res, req, u, cameFromApp && !cookieHas) : res;
     const h = new Headers(out.headers);
+    h.set("x-gl-cache", cacheState);
+    if (cacheState === "HIT") h.set("cache-control", "public, max-age=120"); else if (cacheState === "BYPASS" && /(?:^|;\s*)(gl_sess|gl_adm)=[^;\s]/.test(req.headers.get("Cookie") || "")) h.set("cache-control", "private, no-cache");
     h.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; worker-src 'self'");
     h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     h.set("X-Frame-Options", "DENY");

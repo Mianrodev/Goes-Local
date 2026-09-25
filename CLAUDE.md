@@ -10,5 +10,5 @@ Rules:
 - wrangler.toml must keep keep_vars = true and match the live D1/KV bindings, routes and cron exactly (`npm run check-live` proves it; `scripts/deploy.sh` runs it first).
 - GHL API: update custom fields and native fields in two separate calls (combined calls silently drop custom fields and still return 200).
 - Talk to Eric in short plain English, no jargon. Mock up UI changes before building.
-- Before commit: `npm run precheck` (node --check, duplicate-route scan, one VERSION line, no leaked city values), bump VERSION.
+- Before commit: `npm run precheck` (node --check, duplicate-route scan, one VERSION line, no leaked city values), bump `const BUILD` (the version).
 - Deploy only committed code: `scripts/deploy.sh` (needs CLOUDFLARE_API_TOKEN and ADMIN_LOGIN_KEY). Add a `changelog/v15.xx.md` per release and tag it `v15.xx-shared`.

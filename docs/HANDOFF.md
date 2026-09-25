@@ -182,7 +182,7 @@ Structured hours + "Currently Open" badge (needs a "Structured Hours" GHL text f
 
 Release routine:
 1. Edit `worker.js` (one file for every city).
-2. `npm run precheck`; bump `o.push("VERSION: v15.xx-shared")`.
+2. `npm run precheck`; bump `const BUILD = "v15.xx-shared"`.
 3. Commit; add `changelog/v15.xx.md`.
 4. `scripts/deploy.sh` → Orlando deploy → migrate → `/debug` check → Miami, same. Click through the changed feature live.
 5. Tell Eric in plain English what changed and that it's live. Tag `v15.xx-shared`.
