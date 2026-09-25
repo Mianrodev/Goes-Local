@@ -383,6 +383,26 @@ function hoodOf(addr, area, zip) {
   return "";
 }
 
+// Cities without CITY_VALID_ZIPS: only zips whose first 3 digits cover at least 5% of the city's own listings
+// may enter the new-neighbourhood queue, so stray out-of-area listings can't create neighbourhoods.
+let ZIP3 = {
+  t: 0,
+  s: null
+};
+
+async function cityZip3(DB) {
+  if (Date.now() - ZIP3.t < 6 * 36e5) return ZIP3.s;
+  try {
+    const rows = (await DB.prepare("SELECT substr(zip,1,3) p,COUNT(*) n FROM businesses WHERE zip<>'' GROUP BY p").all()).results || [];
+    const tot = rows.reduce((a, r) => a + r.n, 0);
+    ZIP3 = {
+      t: Date.now(),
+      s: tot >= 200 ? new Set(rows.filter(r => r.n >= tot * .05).map(r => r.p)) : null
+    };
+  } catch {}
+  return ZIP3.s;
+}
+
 const hoodName = slug => {
   const h = HOOD_CACHE.list.find(x => x.slug === slug);
   return h ? h.name : slug;
@@ -915,6 +935,89 @@ function withDemo(b) {
   return sl;
 }
 
+// Listing logos that must not be shown: images shared by many unrelated businesses (Instagram's icon, a booking
+// site's logo, a parked-domain logo...) and images that no longer load. The shared set is rebuilt at the end of
+// each sync pass (computeBadLogos); dead images come from the hourly checker (logoCheckBatch). ROWOF drops them,
+// so those listings fall back to their category photo.
+let BADLOGO = {
+  t: 0,
+  s: new Set
+};
+
+const LOGO_PLATFORMS = /(^|\.)(linktr\.ee|linktree\.com|bluepillow\.com|fresha\.com|vagaro\.com|booksy\.com|glossgenius\.com|styleseat\.com|schedulicity\.com|setmore\.com|massagebook\.com|hamperapp\.com|instagram\.com|facebook\.com|squareup\.com|square\.site|yelp\.com|tiktok\.com|beacons\.ai|linkin\.bio|mindbodyonline\.com|airbnb\.com|vrbo\.com|booking\.com)$/;
+
+const DOM2 = u => HOSTOF(u).split(".").slice(-2).join(".");
+
+async function computeBadLogos(DB) {
+  const rows = (await DB.prepare("SELECT logo,web,name FROM businesses WHERE logo IN (SELECT logo FROM businesses WHERE logo<>'' GROUP BY logo HAVING COUNT(*)>=3)").all()).results || [];
+  const g = new Map;
+  for (const r of rows) {
+    if (!g.has(r.logo)) g.set(r.logo, []);
+    g.get(r.logo).push(r);
+  }
+  const bad = [];
+  for (const [logo, rs] of g) {
+    const ld = DOM2(logo);
+    const names = new Set(rs.map(r => String(r.name || "").toLowerCase().split(/\s+/)[0])).size;
+    const same = rs.filter(r => r.web && DOM2(r.web) === ld).length;
+    const onPlatform = rs.filter(r => r.web && LOGO_PLATFORMS.test(HOSTOF(r.web))).length;
+    if (names >= 5 && same * 2 < rs.length || onPlatform * 2 >= rs.length) bad.push(logo);
+  }
+  await DB.prepare("INSERT INTO meta(k,v) VALUES('bad_logos',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(JSON.stringify(bad)).run();
+  BADLOGO.t = 0;
+  return bad.length;
+}
+
+async function loadBadLogos(DB) {
+  if (!DB || Date.now() - BADLOGO.t < 6e5) return;
+  BADLOGO.t = Date.now();
+  try {
+    const m = await DB.prepare("SELECT v FROM meta WHERE k='bad_logos'").first();
+    const s = new Set(m ? JSON.parse(m.v) : []);
+    for (const r of (await DB.prepare("SELECT url FROM logo_check WHERE ok=0").all()).results || []) s.add(r.url);
+    BADLOGO.s = s;
+  } catch {}
+}
+
+// Hourly: fetch a batch of listing logo URLs and remember which no longer load (4xx, bad host, or not an image).
+// Server errors and timeouts count as fine and are retried in 30 days.
+async function logoCheckBatch(DB, n) {
+  const rows = (await DB.prepare("SELECT DISTINCT b.logo url FROM businesses b LEFT JOIN logo_check c ON c.url=b.logo WHERE b.logo LIKE 'http%' AND (c.url IS NULL OR c.checked_at<?1) LIMIT ?2").bind(Date.now() - 30 * 864e5, n).all()).results || [];
+  let dead = 0;
+  const check = async url => {
+    let ok = 1, status = 0;
+    try {
+      const r = await fetch(url, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+          accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+          referer: S.dom + "/"
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(6e3)
+      });
+      status = r.status;
+      const ct = String(r.headers.get("content-type") || "").toLowerCase();
+      try {
+        await r.body?.cancel();
+      } catch {}
+      if (status >= 400 && status < 500 && status !== 429 || status === 200 && /text\/html/.test(ct)) ok = 0;
+    } catch (e) {
+      if (!/timeout|abort/i.test(String(e && (e.name + e.message)))) ok = 0;
+    }
+    if (!ok) dead++;
+    return DB.prepare("INSERT OR REPLACE INTO logo_check(url,ok,status,checked_at) VALUES(?1,?2,?3,?4)").bind(url, ok, status, Date.now());
+  };
+  const ops = [];
+  for (let i = 0; i < rows.length; i += 10) ops.push(...await Promise.all(rows.slice(i, i + 10).map(r => check(r.url))));
+  if (ops.length) await DB.batch(ops);
+  if (dead) BADLOGO.t = 0;
+  return {
+    checked: rows.length,
+    dead: dead
+  };
+}
+
 function bizImg(b) {
   const pick = [ b && b.slots && b.slots.profile || "", String(b && b.logo || "") ];
   for (const l of pick) if (/^https?:\/\//i.test(l) && !/example\.test/i.test(l)) return l;
@@ -1412,6 +1515,9 @@ async function migrate(DB, env) {
   } catch {}
   try {
     await DB.prepare("CREATE TABLE IF NOT EXISTS category_map(sub_slug TEXT PRIMARY KEY, sub TEXT DEFAULT '', main TEXT NOT NULL, updated_at INTEGER)").run();
+  } catch {}
+  try {
+    await DB.prepare("CREATE TABLE IF NOT EXISTS logo_check(url TEXT PRIMARY KEY, ok INTEGER DEFAULT 1, status INTEGER DEFAULT 0, checked_at INTEGER)").run();
   } catch {}
   try {
     await DB.prepare("CREATE TABLE IF NOT EXISTS dup_hidden(ghl_id TEXT PRIMARY KEY, keep_id TEXT NOT NULL, cs TEXT, slug TEXT, name TEXT DEFAULT '', created_at INTEGER)").run();
@@ -1931,7 +2037,8 @@ async function syncStep(env, DB, maxPages) {
         const byZip = new Map;
         for (const miss of HOOD_CACHE.misses) if (!byZip.has(miss.zip)) byZip.set(miss.zip, miss);
         HOOD_CACHE.misses = [];
-        const ups = [ ...byZip.values() ].filter(miss => !HOOD_CACHE.zipMap[miss.zip] && (!S.validZips || S.validZips.has(miss.zip))).map(miss => DB.prepare(`INSERT INTO hood_pending(zip,sample_area,sample_addr,n,first_seen) VALUES(?1,?2,?3,1,?4)\n       ON CONFLICT(zip) DO UPDATE SET n=n+1`).bind(miss.zip, miss.area, miss.addr, Date.now()));
+        const zip3 = S.validZips ? null : await cityZip3(DB);
+        const ups = [ ...byZip.values() ].filter(miss => !HOOD_CACHE.zipMap[miss.zip] && (S.validZips ? S.validZips.has(miss.zip) : !zip3 || zip3.has(miss.zip.slice(0, 3)))).map(miss => DB.prepare(`INSERT INTO hood_pending(zip,sample_area,sample_addr,n,first_seen) VALUES(?1,?2,?3,1,?4)\n       ON CONFLICT(zip) DO UPDATE SET n=n+1`).bind(miss.zip, miss.area, miss.addr, Date.now()));
         if (ups.length) try {
           await DB.batch(ups);
         } catch (e) {
@@ -1987,6 +2094,11 @@ async function syncStep(env, DB, maxPages) {
       removed += dups.hidden;
     } catch (e) {
       console.log("dedupe failed: " + e.message);
+    }
+    try {
+      await computeBadLogos(DB);
+    } catch (e) {
+      console.log("bad-logo scan failed: " + e.message);
     }
     try {
       const ftsRow = await DB.prepare("SELECT v FROM meta WHERE k='fts_at'").first().catch(() => null);
@@ -2053,7 +2165,7 @@ const ROWOF = r => ({
   desc: FIXMOJIBAKE(r.descr),
   svc: r.svc ? r.svc.split(", ").filter(Boolean) : [],
   hrs: r.hrs,
-  logo: r.logo,
+  logo: BADLOGO.s.has(r.logo) ? "" : r.logo,
   map: r.map,
   ic: r.ic || "📍",
   rat: r.rat,
@@ -5728,7 +5840,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.91-shared";
+const BUILD = "v15.92-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -5790,6 +5902,12 @@ const _export = {
       } catch (e) {
         console.log("cron Recently Claimed expiry failed: " + e.message);
       }
+      if (hourly) try {
+        const lc = await logoCheckBatch(DB, 120);
+        if (lc.checked) console.log(`cron: checked ${lc.checked} listing images, ${lc.dead} no longer load`);
+      } catch (e) {
+        console.log("cron image check failed: " + e.message);
+      }
       try {
         const pe = await pendingEmailInviteBatch(env, DB, 15);
         if (pe.sent) console.log(`cron: sent ${pe.sent} claim invite(s) once email showed up, ${pe.left} still waiting`);
@@ -5823,6 +5941,7 @@ const _export = {
     let p = u.pathname.split("/").filter(Boolean);
     const DB = getDB(env);
     if (DB) await catImgOverrides(DB);
+    if (DB) await loadBadLogos(DB);
     if (DB) await seoOverrides(DB);
     if (u.pathname === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nCrawl-delay: 5\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\nDisallow: /admin/\nDisallow: /admin\nDisallow: /manage/\nDisallow: /manage\n\nUser-agent: GPTBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: ChatGPT-User\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: OAI-SearchBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: ClaudeBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: Claude-User\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: Claude-SearchBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: PerplexityBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nUser-agent: Google-Extended\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /*?*hood=\nDisallow: /*?*sub=\nDisallow: /search\n\nSitemap: ${S.dom}/sitemap-index.xml`, {
       headers: {
@@ -5942,6 +6061,18 @@ const _export = {
         await migrate(DB, env);
         const t = (await DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()).results || [];
         return TXT("Migration OK.\nTables: " + t.map(x => x.name).join(", "));
+      }
+      if (p[1] === "logos") {
+        if (role !== "admin") return TXT("Logos needs full admin access — ask an admin.");
+        await migrate(DB, env);
+        const shared = await computeBadLogos(DB);
+        const lc = u.searchParams.has("check") ? await logoCheckBatch(DB, 40) : null;
+        await loadBadLogos(DB);
+        const st = await DB.prepare("SELECT COUNT(*) n, SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) dead FROM logo_check").first() || {};
+        const hid = await DB.prepare("SELECT COUNT(*) n FROM businesses WHERE logo<>''").first() || {};
+        let hiddenListings = 0;
+        for (const r of (await DB.prepare("SELECT logo FROM businesses WHERE logo<>''").all()).results || []) if (BADLOGO.s.has(r.logo)) hiddenListings++;
+        return TXT(`Listing pictures.\nWrong pictures shared by many unrelated businesses: ${shared} image(s).\nImages checked so far: ${st.n || 0} — ${st.dead || 0} no longer load.${lc ? `\nThis run checked ${lc.checked}, ${lc.dead} dead.` : ""}\nListings now showing their category photo instead: ${hiddenListings} of ${hid.n || 0} that have a picture.\nThe shared scan runs after every listing sync; about 120 images are checked every hour.`);
       }
       if (p[1] === "duplicates") {
         if (role !== "admin") return TXT("Duplicates needs full admin access — ask an admin.");
@@ -10962,7 +11093,7 @@ async function edgeKey(u, env) {
 async function edgeHandle(req, env, ctx, u) {
   if (!edgeCacheable(req, u)) {
     const res = await _base.handle(req, env, ctx);
-    if (res.status < 400 && (req.method === "POST" && /^\/(admin|manage|webhooks)(\/|$)/.test(u.pathname) || /^\/admin\/(seo\/reset|sync|urlsync|insertone|migrate|duplicates)$/.test(u.pathname))) ctx.waitUntil(bumpCacheGen(env));
+    if (res.status < 400 && (req.method === "POST" && /^\/(admin|manage|webhooks)(\/|$)/.test(u.pathname) || /^\/admin\/(seo\/reset|sync|urlsync|insertone|migrate|duplicates|logos)$/.test(u.pathname))) ctx.waitUntil(bumpCacheGen(env));
     return [ res, "BYPASS" ];
   }
   const cache = caches.default;
