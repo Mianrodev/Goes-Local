@@ -7,7 +7,8 @@
     "deploy": "scripts/deploy.sh",
     "deploy:orlando": "scripts/deploy.sh orlando",
     "deploy:miami": "scripts/deploy.sh miami",
-    "verify": "node scripts/migrate-verify.mjs"
+    "verify": "node scripts/migrate-verify.mjs",
+    "browse-check": "node scripts/browse-check.mjs"
   },
   "repository": {
     "type": "git",
