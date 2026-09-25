@@ -981,7 +981,7 @@ function norm(c, m) {
     const tagCat = allMains().find(m => (c.tags || []).some(t => String(t).trim().toLowerCase() === m.toLowerCase())) || ((c.tags || []).some(t => String(t).trim().toLowerCase() === "other") ? "Other" : "");
     if (tagCat) cat = tagCat;
   }
-  const sub = P(v, "subcategory", "sub category", "secondary category") || rawSub || "";
+  const sub = String(P(v, "subcategory", "sub category", "secondary category") || rawSub || "").split(",")[0].trim();
   const nm = /[A-Z]/.test(name) ? name : TC(name);
   const ph = c.phone || P(v, "phone", "formatted phone") || PC(v, "gbp phone", "phone 1", "mobile 1", "phone") || "";
   const addr = c.address1 || P(v, "address", "full address") || "";
@@ -5625,7 +5625,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.87-shared";
+const BUILD = "v15.88-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -10675,6 +10675,17 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         } catch (e) {
           console.log("slug redirect lookup failed (falling through to 404): " + e.message);
         }
+      }
+    }
+    if (p.length === 2) {
+      const cat = d.cats.find(x => x.slug === p[0]);
+      if (cat) {
+        let best = "";
+        for (const sb of cat.subs || []) {
+          const sl = SLUG(sb.name);
+          if (sl && p[1].startsWith(sl + "-") && sl.length > best.length) best = sl;
+        }
+        if (best) return Response.redirect(AUTH.SITE_URL + `/${cat.slug}/${best}` + u.search, 301);
       }
     }
     if (p.length && p.length <= 2 && !d.cats.some(x => x.slug === p[0])) {
