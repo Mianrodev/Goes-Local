@@ -75,4 +75,17 @@ Already in place: $10 total-spend budget alert (auto-created) on the account.
 
 Pending: Phase A (Bot Fight Mode, WAF rules, rate limit) — token lacks Zone WAF/Bot permissions. Phase C step 8 (shorten combined sub-category URLs) — needs Eric's decision.
 
-## After — to be filled in
+## After — first measurements (25 Sep, 20:20 UTC)
+
+| Hour (UTC) | Miami rows read | Orlando rows read | Note |
+|---|---|---|---|
+| 14:00–17:00 (baseline) | 107–145M/h | 41–57M/h | before any change |
+| 18:00 | 104M | 39M | Smart Placement, v15.81 robots |
+| 19:00 | 42M | 16M | v15.84–v15.89 rolled out during the hour |
+| 20:00–20:21 | 10.4M in 21 min ≈ **30M/h** | 3.6M in 21 min ≈ **10M/h** | all changes + WAF live |
+
+≈ **−75% to −80%** so far. Projected: Miami ~0.7B/day, Orlando ~0.25B/day (target < 0.1B each) → ~28B/month, just over the 25B allowance (~$3/month).
+
+What's left: almost all remaining reads are hood/rating/claim facet counts on filtered **sub-category** pages (`WHERE cs=? AND sub=? AND … GROUP BY hood`), i.e. crawlers still walking filter combinations. Applebot passes the WAF as a known crawler and hasn't re-read robots.txt yet (usually within ~24 h). Re-measure 26 Sep (scheduled). If it hasn't dropped: stop computing facet counts on filtered views for crawlers, or precompute per-sub-category hood counts.
+
+## After — 24 h (to fill in 26 Sep)
