@@ -4845,18 +4845,25 @@ ${LIGHTBOX}
 
 const ALLCATS = (d, faqs) => {
   const totalSubs = (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
-  const mains = [ ...(d.cats || []) ].sort((a, b) => a.name === "Other" ? 1 : b.name === "Other" ? -1 : b.n - a.n);
+  const shuffled = (() => {
+    const rest = (d.cats || []).filter(c => c.name !== "Other");
+    const other = (d.cats || []).filter(c => c.name === "Other");
+    const a = [ ...rest ];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [ a[j], a[i] ];
+    }
+    return [ ...a, ...other ];
+  })();
   return PAGE(d, {
     title: SEOTXT("categories", `All business categories in ${S.city} | ${S.brand}`, `Browse every business category in ${S.city} — ${totalSubs} categories covering ${NUM(d.count)} local listings.`).title,
     desc: SEOTXT("categories", `All business categories in ${S.city} | ${S.brand}`, `Browse every business category in ${S.city} — ${totalSubs} categories covering ${NUM(d.count)} local listings.`).desc,
     can: S.dom + "/categories",
     ld: [ FAQLD(faqs), SEOLD("categories") ].filter(Boolean),
-    body: `<style>.mcats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:40px}.mcat{background:${T.card};border:1px solid ${T.line};border-radius:16px;overflow:hidden;display:flex;flex-direction:column}.mcat-img{display:block;position:relative;aspect-ratio:16/9;overflow:hidden;color:#fff;text-decoration:none}.mcat-img img,.mcat-img .fill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:34px}.mcat-img:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(10,20,40,.78))}.mcat-img b{position:absolute;left:14px;right:14px;bottom:10px;z-index:1;font-family:Fraunces,serif;font-size:19px;line-height:1.2}.mcat-b{padding:12px 14px 16px}.mcat-n{font-size:13px;color:${T.muted};margin-bottom:10px}.mcat-subs{display:flex;flex-wrap:wrap;gap:6px}.mcat-subs a{font-size:12px;background:${T.sand};color:${T.body};border-radius:99px;padding:4px 10px;text-decoration:none}.mcat-subs a.more{background:none;color:${T.coral};font-weight:600;padding-left:2px}@media(max-width:1000px){.mcats{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.mcats{grid-template-columns:1fr}}</style>\n<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / Categories</nav>\n<div style="padding:14px 0 26px"><div class="kicker">Browse</div><h1>All categories</h1>\n<p style="color:${T.body};margin-top:8px">${NUM(mains.length)} main categories · ${NUM(totalSubs)} categories · ${NUM(d.count)} listings</p></div>\n<div class="mcats">${mains.map(c => {
+    body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / Categories</nav>\n<div style="padding:14px 0 26px"><div class="kicker">Browse</div><h1>All categories</h1>\n<p style="color:${T.body};margin-top:8px">${NUM(totalSubs)} categories · ${NUM(d.count)} listings</p></div>\n<div class="cats" style="margin-bottom:40px">${shuffled.map((c, i) => {
       const img = CATIMG_SET(c.slug);
       const p = panelOf(c.slug);
-      const subs = (c.subs || []).filter(sb => sb.name && sb.name.indexOf(",") < 0).slice(0, 4);
-      const more = (c.subs || []).length - subs.length;
-      return `<div class="mcat"><a class="mcat-img" href="/${E(c.slug)}">${img ? `<img src="${E(img)}" alt="${E(c.name)} in ${E(S.city)}" loading="lazy">` : `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]})">${IC[c.slug] || "📍"}</span>`}<b>${E(c.name)}</b></a>\n<div class="mcat-b"><div class="mcat-n">${NUM(c.n)} listing${c.n === 1 ? "" : "s"}</div><div class="mcat-subs">${subs.map(sb => `<a href="/${E(c.slug)}/${E(SLUG(sb.name))}">${E(sb.name)}</a>`).join("")}${more > 0 ? `<a class="more" href="/${E(c.slug)}">+ ${NUM(more)} more →</a>` : ""}</div></div></div>`;
+      return `<a class="cat${i % 6 === 0 ? " big" : ""}" href="/${E(c.slug)}">\n${img ? `<img src="${E(img)}" alt="${E(c.name)} in ${E(S.city)}" loading="lazy">` : `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]});color:#fff">${IC[c.slug] || "📍"}</span>`}\n<b>${E(c.name)}</b></a>`;
     }).join("")}</div>\n${FAQBLOCK(faqs)}\n</div>`
   });
 };
@@ -5618,7 +5625,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.86-shared";
+const BUILD = "v15.87-shared";
 
 const APP_COOKIE = "gl_app";
 
