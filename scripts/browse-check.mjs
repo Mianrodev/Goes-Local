@@ -8,6 +8,7 @@ import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { readFileSync, mkdirSync } from "node:fs";
 import { parse } from "smol-toml";
+import { createHash } from "node:crypto";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(execSync("npm root -g").toString().trim() + "/playwright");
@@ -24,7 +25,8 @@ try {
 } catch {}
 
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args, proxy: process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY } : undefined });
-const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+const CHECK = createHash("sha256").update("gl-check:" + (process.env.ADMIN_LOGIN_KEY || "")).digest("hex").slice(0, 32);
+const page = await (await b.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: { "x-gl-check": CHECK } })).newPage();
 const errors = [], out = [];
 page.on("pageerror", e => errors.push("JS: " + e.message));
 page.on("response", r => { if (r.status() >= 500 && r.url().startsWith(base)) errors.push(r.status() + " " + r.url()); });

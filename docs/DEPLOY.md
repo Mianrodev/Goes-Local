@@ -32,6 +32,8 @@ npm run browse-check -- orlando       # real headless-Chromium click-through + s
 - Token permissions in use: Account D1 Edit, Workers Scripts Edit, Workers KV Storage Edit, Account Settings Read, Workers Tail Read; Zone Read; User Details Read, Memberships Read. Not granted: Workers Observability (logs query API) — ask for it when investigating errors.
 - `wrangler tail` doesn't connect from the sandbox (long-lived websocket through the proxy). To confirm cron still runs after a deploy, watch the `sync:progress` key in the city's SESSIONS KV namespace change.
 - Headless Chromium must trust the egress proxy CA; `scripts/browse-check.mjs` passes its SPKI pin.
+- The sandbox egresses from Google Cloud (ASN 396982), which the WAF challenges. Our scripts send `x-gl-check: <sha256("gl-check:"+ADMIN_LOGIN_KEY)[:32]>`, which the WAF rules exempt (see `scripts/security-rules.mjs`). Plain `curl` without that header gets a 403 challenge — add the header.
+- Token also has Zone WAF / Bot Management / Firewall Services Edit (added 25 Sep).
 
 ## Live settings worth knowing (read 2026-09-25)
 - Orlando Variables: ADMIN_LOGIN_KEY (plain text — visible in the dashboard, unlike Miami's Secret), CITY_BRAND, CITY_COUNTY, CITY_DOMAIN, CITY_FROM_EMAIL, CITY_FROM_NAME, CITY_GA_IDS, CITY_NAME, CITY_STATE, CITY_TAGLINE. Secrets: GHL_API_TOKEN, GHL_LOCATION_ID.

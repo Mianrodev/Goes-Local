@@ -5,6 +5,7 @@
 // Needs ADMIN_LOGIN_KEY (same key on every city).
 import { readFileSync } from "node:fs";
 import { parse } from "smol-toml";
+import { createHash } from "node:crypto";
 
 const [city, expected] = process.argv.slice(2);
 const doMigrate = !process.argv.includes("--no-migrate");
@@ -12,18 +13,19 @@ const KEY = process.env.ADMIN_LOGIN_KEY;
 if (!city || !expected) { console.error("usage: migrate-verify.mjs <city> <version> [--no-migrate]"); process.exit(2); }
 if (!KEY) { console.error("ADMIN_LOGIN_KEY is not set."); process.exit(2); }
 
+const CHECK = createHash("sha256").update("gl-check:" + KEY).digest("hex").slice(0, 32);
 const cfg = parse(readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8"));
 const route = (cfg.env[city].routes || []).find(r => r.custom_domain) || cfg.env[city].routes[0];
 const base = "https://" + route.pattern.replace(/\/.*$/, "");
 
 const login = await fetch(base + "/admin/login", {
-  method: "POST", redirect: "manual",
+  method: "POST", redirect: "manual", headers: { "x-gl-check": CHECK },
   body: new URLSearchParams({ as: "admin", key: KEY })
 });
 const cookie = (login.headers.getSetCookie?.() || [login.headers.get("set-cookie") || ""]).map(c => c.split(";")[0]).find(c => c.startsWith("gl_adm="));
 if (login.status !== 302 || !cookie) { console.error(`✗ ${city}: admin login failed (HTTP ${login.status})`); process.exit(1); }
 const get = async p => {
-  const r = await fetch(base + p + (p.includes("?") ? "&" : "?") + "t=" + Date.now(), { headers: { cookie, "cache-control": "no-cache" }, redirect: "manual" });
+  const r = await fetch(base + p + (p.includes("?") ? "&" : "?") + "t=" + Date.now(), { headers: { cookie, "cache-control": "no-cache", "x-gl-check": CHECK }, redirect: "manual" });
   return { status: r.status, text: await r.text() };
 };
 

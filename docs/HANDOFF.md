@@ -201,6 +201,7 @@ History: v15.76 CRM Business Name on existing contacts → v15.77 GA IDs to `CIT
 6. Copy Miami's `content_images` rows and verify URLs; copy the 10 `hero_slides` URLs matched to Tampa titles and enable them.
 7. Neighbourhoods via `/admin/hoods` (Downtown, Ybor City, Hyde Park, South Tampa, Seminole Heights, Carrollwood, New Tampa, Brandon).
 8. Point the domain, `/admin/sync`, check `/categories` and homepage visually.
+8b. **Bot protection (required):** `node scripts/security-rules.mjs <newcity>goeslocal.com` — adds the scraper block, cloud-network challenge, filter-crawl challenge and rate limit, with webhooks/admin exempt. Do **not** turn on Bot Fight Mode (free plan can't exempt webhooks).
 9. **Payment links decision first:** the four FastPayDirect links (`FEATURED_PAY_URL`, `FEATURED_PAY_URL_ANNUAL`, `PREMIUM_PAY_URL`, `PREMIUM_PAY_URL_ANNUAL`, ~line 3493) are hardcoded and shared — Orlando currently sends upgrades through Miami's links, and Orlando has no `PAYMENT_WEBHOOK_KEY`. Either intended (one merchant) or they become `CITY_PAY_*` variables. Ask Eric.
 
 Decision on record: once a new city is proven on the shared setup, Miami stays on it too — no separate Miami branch.
