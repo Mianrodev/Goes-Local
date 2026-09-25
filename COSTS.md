@@ -61,3 +61,18 @@ Note: a separate database `lead-scraper-db` (not Goes Local) was created on 25 S
 | 2535 | 11M | `SELECT * FROM businesses WHERE cs=? ORDER BY premium DESC, claimed DESC, rat DESC, rev DESC LIMIT ?` |
 | 4013 | 10M | `SELECT sub,COUNT(*) n FROM businesses WHERE cs=?1 AND hood=?2 AND rat>=?3 AND claimed=?4 AND sub<>'' GROUP BY sub` |
 | 3073 | 6M | `SELECT sub,COUNT(*) n FROM businesses WHERE cs=?1 AND rat>=?2 AND sub<>'' GROUP BY sub` |
+
+## Changes shipped 25 Sep 2026 (evening)
+
+| Version | Time (UTC) | What | Expected effect |
+|---|---|---|---|
+| v15.84 | 19:05–19:15 | Edge cache (Cache API) for public pages, 1 h (home 10 min, blog/news 15 min, sitemaps 12 h); junk/tracking params ignored in the key | Repeat hits (mostly bots) skip D1 entirely |
+| — | ~18:50 | 4 indexes created live on both D1s (`ix_cs_hood_sub`, `ix_cs_sub_rank`, `ix_cs_rank`, `ix_cs_related`) — one-off ~62k rows written each city | Filter counts / listing lists read tens of rows instead of whole categories |
+| v15.85 | 19:25–19:40 | `shell()` counts shared via `meta.shell_v1` (30 min); no FTS rebuild per `insertOne`; FTS rebuild only when something changed; invite job ≤ once/6 h per business; view tracking moved to a browser beacon | Removes ~1B rows/day (Miami shell scans), ~2.8k rebuilds/day, most GHL calls |
+| v15.86 | 19:50 | robots.txt also blocks `hood`/`sub` filters and `/search`, `Crawl-delay: 5`; `X-Robots-Tag: noindex, follow` on filtered views; `rel=nofollow` on filter links | Crawlers stop walking filter combinations (Applebot re-reads robots.txt within ~a day) |
+
+Already in place: $10 total-spend budget alert (auto-created) on the account.
+
+Pending: Phase A (Bot Fight Mode, WAF rules, rate limit) — token lacks Zone WAF/Bot permissions. Phase C step 8 (shorten combined sub-category URLs) — needs Eric's decision.
+
+## After — to be filled in
