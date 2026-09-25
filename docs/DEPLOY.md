@@ -44,4 +44,4 @@ npm run browse-check -- orlando       # real headless-Chromium click-through + s
 - [x] `wrangler.toml` written with the known D1 and KV ids; dry-run bundles both cities correctly.
 - [x] `wrangler.toml` filled from the live Workers (compat dates, binding names, cron, custom domains, workers.dev on, logs on); `check-live` passes for both.
 - [x] Orlando: no-change v15.79 deploy on 2026-09-25 15:34Z — settings identical before/after, migrate + /debug OK, browser click-through OK, full sync completed 15:45Z.
-- [ ] Miami: same.
+- [x] Miami: no-change v15.79 deploy on 2026-09-25 15:47Z — same checks passed; new sync pass started 15:50Z.
