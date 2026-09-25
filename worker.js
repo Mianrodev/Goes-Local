@@ -5625,7 +5625,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.88-shared";
+const BUILD = "v15.89-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -5663,20 +5663,26 @@ const _export = {
       } catch (e) {
         console.log("cron import batch failed: " + e.message);
       }
+      let hourly = false;
       try {
-        const gp = await gpSyncBatch(env, DB, 5);
+        const hr = await DB.prepare("SELECT v FROM meta WHERE k='cron_hourly_at'").first();
+        hourly = !hr || Date.now() - +hr.v >= 55 * 60 * 1e3;
+        if (hourly) await DB.prepare("INSERT INTO meta(k,v) VALUES('cron_hourly_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(Date.now())).run();
+      } catch {}
+      if (hourly) try {
+        const gp = await gpSyncBatch(env, DB, 60);
         if (gp.done) console.log(`cron: refreshed Google reviews for ${gp.done} listings, ${gp.left} left`);
       } catch (e) {
         console.log("cron google-reviews batch failed: " + e.message);
       }
-      try {
-        const uf = await urlFieldSyncBatch(env, DB, 20);
+      if (hourly) try {
+        const uf = await urlFieldSyncBatch(env, DB, 100);
         if (uf.error) console.log("cron listing-url batch: " + uf.error); else if (uf.done) console.log(`cron: wrote Listing URL for ${uf.done} businesses, ${uf.left} left`);
       } catch (e) {
         console.log("cron listing-url batch failed: " + e.message);
       }
-      try {
-        const rc = await expireRecentlyClaimedBatch(env, DB, 20);
+      if (hourly) try {
+        const rc = await expireRecentlyClaimedBatch(env, DB, 100);
         if (rc.done) console.log(`cron: expired Recently Claimed tag for ${rc.done} businesses (30+ days), ${rc.left} left`);
       } catch (e) {
         console.log("cron Recently Claimed expiry failed: " + e.message);
