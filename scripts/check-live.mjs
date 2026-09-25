@@ -33,7 +33,13 @@ for (const name of envs) {
   want("compatibility_date", s.compatibility_date, e.compatibility_date ?? cfg.compatibility_date);
   const liveFlags = s.compatibility_flags || [], fileFlags = e.compatibility_flags ?? cfg.compatibility_flags ?? [];
   if (!same(liveFlags, fileFlags)) problems.push(`compatibility_flags: live=${JSON.stringify(liveFlags)} toml=${JSON.stringify(fileFlags)}`);
-  want("observability.enabled", !!(s.observability && s.observability.enabled), !!(e.observability && e.observability.enabled));
+  const o = s.observability || {}, fo = e.observability || {};
+  want("observability.enabled", !!o.enabled, !!fo.enabled);
+  want("observability.logs.enabled", !!(o.logs && o.logs.enabled), !!(fo.logs && fo.logs.enabled));
+  want("observability.logs.invocation_logs", !!(o.logs && o.logs.invocation_logs), !!(fo.logs && fo.logs.invocation_logs));
+  want("observability.traces.enabled", !!(o.traces && o.traces.enabled), !!(fo.traces && fo.traces.enabled));
+  if (s.logpush) problems.push("logpush is on live but not described in wrangler.toml");
+  if ((s.tail_consumers || []).length) problems.push("tail consumers are set live but not described in wrangler.toml");
 
   const b = s.bindings || [];
   const d1 = b.filter(x => x.type === "d1").map(x => ({ binding: x.name, id: x.id || x.database_id }));
@@ -58,7 +64,7 @@ for (const name of envs) {
   want("preview_urls", !!sub.previews_enabled, e.preview_urls ?? cfg.preview_urls ?? !!(e.workers_dev ?? true));
 
   const routes = e.routes || [];
-  const doms = (await api(`/accounts/${ACCOUNT}/workers/domains?service=${script}`)).map(x => x.hostname);
+  const doms = (await api(`/accounts/${ACCOUNT}/workers/domains`)).filter(x => x.service === script).map(x => x.hostname);
   const fileDoms = routes.filter(r => r.custom_domain).map(r => r.pattern);
   if (!same(doms, fileDoms)) problems.push(`custom domains: live=${JSON.stringify(doms)} toml=${JSON.stringify(fileDoms)}`);
 

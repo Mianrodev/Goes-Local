@@ -29,5 +29,5 @@ npx wrangler rollback --env orlando   # undo the last deploy on one city
 ## First-time setup status (2026-09-25)
 - [x] Live code pulled from both Workers — identical, committed and tagged `v15.79-shared`.
 - [x] `wrangler.toml` written with the known D1 and KV ids; dry-run bundles both cities correctly.
-- [ ] Fill the `CHECK_LIVE` values (compatibility date, binding names, cron, domains, workers.dev) from `npm run check-live`. Needs the API token.
+- [x] `wrangler.toml` filled from the live Workers (compat dates, binding names, cron, custom domains, workers.dev on, logs on); `check-live` passes for both.
 - [ ] No-change deploy of v15.79 to Orlando, verify, then Miami.
