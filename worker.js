@@ -5627,7 +5627,7 @@ const _export = {
     const DB = getDB(env);
     if (DB) await catImgOverrides(DB);
     if (DB) await seoOverrides(DB);
-    if (u.pathname === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /admin\nDisallow: /manage/\nDisallow: /manage\n\nUser-agent: GPTBot\nAllow: /\n\nUser-agent: ChatGPT-User\nAllow: /\n\nUser-agent: OAI-SearchBot\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /\n\nUser-agent: Claude-User\nAllow: /\n\nUser-agent: Claude-SearchBot\nAllow: /\n\nUser-agent: PerplexityBot\nAllow: /\n\nUser-agent: Google-Extended\nAllow: /\n\nSitemap: ${S.dom}/sitemap-index.xml`, {
+    if (u.pathname === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\nDisallow: /admin/\nDisallow: /admin\nDisallow: /manage/\nDisallow: /manage\n\nUser-agent: GPTBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: ChatGPT-User\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: OAI-SearchBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: ClaudeBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: Claude-User\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: Claude-SearchBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: PerplexityBot\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nUser-agent: Google-Extended\nAllow: /\nDisallow: /*?*rating=\nDisallow: /*?*claim=\nDisallow: /*?*sort=\n\nSitemap: ${S.dom}/sitemap-index.xml`, {
       headers: {
         "content-type": "text/plain; charset=utf-8"
       }
@@ -8008,7 +8008,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (u.pathname === "/debug") {
       if (!await isAdmin(env, req, u)) return Response.redirect(AUTH.SITE_URL + "/admin/login", 302);
       const o = [];
-      o.push("VERSION: v15.80-shared");
+      o.push("VERSION: v15.81-shared");
       o.push("TOKEN: " + (env.GHL_API_TOKEN ? `present (len ${env.GHL_API_TOKEN.length})` : "MISSING"));
       o.push("LOCATION: " + (env.GHL_LOCATION_ID || "MISSING"));
       o.push("ADMIN_LOGIN_KEY: " + (env.ADMIN_LOGIN_KEY ? "present" : "MISSING"));
@@ -9876,9 +9876,9 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (p[0] === "add") return R(ADD(d));
     if (p[0] === "blog" && !p[1]) {
       const activeCat = u.searchParams.get("cat") || "";
-      const posts = DB ? (activeCat ? await DB.prepare("SELECT * FROM posts WHERE published=1 AND archived=0 AND blog_cat=?1 ORDER BY created_at DESC LIMIT 60").bind(activeCat).all().catch(() => ({
+      const posts = DB ? (activeCat ? await DB.prepare("SELECT id,slug,title,excerpt,cover_image,blog_cat,author,created_at FROM posts WHERE published=1 AND archived=0 AND blog_cat=?1 ORDER BY created_at DESC LIMIT 60").bind(activeCat).all().catch(() => ({
         results: []
-      })) : await DB.prepare("SELECT * FROM posts WHERE published=1 AND archived=0 ORDER BY created_at DESC LIMIT 60").all().catch(() => ({
+      })) : await DB.prepare("SELECT id,slug,title,excerpt,cover_image,blog_cat,author,created_at FROM posts WHERE published=1 AND archived=0 ORDER BY created_at DESC LIMIT 60").all().catch(() => ({
         results: []
       }))).results || [] : [];
       const catRows = DB ? (await DB.prepare("SELECT DISTINCT blog_cat FROM posts WHERE published=1 AND archived=0 AND blog_cat<>'' ORDER BY blog_cat").all().catch(() => ({
@@ -9887,7 +9887,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       return R(BLOGINDEX(d, posts, catRows.map(r => r.blog_cat), activeCat));
     }
     if (p[0] === "news" && !p[1]) {
-      const items = DB ? (await DB.prepare("SELECT * FROM news WHERE published=1 ORDER BY created_at DESC LIMIT 60").all().catch(() => ({
+      const items = DB ? (await DB.prepare("SELECT id,slug,title,summary,image_url,author,source_name,created_at FROM news WHERE published=1 ORDER BY created_at DESC LIMIT 60").all().catch(() => ({
         results: []
       }))).results || [] : [];
       return R(NEWSINDEX(d, items));
