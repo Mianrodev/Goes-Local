@@ -457,17 +457,48 @@ const SUBMAP = (() => {
 
 const KW = [ [ /school|academy|tutor|college|kindergarten|day care|education|university/i, "Childcare & Education" ], [ /restaurant|diner|eatery|steak|sushi|pizza|taco|buffet|grill/i, "Restaurants & Dining" ], [ /bar$|pub|nightclub|brewery|cocktail|lounge/i, "Nightlife & Bars" ], [ /store|shop$|boutique|retail|market$/i, "Shopping & Boutiques" ], [ /doctor|clinic|physician|hospital|medical|surgeon|therapist|pharmacy/i, "Medical & Healthcare" ], [ /dentist|dental|orthodont/i, "Dental Care" ], [ /contractor|construction|builder|roofing|remodel|refurbish|swimming pool/i, "Contractors & Construction" ], [ /salon|barber|spa|beauty|nail|hair/i, "Beauty & Personal Care" ], [ /lawyer|attorney|legal|law /i, "Legal Services" ], [ /insurance/i, "Insurance" ], [ /bank|tax|account|financial|loan|credit/i, "Financial Services" ], [ /gym|fitness|yoga|pilates|martial arts/i, "Fitness & Wellness" ], [ /hotel|motel|resort|inn$|hostel/i, "Hotels & Hospitality" ], [ /boat|marine|yacht|marina/i, "Boating & Marine" ], [ /vet|pet|animal|kennel|groom/i, "Pet Services" ], [ /car |auto |mechanic|tire|towing/i, "Automotive Repair & Services" ], [ /mover|moving|storage/i, "Moving & Storage" ], [ /clean|janitor|maid|home help/i, "Cleaning & Janitorial" ], [ /landscap|lawn|tree |garden|nursery/i, "Landscaping & Outdoor" ], [ /cafe|coffee|bakery|bakeries|dessert|ice cream|patisserie/i, "Cafes, Bakery & Desserts" ], [ /grocer|supermarket|butcher|deli|food store/i, "Groceries & Specialty Food" ], [ /real estate|realtor|apartment|property manage/i, "Real Estate & Housing" ], [ /travel|airport|taxi|transport|limousine|bus /i, "Travel & Transportation" ], [ /market|advertis|seo|web design|media|design agency/i, "Marketing & Digital" ], [ /wedding|event|caterer|catering|banquet/i, "Events, Weddings & Catering" ], [ /museum|park|golf|bowling|theater|theatre|tour|zoo|stadium/i, "Attractions, Sports & Leisure" ], [ /repair|handyman|plumber|electrician|electrical|hvac|air condition|pest|paint|water damage|restoration|drainage|pipe|home automation|interior design/i, "Home Repair & Maintenance" ] ];
 
+const KW2 = [ [ /dealer\b/i, "Auto Sales & Rental" ], [ /window tint|vehicle wrap|wheel alignment|engine rebuild|gas station|diesel fuel|truck parts|salvage yard|junkyard|battery wholesal|auto glass/i, "Automotive Repair & Services" ], [ /turf|\bsod\b|pond|orchid|artificial plant|interior plant/i, "Landscaping & Outdoor" ], [ /party|audiovisual|stage lighting|portable toilet/i, "Events, Weddings & Catering" ], [ /locksmith|key duplication|chimney|property maintenance|security system|fire protection|septic|air filter|heating equipment|appliance|professional organizer|interior decorat/i, "Home Repair & Maintenance" ], [ /window|door|floor|cabinet|carpent|woodwork|welder|welding|fabricat|glass|awning|patio|stone|granite|marble|tile|ceramic|building material|building firm|sandblast|solar|surveyor|drafting|aluminum|metal supplier|wood supplier|lumber|dumpster|debris|equipment rental|soil testing/i, "Contractors & Construction" ], [ /laundr|dry clean/i, "Cleaning & Janitorial" ], [ /swim club|\bclub\b|art studio|artist/i, "Attractions, Sports & Leisure" ], [ /flower|florist|tailor|fabric/i, "Shopping & Boutiques" ], [ /manufactur|wholesal|supplier|distribut|shipping|corporate office|training center|industr|energy|oil|natural gas|foundation|electronic parts/i, "Professional & B2B" ] ];
+
+let CATMAP = {
+  t: 0,
+  d: {}
+};
+
+async function loadCatMap(DB) {
+  const now = Date.now();
+  if (!DB || now - CATMAP.t < 60 * 1e3) return CATMAP.d;
+  try {
+    const d = {};
+    for (const r of (await DB.prepare("SELECT sub_slug, main FROM category_map").all()).results || []) d[r.sub_slug] = r.main;
+    CATMAP = {
+      t: now,
+      d: d
+    };
+  } catch {
+    CATMAP.t = now;
+  }
+  return CATMAP.d;
+}
+
+const allMains = () => [ ...new Set([ ...MAINS, ...Object.values(CATMAP.d) ]) ].filter(m => m && m !== "Other");
+
 function mainOf(sub) {
   if (!sub) return "Other";
   const s = SL(sub);
   if (!s) return "Other";
+  if (CATMAP.d[s]) return CATMAP.d[s];
   if (SUBMAP[s]) return SUBMAP[s];
   for (const [re, m] of KW) if (re.test(sub)) return m;
-  return TC(sub);
+  for (const part of String(sub).split(",").map(x => SL(x)).filter(Boolean)) {
+    if (CATMAP.d[part]) return CATMAP.d[part];
+    if (SUBMAP[part]) return SUBMAP[part];
+  }
+  for (const [re, m] of KW2) if (re.test(sub)) return m;
+  return "Other";
 }
 
 async function validCategory(DB, category) {
-  if (MAINS.includes(category) || category === "Other") return category;
+  if (allMains().includes(category) || category === "Other") return category;
   if (!DB || !category) return "Other";
   try {
     const row = await DB.prepare("SELECT 1 FROM businesses WHERE cat=?1 LIMIT 1").bind(category).first();
@@ -943,9 +974,11 @@ function norm(c, m) {
   const v = cv(c, m);
   const name = P(v, "business name", "company name") || c.companyName || [ c.firstNameRaw || c.firstName, c.lastNameRaw || c.lastName ].filter(Boolean).join(" ").trim() || c.contactName || "Unnamed";
   const rawSub = P(v, "category", "business category", "primary category", "main category") || PC(v, "gbp category", "lead category", "category");
-  let cat = rawSub === "Other" || MAINS.includes(rawSub) ? rawSub : mainOf(rawSub);
-  if (!rawSub) {
-    const tagCat = MAINS.find(m => (c.tags || []).some(t => String(t).trim().toLowerCase() === m.toLowerCase())) || ((c.tags || []).some(t => String(t).trim().toLowerCase() === "other") ? "Other" : "");
+  const subField = P(v, "subcategory", "sub category", "secondary category");
+  const override = CATMAP.d[SL(subField || "")] || CATMAP.d[SL(rawSub || "")];
+  let cat = override || (rawSub === "Other" || allMains().includes(rawSub) ? rawSub : mainOf(rawSub));
+  if (!rawSub && !override) {
+    const tagCat = allMains().find(m => (c.tags || []).some(t => String(t).trim().toLowerCase() === m.toLowerCase())) || ((c.tags || []).some(t => String(t).trim().toLowerCase() === "other") ? "Other" : "");
     if (tagCat) cat = tagCat;
   }
   const sub = P(v, "subcategory", "sub category", "secondary category") || rawSub || "";
@@ -1358,6 +1391,9 @@ async function migrate(DB, env) {
     await DB.prepare("ALTER TABLE site_seo ADD COLUMN custom_schema TEXT DEFAULT ''").run();
   } catch {}
   try {
+    await DB.prepare("CREATE TABLE IF NOT EXISTS category_map(sub_slug TEXT PRIMARY KEY, sub TEXT DEFAULT '', main TEXT NOT NULL, updated_at INTEGER)").run();
+  } catch {}
+  try {
     await seedStarterContent(DB, env);
   } catch (e) {
     console.log("seedStarterContent failed: " + e.message);
@@ -1751,6 +1787,7 @@ async function processImportBatch(env, DB, limit) {
 
 async function syncStep(env, DB, maxPages) {
   const t0 = Date.now();
+  await loadCatMap(DB);
   const KV = KVOF(env);
   if (KV) {
     const held = await KV.get("sync:lock");
@@ -2024,6 +2061,7 @@ async function recordSlugChange(DB, ghlId, oldCs, oldSlug, newCs, newSlug) {
 
 async function refreshOne(env, DB, ghlId, expect) {
   if (!DB || !ghlId) return false;
+  await loadCatMap(DB);
   let m = {};
   try {
     m = await fields(env);
@@ -2070,6 +2108,7 @@ async function refreshOne(env, DB, ghlId, expect) {
 
 async function insertOne(env, DB, ghlId, pre) {
   if (!DB || !ghlId) return false;
+  await loadCatMap(DB);
   let m = {};
   try {
     m = await fields(env);
@@ -2496,7 +2535,7 @@ async function startAdminSession(env, role) {
 
 const listingItems = [ [ "/admin/pending", "Pending listings" ], [ "/admin/claims", "Claims queue" ], [ "/admin/cancellations", "Cancellations" ], [ "/admin/deletions", "Deletion requests" ], [ "/admin/adrequests", "Ad space requests" ], [ "/admin/businesses", "Businesses" ] ];
 
-const contentItems = [ [ "/admin/comments", "Comments" ], [ "/admin/hero", "Homepage hero" ], [ "/admin/images", "Category images" ], [ "/admin/banner-images", "Category banner photos" ], [ "/admin/hoods", "Neighbourhoods" ], [ "/admin/ads", "Ad slots" ], [ "/admin/banners", "Category banners" ], [ "/admin/claiminvites", "Claim invites" ] ];
+const contentItems = [ [ "/admin/comments", "Comments" ], [ "/admin/hero", "Homepage hero" ], [ "/admin/categories", "Categories" ], [ "/admin/images", "Category images" ], [ "/admin/banner-images", "Category banner photos" ], [ "/admin/hoods", "Neighbourhoods" ], [ "/admin/ads", "Ad slots" ], [ "/admin/banners", "Category banners" ], [ "/admin/claiminvites", "Claim invites" ] ];
 
 const seoItems = [ [ "/admin/seo", "SEO" ], [ "/admin/blog", "Blog" ], [ "/admin/news", "News" ], [ "/admin/faqs", "Category FAQs" ], [ "/admin/hoodfaqs", "Neighbourhood FAQs" ] ];
 
@@ -4766,25 +4805,18 @@ ${LIGHTBOX}
 
 const ALLCATS = (d, faqs) => {
   const totalSubs = (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
-  const shuffled = (() => {
-    const rest = (d.cats || []).filter(c => c.name !== "Other");
-    const other = (d.cats || []).filter(c => c.name === "Other");
-    const a = [ ...rest ];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [ a[j], a[i] ];
-    }
-    return [ ...a, ...other ];
-  })();
+  const mains = [ ...(d.cats || []) ].sort((a, b) => a.name === "Other" ? 1 : b.name === "Other" ? -1 : b.n - a.n);
   return PAGE(d, {
     title: SEOTXT("categories", `All business categories in ${S.city} | ${S.brand}`, `Browse every business category in ${S.city} — ${totalSubs} categories covering ${NUM(d.count)} local listings.`).title,
     desc: SEOTXT("categories", `All business categories in ${S.city} | ${S.brand}`, `Browse every business category in ${S.city} — ${totalSubs} categories covering ${NUM(d.count)} local listings.`).desc,
     can: S.dom + "/categories",
     ld: [ FAQLD(faqs), SEOLD("categories") ].filter(Boolean),
-    body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / Categories</nav>\n<div style="padding:14px 0 26px"><div class="kicker">Browse</div><h1>All categories</h1>\n<p style="color:${T.body};margin-top:8px">${NUM(totalSubs)} categories · ${NUM(d.count)} listings</p></div>\n<div class="cats" style="margin-bottom:40px">${shuffled.map((c, i) => {
+    body: `<style>.mcats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:40px}.mcat{background:${T.card};border:1px solid ${T.line};border-radius:16px;overflow:hidden;display:flex;flex-direction:column}.mcat-img{display:block;position:relative;aspect-ratio:16/9;overflow:hidden;color:#fff;text-decoration:none}.mcat-img img,.mcat-img .fill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:flex;align-items:center;justify-content:center;font-size:34px}.mcat-img:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(10,20,40,.78))}.mcat-img b{position:absolute;left:14px;right:14px;bottom:10px;z-index:1;font-family:Fraunces,serif;font-size:19px;line-height:1.2}.mcat-b{padding:12px 14px 16px}.mcat-n{font-size:13px;color:${T.muted};margin-bottom:10px}.mcat-subs{display:flex;flex-wrap:wrap;gap:6px}.mcat-subs a{font-size:12px;background:${T.sand};color:${T.body};border-radius:99px;padding:4px 10px;text-decoration:none}.mcat-subs a.more{background:none;color:${T.coral};font-weight:600;padding-left:2px}@media(max-width:1000px){.mcats{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.mcats{grid-template-columns:1fr}}</style>\n<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / Categories</nav>\n<div style="padding:14px 0 26px"><div class="kicker">Browse</div><h1>All categories</h1>\n<p style="color:${T.body};margin-top:8px">${NUM(mains.length)} main categories · ${NUM(totalSubs)} categories · ${NUM(d.count)} listings</p></div>\n<div class="mcats">${mains.map(c => {
       const img = CATIMG_SET(c.slug);
       const p = panelOf(c.slug);
-      return `<a class="cat${i % 6 === 0 ? " big" : ""}" href="/${E(c.slug)}">\n${img ? `<img src="${E(img)}" alt="${E(c.name)} in ${E(S.city)}" loading="lazy">` : `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]});color:#fff">${IC[c.slug] || "📍"}</span>`}\n<b>${E(c.name)}</b></a>`;
+      const subs = (c.subs || []).filter(sb => sb.name && sb.name.indexOf(",") < 0).slice(0, 4);
+      const more = (c.subs || []).length - subs.length;
+      return `<div class="mcat"><a class="mcat-img" href="/${E(c.slug)}">${img ? `<img src="${E(img)}" alt="${E(c.name)} in ${E(S.city)}" loading="lazy">` : `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]})">${IC[c.slug] || "📍"}</span>`}<b>${E(c.name)}</b></a>\n<div class="mcat-b"><div class="mcat-n">${NUM(c.n)} listing${c.n === 1 ? "" : "s"}</div><div class="mcat-subs">${subs.map(sb => `<a href="/${E(c.slug)}/${E(SLUG(sb.name))}">${E(sb.name)}</a>`).join("")}${more > 0 ? `<a class="more" href="/${E(c.slug)}">+ ${NUM(more)} more →</a>` : ""}</div></div></div>`;
     }).join("")}</div>\n${FAQBLOCK(faqs)}\n</div>`
   });
 };
@@ -5055,6 +5087,12 @@ const ADMINSEO = (role, err, ok) => { const FB = SEO_FALLBACK(); return `<!DOCTY
   const fb = FB[pg.key] || { title: "", desc: "" };
   return `<div class="blk" style="margin-bottom:22px">\n<h2 style="margin-bottom:2px">${E(pg.label)}</h2>\n<p style="font-size:11.5px;color:${T.faint};margin-bottom:14px">${E(pg.path)}</p>\n<form method="POST" action="/admin/seo/save">\n<input type="hidden" name="page_key" value="${E(pg.key)}">\n<div class="fld2 full"><label>Page title <span id="seoT${pg.key}Count" style="font-weight:400;color:${T.faint}">— shown as the headline in Google search results</span></label>\n<input name="title" id="seoT${pg.key}" maxlength="70" value="${E(cur.title || "")}" placeholder="${E(fb.title)}"></div>\n<div class="fld2 full"><label>Meta description <span id="seoD${pg.key}Count" style="font-weight:400;color:${T.faint}">— shown as the snippet underneath</span></label>\n<textarea name="desc" id="seoD${pg.key}" maxlength="160" placeholder="${E(fb.desc)}">${E(cur.desc || "")}</textarea></div>\n<div class="fld2 full"><label>Custom structured data <span style="font-weight:400;color:${T.faint}">— advanced, optional. Paste raw JSON-LD and it's added to this page, on this city's site only. Leave blank if you don't know what this is.</span></label>\n<textarea name="custom_schema" placeholder='{"@context":"https://schema.org", ...}' style="font-family:monospace;font-size:12.5px;min-height:100px">${E(cur.custom_schema || "")}</textarea></div>\n<script>(function(){\nfunction wire(input,counter,max){\nif(!input||!counter)return;\nfunction upd(){counter.textContent="— "+input.value.length+"/"+max}\ninput.addEventListener("input",upd);upd()}\nwire(document.getElementById("seoT${pg.key}"),document.getElementById("seoT${pg.key}Count"),70);\nwire(document.getElementById("seoD${pg.key}"),document.getElementById("seoD${pg.key}Count"),160);\n})();<\/script>\n<div style="display:flex;gap:8px;align-items:center">\n<button class="btn btn-p btn-sm">Save</button>\n${cur.title || cur.desc || cur.custom_schema ? `<a href="/admin/seo/reset?page_key=${E(pg.key)}" class="btn btn-o btn-sm" style="border-color:#B3261E;color:#B3261E" onclick="return confirm('Clear this page\\'s custom SEO text and structured data, and go back to the generic default?')">Reset to default</a>` : ""}\n</div>\n</form>\n</div>`;
 }).join("")}\n</div></body></html>`; };
+
+const ADMINCATEGORIES = (role, d) => {
+  const opts = sel => [ ...d.mains, "Other" ].map(m => `<option${m === sel ? " selected" : ""}>${E(m)}</option>`).join("");
+  const qs = (o) => "/admin/categories?" + new URLSearchParams(Object.entries({ q: d.q, main: d.main, ...o }).filter(([, v]) => v)).toString();
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Categories — Admin | ${S.brand}</title><style>${CSS}\n.ctab{width:100%;border-collapse:collapse;font-size:13.5px}.ctab td,.ctab th{padding:9px 8px;border-bottom:1px solid ${T.line};text-align:left;vertical-align:middle}.ctab th{font-size:12px;color:${T.muted};font-weight:600}.ctab select,.ctab input{font-size:13px;padding:6px 8px;border:1px solid ${T.line};border-radius:8px;background:#fff}</style></head><body>\n${ADMINNAV("/admin/categories", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:1040px">\n<h1 style="margin-bottom:6px">Categories</h1>\n<p style="color:${T.muted};margin-bottom:18px">Every listing has a <b>business type</b> (like “Plumber” or “Toyota Dealer”) that sits inside one <b>main category</b> (like “Home Repair &amp; Maintenance”). Pick a different main category for any business type here — or type a new main category name to create one. Listings move the next time the listing sync runs (usually within 30 minutes), and their old web addresses forward to the new ones automatically.</p>\n${d.err ? `<div class="note note-err" style="margin-bottom:18px">${E(d.err)}</div>` : ""}${d.ok ? `<div class="note note-ok" style="margin-bottom:18px">Saved — listings move on the next sync.</div>` : ""}\n<h2 style="font-size:17px;margin:6px 0 10px">Main categories on this site</h2>\n<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px">${d.cats.map(c => `<a href="${E(qs({ main: c.name, q: "" }))}" class="chip" style="text-decoration:none${d.main === c.name ? `;border-color:${T.coral};color:${T.coral}` : ""}">${E(c.name)} · ${NUM(c.n)}</a>`).join("")}${d.main || d.q ? `<a href="/admin/categories?all=1" class="chip" style="text-decoration:none">Show all</a>` : ""}</div>\n<form method="GET" action="/admin/categories" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"><input name="q" value="${E(d.q)}" placeholder="Search business types, e.g. dealer" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid ${T.line};border-radius:8px">${d.main ? `<input type="hidden" name="main" value="${E(d.main)}">` : ""}<button class="btn btn-o btn-sm">Search</button></form>\n<p style="font-size:12.5px;color:${T.faint};margin-bottom:8px">${d.main ? `Business types in <b>${E(d.main)}</b>` : d.q ? "Matching business types" : "Biggest business types"} — showing ${NUM(d.rows.length)}${d.rows.length >= 200 ? " (first 200 — search to narrow down)" : ""}.</p>\n<table class="ctab"><tr><th>Business type</th><th>Listings</th><th>Main category now</th><th>Move to</th></tr>\n${d.rows.map(r => `<tr><td>${E(r.sub)}${d.map[SL(r.sub)] ? ` <span class="bdg" style="background:${T.sand}">custom</span>` : ""}</td><td>${NUM(r.n)}</td><td>${E(r.cat)}</td><td><form method="POST" action="/admin/categories/set" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="hidden" name="sub" value="${E(r.sub)}"><input type="hidden" name="back" value="${E(qs({}))}"><select name="main">${opts(d.map[SL(r.sub)] || r.cat)}</select><input name="newmain" placeholder="or new main category" style="width:170px"><button class="btn btn-p btn-sm">Save</button></form></td></tr>`).join("")}</table>\n${d.custom.length ? `<h2 style="font-size:17px;margin:34px 0 10px">Your custom choices (${NUM(d.custom.length)})</h2>\n<table class="ctab"><tr><th>Business type</th><th>Goes into</th><th></th></tr>${d.custom.map(c => `<tr><td>${E(c.sub || c.sub_slug)}</td><td>${E(c.main)}</td><td><form method="POST" action="/admin/categories/unset"><input type="hidden" name="sub_slug" value="${E(c.sub_slug)}"><input type="hidden" name="back" value="${E(qs({}))}"><button class="btn btn-o btn-sm">Undo</button></form></td></tr>`).join("")}</table>` : ""}\n</div></body></html>`;
+};
 
 const ADMINIMAGES = (role, cats, overrides, err, ok) => `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Category images — Admin | ${S.brand}</title><style>${CSS}</style></head><body>\n${ADMINNAV("/admin/images", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:900px">\n<h1 style="margin-bottom:6px">Category tile images</h1>\n<p style="color:${T.muted};margin-bottom:24px">Controls the picture shown for each category — on the homepage tiles, in the "Categories" menu, and in the hero's category cards. A category with no custom image here just uses the site's default picture, so nothing breaks by leaving one unset.</p>\n${err ? `<div class="note note-err" style="margin-bottom:18px">${E(err)}</div>` : ""}\n${ok ? `<div class="note note-ok" style="margin-bottom:18px">Saved.</div>` : ""}\n<div class="rows">\n${cats.map(c => {
   const cur = overrides[c.slug] || "";
@@ -6526,6 +6564,56 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (p[1] === "seo") {
         if (![ "admin", "agent" ].includes(role)) return Response.redirect(AUTH.SITE_URL + "/admin/pending", 302);
         return new Response(ADMINSEO(role, u.searchParams.get("err") || "", u.searchParams.has("ok")), {
+          headers: {
+            "content-type": "text/html;charset=UTF-8",
+            "cache-control": "no-store"
+          }
+        });
+      }
+      if (p[1] === "categories" && [ "set", "unset" ].includes(p[2]) && req.method === "POST") {
+        if (![ "admin", "agent" ].includes(role)) return Response.redirect(AUTH.SITE_URL + "/admin/pending", 302);
+        const f = await req.formData();
+        const backTo = String(f.get("back") || "/admin/categories");
+        const back = q => Response.redirect(AUTH.SITE_URL + (backTo.startsWith("/admin/categories") ? backTo : "/admin/categories") + (backTo.includes("?") ? "&" : "?") + q, 302);
+        try {
+          if (p[2] === "unset") {
+            await DB.prepare("DELETE FROM category_map WHERE sub_slug=?1").bind(String(f.get("sub_slug") || "")).run();
+          } else {
+            const sub = String(f.get("sub") || "").trim().slice(0, 200);
+            const main = (String(f.get("newmain") || "").trim() || String(f.get("main") || "").trim()).replace(/\s+/g, " ").slice(0, 60);
+            if (!sub || !SL(sub)) return back("err=" + encodeURIComponent("Missing business type."));
+            if (!main || !SL(main)) return back("err=" + encodeURIComponent("Choose a main category."));
+            if ([ "admin", "manage", "blog", "news", "categories", "neighbourhood", "neighbourhoods", "search", "pricing", "about", "add", "claim", "claimed", "featured", "advertise", "privacy", "terms", "login", "signup", "account", "api", "auth", "debug" ].includes(SL(main))) return back("err=" + encodeURIComponent("That name is reserved for another page — pick a different main category name."));
+            await DB.prepare("INSERT INTO category_map(sub_slug,sub,main,updated_at) VALUES(?1,?2,?3,?4) ON CONFLICT(sub_slug) DO UPDATE SET sub=excluded.sub,main=excluded.main,updated_at=excluded.updated_at").bind(SL(sub), sub, main, Date.now()).run();
+          }
+        } catch (e) {
+          console.log("admin/categories save failed: " + e.message);
+          return back("err=" + encodeURIComponent(/no such table/i.test(e.message) ? "Run Admin → Migrate once, then try again." : "Couldn't save — " + e.message));
+        }
+        CATMAP.t = 0;
+        return back("ok=1");
+      }
+      if (p[1] === "categories") {
+        if (![ "admin", "agent" ].includes(role)) return Response.redirect(AUTH.SITE_URL + "/admin/pending", 302);
+        const q = String(u.searchParams.get("q") || "").trim().slice(0, 80), main = String(u.searchParams.get("main") || "").trim();
+        const map = await loadCatMap(DB);
+        let custom = [];
+        try {
+          custom = (await DB.prepare("SELECT sub_slug, sub, main FROM category_map ORDER BY main, sub").all()).results || [];
+        } catch {}
+        const cats = (await DB.prepare("SELECT cat name, COUNT(*) n FROM businesses GROUP BY cat ORDER BY n DESC").all()).results || [];
+        const where = [ "sub<>''" ], args = [];
+        if (q) {
+          args.push("%" + q + "%");
+          where.push(`sub LIKE ?${args.length}`);
+        }
+        if (main) {
+          args.push(main);
+          where.push(`cat=?${args.length}`);
+        }
+        const rows = (await DB.prepare(`SELECT sub, cat, COUNT(*) n FROM businesses WHERE ${where.join(" AND ")} GROUP BY sub, cat ORDER BY n DESC LIMIT 200`).bind(...args).all()).results || [];
+        const mains = [ ...new Set([ ...allMains(), ...cats.map(c => c.name) ]) ].filter(m => m && m !== "Other").sort();
+        return new Response(ADMINCATEGORIES(role, { cats: cats, rows: rows, mains: mains, map: map, custom: custom, q: q, main: main, err: u.searchParams.get("err") || "", ok: u.searchParams.has("ok") }), {
           headers: {
             "content-type": "text/html;charset=UTF-8",
             "cache-control": "no-store"
@@ -8008,7 +8096,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (u.pathname === "/debug") {
       if (!await isAdmin(env, req, u)) return Response.redirect(AUTH.SITE_URL + "/admin/login", 302);
       const o = [];
-      o.push("VERSION: v15.81-shared");
+      o.push("VERSION: v15.82-shared");
       o.push("TOKEN: " + (env.GHL_API_TOKEN ? `present (len ${env.GHL_API_TOKEN.length})` : "MISSING"));
       o.push("LOCATION: " + (env.GHL_LOCATION_ID || "MISSING"));
       o.push("ADMIN_LOGIN_KEY: " + (env.ADMIN_LOGIN_KEY ? "present" : "MISSING"));
@@ -10532,6 +10620,11 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           console.log("slug redirect lookup failed (falling through to 404): " + e.message);
         }
       }
+    }
+    if (p.length && p.length <= 2 && !d.cats.some(x => x.slug === p[0])) {
+      const want = p[p.length - 1];
+      const home = d.cats.find(x => (x.subs || []).some(sb => SLUG(sb.name) === want));
+      if (home) return Response.redirect(AUTH.SITE_URL + `/${home.slug}/${want}` + u.search, 301);
     }
     return R(NOTICE(d, "We couldn't find that page", "The page you're looking for doesn't exist or has moved.", "Back to " + S.brand, "/"), 404);
   }
