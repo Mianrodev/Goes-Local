@@ -205,3 +205,6 @@ History: v15.76 CRM Business Name on existing contacts → v15.77 GA IDs to `CIT
 9. **Payment links decision first:** the four FastPayDirect links (`FEATURED_PAY_URL`, `FEATURED_PAY_URL_ANNUAL`, `PREMIUM_PAY_URL`, `PREMIUM_PAY_URL_ANNUAL`, ~line 3493) are hardcoded and shared — Orlando currently sends upgrades through Miami's links, and Orlando has no `PAYMENT_WEBHOOK_KEY`. Either intended (one merchant) or they become `CITY_PAY_*` variables. Ask Eric.
 
 Decision on record: once a new city is proven on the shared setup, Miami stays on it too — no separate Miami branch.
+
+## Duplicate listings (since v15.91)
+Listings with the same name + phone + address show once on the site: the kept copy is chosen claimed → Plus → paid → most reviews. The other copies are hidden (table `dup_hidden`), and their old URLs 301 to the kept one. This runs after every sync pass. You can also run it now at `/admin/duplicates`. `/admin/duplicates?csv=1` downloads the list so the CRM team can merge or delete copies in GoHighLevel. Claimed or paid copies are never hidden. First run on 25 Sep: Orlando hid 837 copies, Miami 3,003.
