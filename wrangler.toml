@@ -41,6 +41,7 @@ workers_dev = true
 preview_urls = false
 routes = [{ pattern = "miamigoeslocal.com", custom_domain = true }]
 triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }   # D1 lives in APAC (Singapore); run the Worker next to it
 
 [env.miami.observability]
 enabled = true
