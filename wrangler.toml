@@ -1,0 +1,46 @@
+# One file (worker.js) deployed once per city. City differences live in the
+# dashboard Variables (CITY_*, GHL tokens, keys) and each city's own D1 — never here.
+#
+# Values marked CHECK_LIVE have not been confirmed against the live Workers yet.
+# `npm run check-live` prints the real values; the deploy script refuses to run
+# while anything here disagrees with what is live.
+
+name = "goes-local"
+main = "worker.js"
+compatibility_date = "CHECK_LIVE"
+keep_vars = true
+no_bundle = true            # upload worker.js exactly as committed, so live code can be diffed against git
+
+[env.orlando]
+name = "goes-local-orlando-api"
+workers_dev = false          # CHECK_LIVE
+preview_urls = false         # CHECK_LIVE
+routes = [{ pattern = "orlandogoeslocal.com", custom_domain = true }]   # CHECK_LIVE (www too?)
+triggers = { crons = ["*/5 * * * *"] }                                  # CHECK_LIVE
+observability = { enabled = true }
+
+[[env.orlando.d1_databases]]
+binding = "CHECK_LIVE"
+database_name = "orlando-directory-db"
+database_id = "25894099-96cd-4431-8930-f21badead15b"
+
+[[env.orlando.kv_namespaces]]
+binding = "CHECK_LIVE"
+id = "99679f634f624df0b542c1e2b21a2480"   # GOES_LOCAL_ORLANDO_SESSIONS
+
+[env.miami]
+name = "goes-local-miami-api"
+workers_dev = false          # CHECK_LIVE
+preview_urls = false         # CHECK_LIVE
+routes = [{ pattern = "miamigoeslocal.com", custom_domain = true }]     # CHECK_LIVE (www too?)
+triggers = { crons = ["*/5 * * * *"] }                                  # CHECK_LIVE
+observability = { enabled = true }
+
+[[env.miami.d1_databases]]
+binding = "CHECK_LIVE"
+database_name = "miami-directory-db"
+database_id = "b0226c38-0b16-45d9-84bf-603435efa245"
+
+[[env.miami.kv_namespaces]]
+binding = "CHECK_LIVE"
+id = "4355959c05424505953f2ccf725eee4c"   # GOES_LOCAL_SESSIONS

@@ -1,0 +1,25 @@
+{
+  "name": "goes-local",
+  "description": "Goes Local city directory — one Cloudflare Worker for every city",
+  "scripts": {
+    "precheck": "node scripts/precheck.mjs",
+    "check-live": "node scripts/check-live.mjs",
+    "deploy": "scripts/deploy.sh",
+    "deploy:orlando": "scripts/deploy.sh orlando",
+    "deploy:miami": "scripts/deploy.sh miami",
+    "verify": "node scripts/migrate-verify.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mianrodev/Goes-Local.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mianrodev/Goes-Local/issues"
+  },
+  "homepage": "https://github.com/Mianrodev/Goes-Local#readme",
+  "devDependencies": {
+    "smol-toml": "^1.9.0",
+    "wrangler": "^4.139.0"
+  },
+  "private": true
+}
