@@ -968,6 +968,50 @@ async function computeBadLogos(DB) {
   return bad.length;
 }
 
+// Scraped contact details that aren't the business's: error-tracker addresses, template placeholders, font
+// designers' credits, a platform's own press address... plus "No Website" and bare platform home pages.
+const JUNK_EMAIL = /sentry|wixpress\.com|@(mystore|example|domain|email|yourdomain|test)\.(com|org|net)$|^(filler|user|name|your-?email|email|test)@|\.(png|jpe?g|gif|webp|svg)$/i;
+let BADEMAIL = new Set;
+
+const junkEmail = e => !e || JUNK_EMAIL.test(String(e).trim()) || BADEMAIL.has(String(e).trim().toLowerCase());
+
+const cleanEmail = e => {
+  const x = String(e || "").trim().replace(/^u003e/i, "");
+  return junkEmail(x) ? "" : x;
+};
+
+const cleanWeb = w => {
+  const x = String(w || "").trim();
+  if (!/\./.test(x) || /\s/.test(x)) return "";
+  try {
+    const u = new URL(/^https?:/i.test(x) ? x : "https://" + x);
+    if (u.pathname.replace(/\/+$/, "") === "" && !u.search && (LOGO_PLATFORMS.test(u.hostname.replace(/^www\./, "")) || /^sites\.google\.com$/i.test(u.hostname))) return "";
+  } catch {
+    return "";
+  }
+  return x;
+};
+
+async function computeBadEmails(DB) {
+  const rows = (await DB.prepare("SELECT email,web,name FROM businesses WHERE email IN (SELECT email FROM businesses WHERE email<>'' GROUP BY email HAVING COUNT(*)>=4)").all()).results || [];
+  const g = new Map;
+  for (const r of rows) {
+    const k = String(r.email).trim().toLowerCase();
+    if (!g.has(k)) g.set(k, []);
+    g.get(k).push(r);
+  }
+  const bad = [];
+  for (const [e, rs] of g) {
+    const ed = e.split("@")[1] || "";
+    const names = new Set(rs.map(r => String(r.name || "").toLowerCase().split(/\s+/)[0])).size;
+    const same = rs.filter(r => r.web && DOM2(r.web) === ed.split(".").slice(-2).join(".")).length;
+    if (names >= 3 && same * 2 < rs.length || LOGO_PLATFORMS.test(ed)) bad.push(e);
+  }
+  await DB.prepare("INSERT INTO meta(k,v) VALUES('bad_emails',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(JSON.stringify(bad)).run();
+  BADLOGO.t = 0;
+  return bad.length;
+}
+
 async function loadBadLogos(DB) {
   if (!DB || Date.now() - BADLOGO.t < 6e5) return;
   BADLOGO.t = Date.now();
@@ -976,6 +1020,8 @@ async function loadBadLogos(DB) {
     const s = new Set(m ? JSON.parse(m.v) : []);
     for (const r of (await DB.prepare("SELECT url FROM logo_check WHERE ok=0").all()).results || []) s.add(r.url);
     BADLOGO.s = s;
+    const me = await DB.prepare("SELECT v FROM meta WHERE k='bad_emails'").first();
+    BADEMAIL = new Set(me ? JSON.parse(me.v) : []);
   } catch {}
 }
 
@@ -2097,6 +2143,7 @@ async function syncStep(env, DB, maxPages) {
     }
     try {
       await computeBadLogos(DB);
+      await computeBadEmails(DB);
     } catch (e) {
       console.log("bad-logo scan failed: " + e.message);
     }
@@ -2160,8 +2207,8 @@ const ROWOF = r => ({
   zip: r.zip,
   ph: r.ph,
   pr: r.pr,
-  email: r.email,
-  web: r.web,
+  email: cleanEmail(r.email),
+  web: cleanWeb(r.web),
   desc: FIXMOJIBAKE(r.descr),
   svc: r.svc ? r.svc.split(", ").filter(Boolean) : [],
   hrs: r.hrs,
@@ -2501,7 +2548,7 @@ async function applyListingVerification(env, DB, cid) {
     // that's entirely ours: it only flips once we've actually sent this exact
     // email, so it's what keeps this from sending twice.
     if (biz && !biz.claim_invited_at) {
-      if (biz.email) {
+      if (biz.email && !junkEmail(biz.email)) {
         const href = `${S.dom}/${biz.cs}/${biz.slug}`;
         const sent = await sendTplEmail(env, DB, biz.email, "claim_invite", {
           business: biz.name,
@@ -3047,7 +3094,7 @@ async function pendingEmailInviteBatch(env, DB, maxUpdates) {
         await DB.prepare("DELETE FROM pending_email_invites WHERE ghl_id=?1").bind(r.ghl_id).run();
         continue;
       }
-      if (!biz.email) continue;
+      if (!biz.email || junkEmail(biz.email)) continue;
       const href = `${S.dom}/${biz.cs}/${biz.slug}`;
       const wasSent = await sendTplEmail(env, DB, biz.email, "claim_invite", {
         business: biz.name,
@@ -4262,7 +4309,7 @@ function claimTier(biz, email) {
     tier: "C",
     reason: "no email"
   };
-  if (biz.email && NRM(biz.email) === e) return {
+  if (biz.email && !junkEmail(biz.email) && NRM(biz.email) === e) return {
     tier: "B",
     reason: "matches email on listing"
   };
@@ -5011,7 +5058,7 @@ function BIZPAGE(d, b, rel, x) {
     body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / <a href="/${E(b.cs)}">${E(b.cat)}</a>${b.hood ? ` / <a href="/neighbourhood/${E(b.hood)}">${E(hoodName(b.hood))}</a>` : ""} / ${E(b.name)}</nav>\n${(() => {
       const sl = bpSl, p = bpPanel;
       return `<div class="lnhead">\n<div class="lnbanner">${sl.cover ? `<img src="${E(sl.cover)}" alt="${E(b.name)}">` : `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]})">${b.ic || "📍"}</span>`}</div>\n</div>`;
-    })()}\n\n<div class="split split-biz"><div>\n<div class="lnrow2">\n<div class="lnphoto">\n<div class="lnavatar">${AVATARIMG(b)}</div>\n</div>\n<div class="lnname" style="flex:1;min-width:180px;padding-bottom:6px">\n<h1 style="font-size:24px;line-height:1.2">${E(b.name)}</h1>\n<div style="margin-top:4px">${b.claimed ? RATE(b) : ""}</div>\n</div>\n</div>\n<div class="blk biz-badges-blk" style="padding:14px 18px;margin-top:10px">\n<span class="pin" style="position:static;display:inline-flex;gap:8px;margin-bottom:6px">${b.plus ? BDG("bdg-plus", "PRO") : b.premium ? BDG("bdg-feat", "PLUS") : ""}${b.claimed ? BDG("bdg-ver", "Verified & Approved", ICO.check) : ""}\n${parseHrs2(b.hrs2) ? `<span id="glOpenBadge" class="bdg" style="background:#eee;color:#555">···</span>` : ""}</span>\n<div class="tagrow">${BDG("bdg-cat", b.cat)}\n${b.hood ? BDG("bdg-cat", hoodName(b.hood)) : ""}</div>${LABELROW(b.labels, 8)}\n</div>\n<div class="blk"><h2>About this business</h2>\n${b.desc ? `<p>${E(b.desc)}</p>` : `<p style="color:${T.muted}">${E(b.name)} is a ${E(b.cat)} business${b.hood ? ` serving the ${E(hoodName(b.hood))} area of ${E(S.city)}` : ` in ${E(b.city || S.city)}, ${E(b.state || S.st)}`}. This page was built from public information and hasn't been confirmed by the owner yet, so some details may be out of date. ${b.claimed ? "" : `<a href="/claim">Are you the owner?</a> Claim this listing for free to add your own description, hours, and photos.`}</p>`}\n<div class="facts">\n${b.claimed ? `<div class="fact"><b>Claimed business</b><span>Owner-verified, details kept current</span></div>` : ""}\n${b.yrs ? `<div class="fact"><b>${E(YRS(b.yrs))}</b><span>Trading history</span></div>` : ""}\n${b.claimed ? STARS(b) : ""}\n</div></div>
+    })()}\n\n<div class="split split-biz"><div>\n<div class="lnrow2">\n<div class="lnphoto">\n<div class="lnavatar">${AVATARIMG(b)}</div>\n</div>\n<div class="lnname" style="flex:1;min-width:180px;padding-bottom:6px">\n<h1 style="font-size:24px;line-height:1.2">${E(b.name)}</h1>\n<div style="margin-top:4px">${b.claimed ? RATE(b) : ""}</div>\n</div>\n</div>\n<div class="blk biz-badges-blk" style="padding:14px 18px;margin-top:10px">\n<span class="pin" style="position:static;display:inline-flex;gap:8px;margin-bottom:6px">${b.plus ? BDG("bdg-plus", "PRO") : b.premium ? BDG("bdg-feat", "PLUS") : ""}${b.claimed ? BDG("bdg-ver", "Verified & Approved", ICO.check) : ""}\n${parseHrs2(b.hrs2) ? `<span id="glOpenBadge" class="bdg" style="background:#eee;color:#555">···</span>` : ""}</span>\n<div class="tagrow">${BDG("bdg-cat", b.cat)}\n${b.hood ? BDG("bdg-cat", hoodName(b.hood)) : ""}</div>${LABELROW(b.labels, 8)}\n</div>\n<div class="blk"><h2>About this business</h2>\n${b.desc ? `<p>${E(b.desc)}</p>` : `<p style="color:${T.muted}">${E(b.name)} is ${/^[aeiou]/i.test(b.cat || "") ? "an" : "a"} ${E(b.cat)} business${b.hood ? ` serving the ${E(hoodName(b.hood))} area of ${E(S.city)}` : ` in ${E(b.city || S.city)}, ${E(b.state || S.st)}`}. This page was built from public information and hasn't been confirmed by the owner yet, so some details may be out of date. ${b.claimed ? "" : `<a href="/claim">Are you the owner?</a> Claim this listing for free to add your own description, hours, and photos.`}</p>`}\n<div class="facts">\n${b.claimed ? `<div class="fact"><b>Claimed business</b><span>Owner-verified, details kept current</span></div>` : ""}\n${b.yrs ? `<div class="fact"><b>${E(YRS(b.yrs))}</b><span>Trading history</span></div>` : ""}\n${b.claimed ? STARS(b) : ""}\n</div></div>
 
 ${b.premium && b.photos && b.photos.length ? `<div class="blk"><h2>Photos</h2>\n<div class="gallery">${b.photos.map((p, i) => `<img src="${E(p)}" alt="${E(b.name)}" loading="lazy" data-lb="gallery" data-caption="${E(b.name)} — photo ${i + 1} of ${b.photos.length}">`).join("")}</div>\n</div>` : ""}\n\n${b.claimed && (x.updates || []).length ? `<div class="blk"><h2>Events & Promotions</h2>\n<div class="upd-grid" style="margin-top:14px">${x.updates.map(u => {
       const type = [ "event", "promotion" ].includes(u.type) ? u.type : "general";
@@ -5840,7 +5887,7 @@ async function hoodCounts(DB) {
   }
 }
 
-const BUILD = "v15.92-shared";
+const BUILD = "v15.93-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -6066,13 +6113,14 @@ const _export = {
         if (role !== "admin") return TXT("Logos needs full admin access — ask an admin.");
         await migrate(DB, env);
         const shared = await computeBadLogos(DB);
+        const badEmails = await computeBadEmails(DB);
         const lc = u.searchParams.has("check") ? await logoCheckBatch(DB, 40) : null;
         await loadBadLogos(DB);
         const st = await DB.prepare("SELECT COUNT(*) n, SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) dead FROM logo_check").first() || {};
         const hid = await DB.prepare("SELECT COUNT(*) n FROM businesses WHERE logo<>''").first() || {};
         let hiddenListings = 0;
         for (const r of (await DB.prepare("SELECT logo FROM businesses WHERE logo<>''").all()).results || []) if (BADLOGO.s.has(r.logo)) hiddenListings++;
-        return TXT(`Listing pictures.\nWrong pictures shared by many unrelated businesses: ${shared} image(s).\nImages checked so far: ${st.n || 0} — ${st.dead || 0} no longer load.${lc ? `\nThis run checked ${lc.checked}, ${lc.dead} dead.` : ""}\nListings now showing their category photo instead: ${hiddenListings} of ${hid.n || 0} that have a picture.\nThe shared scan runs after every listing sync; about 120 images are checked every hour.`);
+        return TXT(`Listing pictures.\nWrong pictures shared by many unrelated businesses: ${shared} image(s).\nImages checked so far: ${st.n || 0} — ${st.dead || 0} no longer load.${lc ? `\nThis run checked ${lc.checked}, ${lc.dead} dead.` : ""}\nListings now showing their category photo instead: ${hiddenListings} of ${hid.n || 0} that have a picture.\nScraped email addresses that aren't the business's (shared by unrelated listings): ${badEmails}, plus known junk patterns.\nThe shared scan runs after every listing sync; about 120 images are checked every hour.`);
       }
       if (p[1] === "duplicates") {
         if (role !== "admin") return TXT("Duplicates needs full admin access — ask an admin.");
@@ -7583,6 +7631,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         }
         if (!biz) return fail("That business wasn't found — look it up again.");
         if (!biz.email) return fail("This business has no email on file, so an invite can't be sent.");
+        if (junkEmail(biz.email)) return fail("The email on file (" + biz.email + ") was scraped from a website by mistake and isn't the business's — fix it in the CRM first.");
         const href = `${S.dom}/${biz.cs}/${biz.slug}`;
         let sent = false;
         try {
