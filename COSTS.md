@@ -88,4 +88,12 @@ Pending: Phase A (Bot Fight Mode, WAF rules, rate limit) — token lacks Zone WA
 
 What's left: almost all remaining reads are hood/rating/claim facet counts on filtered **sub-category** pages (`WHERE cs=? AND sub=? AND … GROUP BY hood`), i.e. crawlers still walking filter combinations. Applebot passes the WAF as a known crawler and hasn't re-read robots.txt yet (usually within ~24 h). Re-measure 26 Sep (scheduled). If it hasn't dropped: stop computing facet counts on filtered views for crawlers, or precompute per-sub-category hood counts.
 
-## After — 24 h (to fill in 26 Sep)
+## After — 24 h (checked 26 Sep, 16:35 UTC)
+
+| Day (UTC) | Miami rows read | Orlando rows read |
+|---|---|---|
+| 19–25 Sep (before) | 2.5–4.0B/day | 0.4–1.1B/day |
+| 26 Sep, 00:00–17:00 | 0.10B (≈0.14B/day pace) | 0.22B |
+| 26 Sep, last 3 hours | 0.8–1.3M/h | 0.6–6.4M/h |
+
+Miami is down about 96%. Orlando ran about 10M/h overnight and fell to under 1M/h from 15:00. At the current pace both cities together read well under 0.5B/day, which is under 15B/month and inside the 25B/month included in the Workers plan, so D1 reads should cost about $0. No further fix needed. The ASN 45102 block and extra indexes were not required: the WAF challenge rules, edge cache and robots.txt were enough.
