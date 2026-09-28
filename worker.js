@@ -1067,7 +1067,9 @@ async function logoCheckBatch(DB, n) {
   };
 }
 
+// Only claimed businesses show their own picture; every unclaimed listing shows the "unclaimed" picture.
 function bizImg(b) {
+  if (!b || !b.claimed) return DEFAULT_LISTING_IMG;
   const pick = [ b && b.slots && b.slots.profile || "", String(b && b.logo || "") ];
   for (const l of pick) if (/^https?:\/\//i.test(l) && !/example\.test/i.test(l)) return l;
   if (DEMO_PHOTOS && b && b.claimed) return demoImg(String(b.id || b.slug || "x") + "-profile", 640, 480);
@@ -4419,8 +4421,8 @@ const GOOGLEREVIEWS = b => {
 
 function PHOTO(b, cls) {
   const raw = bizImg(b);
-  const src = raw === DEFAULT_LISTING_IMG ? CATIMG(b.cs) : raw;
-  const fallbackImg = CATIMG(b.cs);
+  const src = raw === DEFAULT_LISTING_IMG && b.claimed ? CATIMG(b.cs) : raw;
+  const fallbackImg = b.claimed ? CATIMG(b.cs) : DEFAULT_LISTING_IMG;
   const alt = `${b.name}${b.city || S.city ? " in " + (b.city || S.city) : ""}`;
   if (src) return `<img src="${E(src)}" alt="${E(alt)}" loading="lazy" onerror="this.onerror=null;this.src='${E(fallbackImg)}'">`;
   const p = panelOf(b.id);
@@ -4429,7 +4431,7 @@ function PHOTO(b, cls) {
 
 function AVATARIMG(b) {
   const src = bizImg(b);
-  if (src && src !== DEFAULT_LISTING_IMG) return `<img src="${E(src)}" alt="${E(b.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='grid')">\n<span class="fill" style="display:none;background:linear-gradient(135deg,${panelOf(b.id)[0]},${panelOf(b.id)[1]})">${b.ic || "📍"}</span>`;
+  if (src && !(src === DEFAULT_LISTING_IMG && b.claimed)) return `<img src="${E(src)}" alt="${E(b.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='grid')">\n<span class="fill" style="display:none;background:linear-gradient(135deg,${panelOf(b.id)[0]},${panelOf(b.id)[1]})">${b.ic || "📍"}</span>`;
   const p = panelOf(b.id);
   return `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]})">${b.ic || "📍"}</span>`;
 }
@@ -6163,7 +6165,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v15.95-shared";
+const BUILD = "v15.96-shared";
 
 const APP_COOKIE = "gl_app";
 
