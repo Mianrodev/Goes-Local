@@ -214,3 +214,9 @@ Listings with the same name + phone + address show once on the site: the kept co
 - **Junk emails and websites.** Scraped addresses that aren't the business's (error trackers, template placeholders, font credits, platform support addresses), the literal "No Website", and bare platform home pages are hidden. Claim invites are never sent to junk emails. The CRM still holds the bad values, so the team can clean them there.
 - **Neighbourhood queue.** For Orlando (no `CITY_VALID_ZIPS`), only zips whose first 3 digits cover at least 5% of the city's listings can enter the queue. Aventura, Kendall, Miami Gardens and Westchester were removed from Orlando on 25 Sep.
 - **Missing zip codes.** Most listings without a zip have no address at all: service-area businesses that Google shows without an address. This is expected.
+
+## SEO tools (since v15.97)
+- **Admin → SEO → "Any other page":** set a custom Google title, description and extra JSON-LD for any single page by pasting its link. Stored in `site_seo` as `path:/…` and applied by `PAGESEO` inside `PAGE`.
+- **Blog/news editor image gallery:** shows every image uploaded to the site (`media` table). Alt text is made from the file name and can be edited. Pictures in posts with no alt text get the post title.
+- **Main category pages** show a row of that category's blog posts (matched on `posts.blog_cat`) under the FAQ.
+- **Best-of pages** `/best…` (v15.95). **Unclaimed listings always show `DEFAULT_LISTING_IMG`** (v15.96).
