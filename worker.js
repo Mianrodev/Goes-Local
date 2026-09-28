@@ -6040,6 +6040,8 @@ async function hoodCounts(DB) {
 // The list of pages (meta.best_index) is rebuilt hourly by the cron; pages rank by a weighted rating so a
 // 5.0 with 3 reviews doesn't beat a 4.8 with 300.
 const BEST_MIN = 5;
+// A list exists only for business types with at least this many qualifying businesses city-wide (Eric: 20+).
+const BEST_LIST_MIN = 20;
 
 let BEST = {
   t: 0,
@@ -6093,7 +6095,7 @@ async function computeBestIndex(DB) {
   }
   const out = [];
   for (const t of types.values()) {
-    if (t.k < BEST_MIN) continue;
+    if (t.k < BEST_LIST_MIN) continue;
     const name = [ ...t.names ].sort((a, b) => b[1] - a[1] || (/[A-Z]/.test(b[0].slice(1)) ? -1 : 1))[0][0];
     const csList = [ ...t.cs ].sort((a, b) => b[1] - a[1]);
     out.push({
@@ -6119,7 +6121,7 @@ async function bestIndex(DB) {
   let types = null;
   try {
     const m = await DB.prepare("SELECT v FROM meta WHERE k='best_index'").first();
-    if (m) types = JSON.parse(m.v).types;
+    if (m) types = JSON.parse(m.v).types.filter(t => t.k >= BEST_LIST_MIN);
   } catch {}
   if (!types) try {
     types = await computeBestIndex(DB);
@@ -6165,14 +6167,16 @@ const BEST_LABEL = () => `${S.city}'s Best`;
 
 const TROPHY = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a4 4 0 0 1-4 4M7 5H4v2a4 4 0 0 0 4 4"/></svg>';
 
-const BESTROW = (b, i) => `<article class="br${i < 3 ? " br-top br-" + (i + 1) : ""}">
+const BESTROW = (b, i) => `<article class="br${i < 3 ? " br-top br-" + (i + 1) : ""}${b.claimed ? " br-claimed" : ""}">
 <div class="br-rank">${i + 1}</div>
 <div class="br-main">
-${i === 0 ? `<div class="br-pick">${TROPHY} Top pick</div>` : ""}
+${i === 0 || b.claimed ? `<div class="br-tags">${i === 0 ? `<span class="br-pick">${TROPHY} Top pick</span>` : ""}${b.claimed ? `<span class="br-own">${ICO.check || "✓"} Verified by the owner</span>` : ""}</div>` : ""}
 <h3><a href="/${E(b.cs)}/${E(b.slug)}">${E(b.name)}</a></h3>
 <div class="br-rate"><span class="br-stars">${STARROW(b.rat)}</span><b>${Number(b.rat).toFixed(1)}</b><span>${NUM(b.rev || 0)} reviews</span></div>
-<div class="br-meta">${b.sub ? `<span>${E(b.sub)}</span>` : ""}${b.hood ? `<span>${ICO.pin}${E(hoodName(b.hood))}</span>` : ""}${b.claimed ? `<span class="br-ver">${ICO.check || "✓"} Verified</span>` : ""}</div>
+<div class="br-meta">${b.sub ? `<span>${E(b.sub)}</span>` : ""}${b.hood ? `<span>${ICO.pin}${E(hoodName(b.hood))}</span>` : ""}</div>
+${b.claimed ? "" : `<a class="br-claim" href="/claim/start?id=${encodeURIComponent(b.id)}">Is this your business? Claim it free →</a>`}
 </div>
+${b.claimed && bizImg(b) !== DEFAULT_LISTING_IMG ? `<img class="br-photo" src="${E(bizImg(b))}" alt="${E(b.name)}" loading="lazy">` : ""}
 <div class="br-acts">${b.pr ? `<a class="btn btn-p btn-sm" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}" aria-label="Call ${E(b.name)}">${ICO.phone}<span>Call</span></a>` : ""}<a class="btn btn-o btn-sm" href="/${E(b.cs)}/${E(b.slug)}">View</a></div>
 </article>`;
 
@@ -6195,7 +6199,12 @@ const BEST_CSS = `<style>
 .br-1 .br-rank{background:linear-gradient(135deg,#E8C06A,#C8901F);color:#fff}.br-2 .br-rank{background:linear-gradient(135deg,#D5DBE1,#9AA5B1);color:#fff}.br-3 .br-rank{background:linear-gradient(135deg,#E6B08A,#B8703F);color:#fff}
 .br-1{border-color:#E8C06A;box-shadow:0 0 0 1px #E8C06A}
 .br-main{flex:1;min-width:0}
-.br-pick{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#B07A12;margin-bottom:3px}
+.br-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:5px}
+.br-pick,.br-own{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#B07A12}
+.br-own{color:#fff;background:var(--teal);border-radius:999px;padding:3px 9px;letter-spacing:.03em}.br-own svg{width:12px;height:12px}
+.br-claimed{border:2px solid var(--teal);background:linear-gradient(90deg,rgba(46,139,139,.07),var(--card) 60%)}
+.br-photo{width:84px;height:84px;border-radius:14px;object-fit:cover;flex-shrink:0}
+.br-claim{display:inline-block;margin-top:7px;font-size:12px;color:var(--muted);text-decoration:underline;text-underline-offset:2px}.br-claim:hover{color:var(--coral)}
 .br h3{font-size:17px;margin:0 0 4px;line-height:1.25}.br h3 a{color:var(--navy);text-decoration:none}.br h3 a:hover{color:var(--coral)}
 .br-rate{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}.br-rate b{color:var(--navy);font-size:14px}
 .br-stars{display:inline-flex;gap:1px}.br-stars svg{width:13px;height:13px}
@@ -6226,7 +6235,7 @@ const BEST_CSS = `<style>
 .bbox ul{list-style:none;margin:0;padding:0}.bbox li a{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;font-weight:600;color:var(--navy);text-decoration:none}.bbox li:first-child a{border-top:0}.bbox li a:hover{color:var(--coral)}.bbox li em{font-style:normal;color:var(--muted);font-weight:500}
 .bbox-cta{background:var(--navy);border-color:var(--navy);color:#fff}.bbox-cta h3{color:#fff}.bbox-cta p{color:rgba(255,255,255,.8)}
 @media(max-width:1000px){.bwrap{grid-template-columns:1fr}.baside{position:static}}
-@media(max-width:720px){.bh{padding:30px 18px 22px}.bh-sub span{font-size:12px;padding:4px 9px}.bcards{grid-template-columns:1fr 1fr;gap:10px}.bcard{min-height:110px;padding:12px}.bcard b{font-size:15px}.br{flex-wrap:wrap;gap:12px;padding:14px}.br-rank{width:38px;height:38px;font-size:16px;border-radius:11px}.br-main{flex:1 1 calc(100% - 60px)}.br-acts{width:100%}.br-acts .btn{flex:1;justify-content:center}}
+@media(max-width:720px){.br-photo{width:56px;height:56px;border-radius:12px}.bh{padding:30px 18px 22px}.bh-sub span{font-size:12px;padding:4px 9px}.bcards{grid-template-columns:1fr 1fr;gap:10px}.bcard{min-height:110px;padding:12px}.bcard b{font-size:15px}.br{flex-wrap:wrap;gap:12px;padding:14px}.br-rank{width:38px;height:38px;font-size:16px;border-radius:11px}.br-main{flex:1 1 calc(100% - 60px)}.br-acts{width:100%}.br-acts .btn{flex:1;justify-content:center}}
 </style>`;
 
 function BESTPAGE(d, t, hood, rows, idx) {
@@ -6302,7 +6311,6 @@ function BESTPAGE(d, t, hood, rows, idx) {
 <h1>${E(h1)}</h1>
 <div class="bh-sub"><span>${ICO.star} Ranked by Google rating &amp; reviews</span><span>${NUM(rows.length)} rated 4★+ in ${E(place)}</span><span>Updated ${E(when)}</span></div>
 </header>
-${hoodChips.length ? `<div class="bchips"><b>Area:</b><a href="/best/${E(t.s)}"${hood ? "" : ' class="on"'}>All of ${E(S.city)}</a>${hoodChips.map(([h]) => `<a href="/best/${E(t.s)}/${E(h)}"${h === hood ? ' class="on"' : ""}>${E(hoodName(h))}</a>`).join("")}</div>` : ""}
 <div class="bwrap">
 <div class="blist">${top.map(BESTROW).join("")}</div>
 <aside class="baside">
@@ -6340,11 +6348,11 @@ function BESTHOME(d, idx) {
 <header class="bh" style="background-image:url('${E(HERO_IMG)}')">
 <div class="kicker">${TROPHY} Updated ${E(MONTH_YEAR())}</div>
 <h1>${E(BEST_LABEL())}</h1>
-<div class="bh-sub"><span>${ICO.star} Ranked by Google rating &amp; reviews</span><span>${NUM(idx.types.length)} top-10 lists</span><span>${NUM(hoodCount)} neighbourhoods</span></div>
+<div class="bh-sub"><span>${ICO.star} Ranked by Google rating &amp; reviews</span><span>${NUM(idx.types.length)} top-10 lists</span><span>Only businesses rated 4★+</span></div>
 <div class="bsearch"><input type="search" id="bestQ" placeholder="What are you looking for? e.g. plumber, nail salon" aria-label="Search the lists"></div>
 </header>
 <section><h2 style="font-size:20px;margin-bottom:12px">Most popular lists</h2>
-<div class="bcards">${popular.map(t => `<a class="bcard" href="/best/${E(t.s)}" style="background-image:url('${E(CATIMG(t.cs[0]))}')"><small>Top 10</small><b>${E(BEST_TITLECASE(t.n))}</b><span>${NUM(t.k)} ranked · ${NUM(t.h.length)} areas</span></a>`).join("")}</div></section>
+<div class="bcards">${popular.map(t => `<a class="bcard" href="/best/${E(t.s)}" style="background-image:url('${E(CATIMG(t.cs[0]))}')"><small>Top 10</small><b>${E(BEST_TITLECASE(t.n))}</b><span>${NUM(t.k)} ranked</span></a>`).join("")}</div></section>
 <section class="bsec" id="bestAll"><h2>All lists by category</h2>
 ${ordered.map(g => `<div class="bgrp"><div class="bgrp-h">${g.cat ? `<img src="${E(CATIMG(g.cat.slug))}" alt="${E(g.cat.name)} in ${E(S.city)}" loading="lazy">` : ""}<div><h2>${E(g.cat ? g.cat.name : "Other")}</h2><span>${NUM(g.ts.length)} lists</span></div></div>
 <div class="btiles">${g.ts.map((t, i) => `<a class="btile${i >= 8 ? " more" : ""}" href="/best/${E(t.s)}" data-q="${E(t.n.toLowerCase())}">Best ${E(BEST_NOUN(t.n))}<em>${NUM(t.k)}</em></a>`).join("")}</div>
@@ -6364,11 +6372,11 @@ if(v.length===1)document.getElementById("bestAll").scrollIntoView({behavior:"smo
 function BESTCTA(idx, slug, hood) {
   const t = idx && idx.bySlug.get(slug);
   if (!t) return "";
-  const inHood = hood && t.h.some(([h]) => h === hood);
+  const inHood = false;
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.00-shared";
+const BUILD = "v16.01-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -10452,19 +10460,18 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     }
     if (u.pathname === "/sitemap-best.xml") {
       const idx = await bestIndex(DB);
-      return XMLRESP(XMLURLSET([ "/best", ...idx.types.flatMap(t => [ `/best/${t.s}`, ...t.h.map(([h]) => `/best/${t.s}/${h}`) ]) ]));
+      return XMLRESP(XMLURLSET([ "/best", ...idx.types.map(t => `/best/${t.s}`) ]));
     }
     if (p[0] === "best" && p.length <= 3) {
       const idx = await bestIndex(DB);
       if (p.length === 1) return R(BESTHOME(d, idx));
       const t = idx.bySlug.get(p[1]);
-      const hood = p[2] || "";
-      if (t && (!hood || t.h.some(([h]) => h === hood))) {
-        const rows = await bestRows(DB, t, hood);
-        if (rows.length >= BEST_MIN) return R(BESTPAGE(d, t, hood, rows, idx));
+      if (t && p[2]) return Response.redirect(AUTH.SITE_URL + `/best/${t.s}`, 301);
+      if (t) {
+        const rows = await bestRows(DB, t, "");
+        if (rows.length >= BEST_MIN) return R(BESTPAGE(d, t, "", rows, idx));
       }
-      if (t && hood) return Response.redirect(AUTH.SITE_URL + `/best/${t.s}`, 302);
-      return Response.redirect(AUTH.SITE_URL + "/best", 302);
+      return Response.redirect(AUTH.SITE_URL + "/best", 301);
     }
     if (!p.length) {
       const hf = await homeFeed(DB);
@@ -11162,7 +11169,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         baseHref: base,
         bestLinks: await (async () => {
           const bi = await bestIndex(DB);
-          const here = (bi.byHood.get(h.slug) || []).slice(0, 12);
+          const here = [];
           return here.length ? `<div class="blk" style="margin-bottom:22px"><h2 style="font-size:17px;margin-bottom:10px">Top-rated in ${E(h.name)}</h2><div class="best-links" style="display:flex;flex-wrap:wrap;gap:8px">${here.map(x => `<a class="btn btn-o btn-sm" href="/best/${E(x.t.s)}/${E(h.slug)}">Best ${E(BEST_NOUN(x.t.n))}</a>`).join("")}</div></div>` : "";
         })(),
         faqs: hoodFaqs,
