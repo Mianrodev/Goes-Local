@@ -228,11 +228,9 @@ Listings with the same name + phone + address show once on the site: the kept co
   - Orlando: Titusville (32780/32796/32754).
 - Wrong zip mappings removed: 33142 from Wynwood, 33145 from Coconut Grove, 33156 from Coral Gables.
 
-## Lead-source tags (since v16.04, requested by SG)
-- Website leads are tagged in the CRM by how they found the site. This applies to "List your business" and "Claim a listing".
-- **`seoinbound`:** the lead came from a search engine or an AI assistant.
-- **`emailinbound`:** the lead clicked a link in one of our emails. That is either a link with `utm_medium=email`, or a visit from a webmail site.
-- **Direct and social visits** get neither tag.
-- **Campaign links must carry** `?utm_source=ghl&utm_medium=email&utm_campaign=<name>`. Many email apps hide where a click came from.
-- **Email replies:** a positive email *reply* never reaches the website, so the team (or a GHL workflow) adds `emailinbound` in the CRM.
+## Lead-source tag (since v16.05)
+- **`seoinbound`:** added in the CRM to every website lead that found us through a search engine or AI assistant. That covers "List your business" and "Claim a listing".
+- **Where it goes:** on a claim, both the person claiming and the business contact get the tag. On a pending listing, it's added again when the listing is published.
+- **Never removed.** Email is tracked in GHL by `emailreplied`, so the site adds no email tag. `emailinbound` from v16.04 was dropped.
+- **`/admin/seotags`** adds the tag to past leads. It's safe to re-run.
 - **Where the rules live:** `leadChannelTag()` in worker.js.
