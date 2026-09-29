@@ -4417,12 +4417,13 @@ async function notifyAdmins(env, DB, kind, tplKey, vars, href) {
   return list.length > 0;
 }
 
-// Lead-source tag for the CRM (SG, 29 Sep): "seoinbound" for leads that found us through a search engine or
-// AI assistant, "emailinbound" for leads that clicked a link in one of our emails. Anything else gets neither.
+// Lead-source tag for the CRM (SG/Eric, 29 Sep): "seoinbound" for leads that found us through a search engine or
+// AI assistant. Email is tracked in GHL itself ("emailreplied"), so email clicks — including webmail referrers such
+// as mail.google.com, which would otherwise match "google" — get no tag here. Nothing ever removes the tag.
 function leadChannelTag(src, med) {
   src = String(src || "").toLowerCase();
   med = String(med || "").toLowerCase();
-  if (/e-?mail|newsletter/.test(med) || /^e-?mail|newsletter/.test(src)) return "emailinbound";
+  if (/e-?mail|newsletter/.test(med) || /^e-?mail|newsletter/.test(src)) return "";
   if (/cpc|ppc|paid/.test(med)) return "";
   if (med === "organic" || /google|bing|yahoo|duckduckgo|ecosia|brave|yandex|baidu|chatgpt|openai|perplexity|gemini|copilot|claude\.ai/.test(src)) return "seoinbound";
   return "";
@@ -6438,7 +6439,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.04-shared";
+const BUILD = "v16.05-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -6678,6 +6679,21 @@ const _export = {
         let hiddenListings = 0;
         for (const r of (await DB.prepare("SELECT logo FROM businesses WHERE logo<>''").all()).results || []) if (BADLOGO.s.has(r.logo)) hiddenListings++;
         return TXT(`Listing pictures.\nWrong pictures shared by many unrelated businesses: ${shared} image(s).\nImages checked so far: ${st.n || 0} — ${st.dead || 0} no longer load.${lc ? `\nThis run checked ${lc.checked}, ${lc.dead} dead.` : ""}\nListings now showing their category photo instead: ${hiddenListings} of ${hid.n || 0} that have a picture.\nScraped email addresses that aren't the business's (shared by unrelated listings): ${badEmails}, plus known junk patterns.\nThe shared scan runs after every listing sync; about 120 images are checked every hour.`);
+      }
+      if (p[1] === "seotags") {
+        // Adds "seoinbound" to every past website lead whose recorded source was a search engine or AI assistant.
+        // Safe to run again: tags are only added, never removed.
+        if (role !== "admin") return TXT("SEO tags needs full admin access — ask an admin.");
+        const rows = (await DB.prepare("SELECT ghl_id,business,status,utm_source,utm_medium,referrer_domain FROM claims WHERE ghl_id<>''").all().catch(() => ({ results: [] }))).results || [];
+        const out = [];
+        let tagged = 0;
+        for (const r of rows) {
+          if (leadChannelTag(r.utm_source || r.referrer_domain, r.utm_medium) !== "seoinbound") continue;
+          const ok = await ghlAddTag(env, r.ghl_id, [ "seoinbound" ]);
+          if (ok) tagged++;
+          out.push(`${ok ? "✓" : "✗ couldn't tag"} ${r.business} (${r.status}, from ${r.utm_source || r.referrer_domain})`);
+        }
+        return TXT(`seoinbound added to ${tagged} past lead(s) that came from search or AI.\n\n${out.join("\n")}`);
       }
       if (p[1] === "duplicates") {
         if (role !== "admin") return TXT("Duplicates needs full admin access — ask an admin.");
@@ -8446,6 +8462,8 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
               }
             }
             if (cid && row && row.referral) await ghlAddTag(env, cid, [ `heard-about-us: ${row.referral}` ]);
+            const seoTag = row ? leadChannelTag(row.utm_source || row.referrer_domain, row.utm_medium) : "";
+            if (cid && seoTag) await ghlAddTag(env, cid, [ seoTag ]);
             if (cid) {
               try {
                 await insertOne(env, DB, cid, pubC);
@@ -11019,7 +11037,13 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           "owner phone": needsOwner ? ownerPhone : undefined
         }
       });
-      if (cid) await ghlAddTag(env, cid, [ "claim-request", utmSource ? `source-${SL(utmSource)}` : "", leadChannelTag(utmSource, utmMedium) ].filter(Boolean));
+      const seoTag = leadChannelTag(utmSource, utmMedium);
+      if (cid) await ghlAddTag(env, cid, [ "claim-request", utmSource ? `source-${SL(utmSource)}` : "", seoTag ].filter(Boolean));
+      if (seoTag && id !== cid) try {
+        await ghlAddTag(env, id, [ seoTag ]);
+      } catch (e) {
+        console.log("claim: seoinbound on business contact failed: " + e.message);
+      }
       if (cid) try {
         await ghlLinkClaimContacts(env, id, b.name, cid, name);
       } catch (e) {
