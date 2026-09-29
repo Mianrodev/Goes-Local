@@ -6439,7 +6439,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.05-shared";
+const BUILD = "v16.06-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -6684,6 +6684,62 @@ const _export = {
         // Adds "seoinbound" to every past website lead whose recorded source was a search engine or AI assistant.
         // Safe to run again: tags are only added, never removed.
         if (role !== "admin") return TXT("SEO tags needs full admin access — ask an admin.");
+        if (u.searchParams.has("preview") || u.searchParams.has("apply")) {
+          // Older leads have no recorded visit source, only GHL tags. Sort every website lead into:
+          //  sure   — a tag says search/AI (source-chatgpt…, source-…google…, heard-about-us: google/online search)
+          //  likely — came in through the website (pending-listing, claim-request, add-a-business) with no sign of
+          //           email, a sales call or social media
+          //  not    — came from email (emailreplied), a call/demo, or social media
+          // ?apply=sure or ?apply=sure,likely adds "seoinbound" to those groups. Tags are only ever added.
+          const SURE_TAG = /^source-.*(google|bing|yahoo|duckduckgo|chatgpt|openai|perplexity|gemini|copilot|claude)|^heard-about-us: *(google|online search|search|chatgpt|ai)/i;
+          const WEB_TAG = /^(pending-listing|claim-request)$/i;
+          const groups = { sure: [], likely: [], not: [] };
+          let url = `${API}/contacts/?locationId=${env.GHL_LOCATION_ID}&limit=100`, pages = 0;
+          while (url && pages < 400) {
+            const pg = await contactsPage(env, url);
+            pages++;
+            for (const c of pg.contacts) {
+              const tags = (c.tags || []).map(t => String(t).trim());
+              const src = String(c.source || "");
+              const web = tags.some(t => WEB_TAG.test(t)) || /add-a-business/i.test(src);
+              const sure = tags.some(t => SURE_TAG.test(t));
+              if (!web && !sure) continue;
+              const name = c.companyName || [ c.firstName, c.lastName ].filter(Boolean).join(" ") || c.email || c.id;
+              const why = tags.filter(t => SURE_TAG.test(t) || WEB_TAG.test(t) || /^source-|^heard-about-us|^emailreplied$|^claimed$/i.test(t)).concat(src ? [ "source: " + src ] : []).join(", ");
+              const notReason = tags.some(t => /^emailreplied$/i.test(t)) ? "email reply" : /^(call with|demo call|website demo)/i.test(src) ? "sales call" : tags.some(t => /^heard-about-us: *social/i.test(t)) ? "social media" : "";
+              const row = { id: c.id, name, why, has: tags.some(t => t.toLowerCase() === "seoinbound") };
+              if (sure) groups.sure.push(row); else if (notReason) groups.not.push({ ...row, why: notReason + " — " + why }); else groups.likely.push(row);
+            }
+            url = pg.nextUrl;
+          }
+          const applyTo = String(u.searchParams.get("apply") || "").split(",").filter(g => g === "sure" || g === "likely");
+          let added = 0;
+          for (const g of applyTo) for (const r of groups[g]) if (!r.has && await ghlAddTag(env, r.id, [ "seoinbound" ])) {
+            r.has = true;
+            added++;
+          }
+          const show = (g, label) => `${label}: ${groups[g].length}\n` + groups[g].map(r => `  ${r.has ? "[seoinbound] " : ""}${r.name} — ${r.why}`).join("\n");
+          return TXT(`${applyTo.length ? `Added seoinbound to ${added} contact(s) in: ${applyTo.join(" + ")}.\n\n` : "Preview only — nothing changed.\n\n"}${show("sure", "SURE (a tag says search/AI)")}\n\n${show("likely", "LIKELY (came through the website, no sign of email/call/social)")}\n\n${show("not", "NOT SEO (email reply, sales call or social)")}`);
+        }
+        if (u.searchParams.has("list")) {
+          // Read-only: walks every GHL contact and counts the tags (and contact "source" values) that look like
+          // lead-source markers, so we can see which older tags mean "came from search/AI".
+          const re = u.searchParams.get("re") ? new RegExp(u.searchParams.get("re"), "i") : /source|heard|seo|google|chatgpt|gpt|perplexity|bing|organic|search|inbound|direct|website|referr|utm|\bai\b/i;
+          const tags = new Map, sources = new Map;
+          let url = `${API}/contacts/?locationId=${env.GHL_LOCATION_ID}&limit=100`, n = 0, pages = 0;
+          while (url && pages < 400) {
+            const pg = await contactsPage(env, url);
+            pages++;
+            for (const c of pg.contacts) {
+              n++;
+              for (const t of c.tags || []) if (re.test(t)) tags.set(t, (tags.get(t) || 0) + 1);
+              if (c.source) sources.set(c.source, (sources.get(c.source) || 0) + 1);
+            }
+            url = pg.nextUrl;
+          }
+          const fmt = m => [ ...m ].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${String(v).padStart(6)}  ${k}`).join("\n");
+          return TXT(`Read ${n} contacts (${pages} pages${url ? ", stopped early" : ""}).\n\nLead-source-looking tags:\n${fmt(tags)}\n\nContact "source" values:\n${fmt(sources)}`);
+        }
         const rows = (await DB.prepare("SELECT ghl_id,business,status,utm_source,utm_medium,referrer_domain FROM claims WHERE ghl_id<>''").all().catch(() => ({ results: [] }))).results || [];
         const out = [];
         let tagged = 0;
