@@ -4522,6 +4522,55 @@ const CSS = `\n@import url('https://fonts.googleapis.com/css2?family=Fraunces:op
 .ln2-claim{flex-wrap:wrap}.ln2-claim .btn{margin-left:0;width:100%;justify-content:center}
 .ln2-facts{grid-template-columns:1fr 1fr}.ln2-sim{grid-template-columns:1fr}.ln2-addr{flex-wrap:wrap}
 .split-biz.ln2 .contact-blk{order:0;margin-top:inherit}}
+.rs-ttl{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;padding:8px 0 18px}
+.rs-ttl h1{font-size:40px}.rs-meta{color:var(--muted);font-size:14px;margin:6px 0 0}
+.rs-srch{width:460px;max-width:100%}.rs-srch>*{margin:0}
+.rs-ban .catbanner{margin-bottom:0}
+.catbanner-feat{left:auto!important;right:14px;background:rgba(255,255,255,.92)!important;color:var(--navy)!important}
+.catbanner-adv{position:absolute;left:16px;top:14px;background:rgba(18,38,63,.45);padding:4px 10px;border-radius:999px;z-index:3;color:#fff;font-size:12.5px;font-weight:600;opacity:.9;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.catbanner-adv:hover{opacity:1;text-decoration:underline}
+.catbanner-cta{display:inline-block;width:max-content;margin-top:10px;background:var(--coral);color:#fff!important;font-weight:700;font-size:13.5px!important;padding:9px 18px;border-radius:999px;opacity:1!important}
+.rs-chips{margin:18px 0 0}.rs-chips .subchip-track{grid-template-rows:auto}
+.rs-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--navy);white-space:nowrap}
+.rs-chip span{color:var(--muted);font-weight:500}.rs-chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}.rs-chip.on span{color:rgba(255,255,255,.7)}
+.rs-bar{display:flex;align-items:center;gap:10px;margin:14px 0 18px;flex-wrap:wrap}
+.rs-pill{position:relative}.rs-pill summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;color:var(--navy);white-space:nowrap}
+.rs-pill summary::-webkit-details-marker{display:none}.rs-pill.on summary{background:var(--teal-s);border-color:#BFE0DF;color:var(--teal)}
+.rs-pill.rs-best summary{background:#FFF7E8;border-color:#F3DDB0;color:#8A5A00}
+.rs-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:60;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-lg);padding:8px;min-width:230px;max-height:340px;overflow:auto}
+.rs-pop .fopt{display:flex;justify-content:space-between;gap:12px;padding:7px 10px;border-radius:8px;font-size:13.5px;color:var(--ink)}.rs-pop .fopt:hover{background:var(--cream)}.rs-pop .fopt.on{color:var(--coral);font-weight:600}.rs-pop .n{color:var(--muted);font-size:12px}
+.rs-clear{font-size:13px;font-weight:600;color:var(--teal)}
+.rs-lay{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+.rs-list{display:flex;flex-direction:column;gap:12px}
+.rr{display:grid;grid-template-columns:120px minmax(0,1fr) auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:var(--sh)}
+.rr.rr-claimed{border-color:#BFE0DF}
+.rr-ph{position:relative;width:120px;height:120px;border-radius:14px;overflow:hidden;background:var(--sand);display:block}
+.rr-ph img,.rr-ph .fill{width:100%;height:100%;object-fit:cover;display:grid;place-items:center;font-size:40px}
+.rr-rank{position:absolute;top:7px;left:7px;background:var(--navy);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:2px 8px}
+.rr-bd{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}.rr-bd .bdg{font-size:10.5px;padding:3px 8px}
+.rr h3{font-size:18px;line-height:1.25;margin-bottom:4px}.rr h3 a{color:var(--navy)}.rr h3 a:hover{color:var(--coral)}
+.rr-rt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13.5px;color:var(--body);margin-bottom:5px}.rr-rt b{color:var(--navy)}
+.rr-st{display:inline-flex;gap:1px}.rr-st svg{width:13px;height:13px}
+.rr-ln{display:flex;gap:6px;align-items:flex-start;font-size:13.5px;color:var(--body)}.rr-ln svg{flex-shrink:0;margin-top:3px;color:var(--teal)}.rr-ln b{color:var(--navy);font-weight:600}
+.rr-claim{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:600;color:var(--coral)}
+.rr-ac{display:flex;flex-direction:column;gap:8px;min-width:150px}.rr-ac .btn{justify-content:center;gap:7px}
+.rs-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:90px}
+.rs-card{padding:20px}.rs-card h3{font-size:18px;margin-bottom:12px}
+.rs-map{position:relative;height:250px;border-radius:14px;overflow:hidden;background:#e9eef0}
+.rs-map img{position:absolute;width:256px;height:256px;max-width:none}
+.rs-pin{position:absolute;transform:translate(-50%,-50%);background:var(--coral);color:#fff;font-size:11px;font-weight:700;border-radius:999px;min-width:22px;height:22px;display:grid;place-items:center;padding:0 5px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.rs-attr{font-size:10.5px;color:var(--faint);margin-top:6px;text-align:right}
+.rs-areas a{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-s);font-size:14px;color:var(--ink)}.rs-areas a span{color:var(--muted)}
+.rs-areas .rs-more{border:0;color:var(--coral);font-weight:600}
+.rs-own{background:linear-gradient(135deg,${T.coral},#F2A65A);border:0;color:#fff}.rs-own h3{color:#fff}.rs-own p{font-size:13.5px;opacity:.94;margin:0 0 14px}.rs-own .btn{background:#fff;color:var(--coral-d)}
+@media(max-width:1000px){.rs-lay{grid-template-columns:1fr}.rs-side{position:static}}
+@media(max-width:720px){
+.rs-ttl h1{font-size:28px}.rs-srch{width:100%}
+.rs-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:16px}.rs-bar::-webkit-scrollbar{display:none}
+.rs-pill{position:static}.rs-pop{position:fixed;left:12px;right:12px;top:auto;bottom:12px;min-width:0;max-height:60vh;z-index:400;box-shadow:0 -10px 40px rgba(18,38,63,.25)}
+.rr{grid-template-columns:88px minmax(0,1fr);gap:12px;padding:11px}.rr-ph{width:88px;height:88px}
+.rr h3{font-size:16.5px}.rr-ac{grid-column:1/-1;flex-direction:row;min-width:0}.rr-ac .btn{flex:1}
+.catbanner-adv{font-size:10.5px;top:8px;left:8px;padding:3px 8px}}
 `;
 
 const ICO = {
@@ -4734,14 +4783,14 @@ const CATBANNER_SLIDE = (pl, catSlug, imgIdx) => {
   // Unpaid autofilled slots with no curated category picture get a clean icon
   // card instead of the stretched, low-res generic placeholder photo.
   const useIconFill = !custom && !catPic;
-  return `<a href="/${E(b.cs)}/${E(b.slug)}" class="catbanner-slide${custom ? "" : " catbanner-fill"}" data-secs="${secs}">\n${custom ? `<img class="catbanner-bg" src="${E(img)}" alt="" aria-hidden="true"${onerr}>` : ""}\n${useIconFill ? CATBANNER_ICONFILL(catSlug) : `<img class="catbanner-img" src="${E(img)}" alt="${E(b.name)}"${onerr}>`}\n<span class="catbanner-shade"></span>\n<span class="catbanner-cap"><b>${E(b.name)}</b>${meta ? `<span>${meta}</span>` : ""}</span>\n</a>`;
+  return `<a href="/${E(b.cs)}/${E(b.slug)}" class="catbanner-slide${custom ? "" : " catbanner-fill"}" data-secs="${secs}">\n${custom ? `<img class="catbanner-bg" src="${E(img)}" alt="" aria-hidden="true"${onerr}>` : ""}\n${useIconFill ? CATBANNER_ICONFILL(catSlug) : `<img class="catbanner-img" src="${E(img)}" alt="${E(b.name)}"${onerr}>`}\n<span class="catbanner-shade"></span>\n<span class="catbanner-tag catbanner-feat">Featured</span>\n<span class="catbanner-cap"><b>${E(b.name)}</b>${meta ? `<span>${meta}</span>` : ""}</span>\n</a>`;
 };
 
 const CATBANNER_OPEN_SLIDE = (catSlug, catName, sub) => {
   const where = sub || catName;
   const href = `/advertise?cat=${encodeURIComponent(catSlug)}${sub ? "&sub=" + encodeURIComponent(sub) : ""}`;
   const catPic = CATBANNERIMG_SET(catSlug);
-  return `<a href="${href}" class="catbanner-slide catbanner-fill catbanner-open" data-secs="8">\n${catPic ? `<img class="catbanner-img" src="${E(catPic)}" alt="${E(where)} in ${E(S.city)}">` : CATBANNER_ICONFILL(catSlug)}\n<span class="catbanner-shade"></span>\n<span class="catbanner-tag">Ad space available</span>\n<span class="catbanner-cap"><b>Your business, front and center in ${E(where)}</b><span>Everyone browsing ${E(where)} in ${E(S.city)} sees this spot first. Advertise here →</span></span>\n</a>`;
+  return `<a href="${href}" class="catbanner-slide catbanner-fill catbanner-open" data-secs="8">\n${catPic ? `<img class="catbanner-img" src="${E(catPic)}" alt="${E(where)} in ${E(S.city)}">` : CATBANNER_ICONFILL(catSlug)}\n<span class="catbanner-shade"></span>\n<span class="catbanner-tag">Ad space available</span>\n<span class="catbanner-cap"><b>Your business, front and center in ${E(where)}</b><span>Everyone browsing ${E(where)} in ${E(S.city)} sees this spot first.</span><span class="catbanner-cta">Advertise here →</span></span>\n</a>`;
 };
 
 // Shared client-side helper: shrinks an oversized photo in the browser before
@@ -4765,7 +4814,9 @@ async function CATBANNER(DB, catSlug, sub, catName) {
     console.log("CATBANNER failed: " + e.message);
   }
   const slides = placements.map(pl => CATBANNER_SLIDE(pl, catSlug));
-  if (placements.length < CATBANNER_TARGET_SLIDES) {
+  // Eric, 29 Sep: an unsold banner advertises itself ("Your business here") instead of showing
+  // unpaid businesses for free, so the autofill below is off.
+  if (false && placements.length < CATBANNER_TARGET_SLIDES) {
     try {
       const used = placements.map(pl => pl.ghl_id);
       // Unpaid autofilled slides never show a business's own photo (see below),
@@ -4798,7 +4849,7 @@ async function CATBANNER(DB, catSlug, sub, catName) {
   if (!placements.length) slides.push(CATBANNER_OPEN_SLIDE(catSlug, catName || catSlug, sub || ""));
   if (!slides.length) slides.push(CATBANNER_OPEN_SLIDE(catSlug, catName || catSlug, sub || ""));
   const multi = slides.length > 1;
-  return `<div class="catbanner" data-slides="${slides.length}">\n${slides.join("\n")}\n${multi ? `<button type="button" class="catbanner-arrow catbanner-prev" aria-label="Previous">‹</button>\n<button type="button" class="catbanner-arrow catbanner-next" aria-label="Next">›</button>\n<div class="catbanner-dots">${slides.map((_, i) => `<button type="button" class="catbanner-dot" aria-label="Slide ${i + 1}"></button>`).join("")}</div>` : ""}\n</div>\n${CATBANNER_JS}`;
+  return `<div class="catbanner" data-slides="${slides.length}">\n${slides.join("\n")}\n${multi ? `<button type="button" class="catbanner-arrow catbanner-prev" aria-label="Previous">‹</button>\n<button type="button" class="catbanner-arrow catbanner-next" aria-label="Next">›</button>\n<div class="catbanner-dots">${slides.map((_, i) => `<button type="button" class="catbanner-dot" aria-label="Slide ${i + 1}"></button>`).join("")}</div>` : ""}\n${placements.length ? `<a class="catbanner-adv" href="/advertise?cat=${encodeURIComponent(catSlug)}${sub ? "&sub=" + encodeURIComponent(sub) : ""}">Advertise here →</a>` : ""}\n</div>\n${CATBANNER_JS}`;
 }
 
 const BANNER_CATS = () => [ ...MAINS.map(name => ({
@@ -5150,6 +5201,45 @@ const FAQLD = faqs => faqs && faqs.length ? {
   }))
 } : undefined;
 
+// Results list v2 (approved mockup, 29 Sep): compact rows — rating, area and one Call button — so about twice as
+// many businesses fit on screen. Paid ad-slot rows keep their tier label and ring.
+const RESROW = (b, rank, tier) => {
+  const href = `/${E(b.cs)}/${E(b.slug)}`, hood = b.hood ? hoodName(b.hood) : "";
+  const place = [ hood ? `<b>${E(hood)}</b>` : "", b.addr ? E(CLAMP(b.addr, 48)) : "" ].filter(Boolean).join(" · ");
+  const badges = [
+    tier && tier.label ? `<span class="bdg" style="background:${tier.ring};color:${tier.fg}">${E(tier.label)}</span>` : "",
+    b.plus ? BDG("bdg-plus", "PRO") : b.premium ? BDG("bdg-feat", "PLUS") : "",
+    b.claimed ? BDG("bdg-ver", "Verified", ICO.check) : `<span class="bdg" style="background:${T.sand};color:${T.body}">Unclaimed</span>`,
+    ACHIEVEBDG(b)
+  ].filter(Boolean).join("");
+  return `<article class="rr${b.claimed ? " rr-claimed" : ""}"${tier && tier.ring ? ` style="box-shadow:0 0 0 2px ${tier.ring},${T.shadow}"` : ""}>
+<a class="rr-ph" href="${href}" tabindex="-1" aria-hidden="true">${PHOTO(b)}${rank ? `<span class="rr-rank">#${rank}</span>` : ""}</a>
+<div class="rr-b"><div class="rr-bd">${badges}</div>
+<h3><a href="${href}">${E(b.name)}</a></h3>
+${b.rat ? `<div class="rr-rt"><span class="rr-st">${STARROW(b.rat)}</span><b>${Number(b.rat).toFixed(1)}</b><span>(${NUM(b.rev || 0)} review${b.rev === 1 ? "" : "s"})${b.sub && b.sub !== b.cat ? " · " + E(b.sub) : ""}</span></div>` : b.sub && b.sub !== b.cat ? `<div class="rr-rt"><span>${E(b.sub)}</span></div>` : ""}
+${place ? `<div class="rr-ln">${ICO.pin}<span>${place}</span></div>` : ""}
+${b.claimed ? "" : `<a class="rr-claim" href="/claim/start?id=${encodeURIComponent(b.id)}">Own this business? Claim it free →</a>`}</div>
+<div class="rr-ac">${b.pr ? `<a class="btn btn-p" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}" aria-label="Call ${E(b.name)}">${ICO.phone} Call</a>` : ""}<a class="btn btn-o" href="${href}">View details</a></div>
+</article>`;
+};
+
+// Small map of the businesses on this page: OpenStreetMap tiles with numbered pins matching the list. No API key.
+function RESMAP(rows) {
+  const pts = rows.map((b, i) => ({ i: i + 1, lat: +b.lat, lng: +b.lng, n: b.name, h: `/${b.cs}/${b.slug}` })).filter(p => p.lat && p.lng && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
+  if (pts.length < 2) return "";
+  return `<div class="blk rs-card"><h3>On the map</h3><div class="rs-map" data-pts="${E(JSON.stringify(pts))}"></div><div class="rs-attr">© OpenStreetMap contributors</div></div>
+<script>(function(){var el=document.querySelector(".rs-map");if(!el)return;var P=JSON.parse(el.getAttribute("data-pts"));
+var W=el.clientWidth||300,H=el.clientHeight||250;function X(l,z){return(l+180)/360*Math.pow(2,z)*256}function Y(a,z){var r=a*Math.PI/180;return(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*Math.pow(2,z)*256}
+var la=P.map(function(p){return p.lat}),ln=P.map(function(p){return p.lng}),z=15,mxL=Math.max.apply(0,ln),mnL=Math.min.apply(0,ln),mxA=Math.max.apply(0,la),mnA=Math.min.apply(0,la);
+for(;z>8;z--){if(X(mxL,z)-X(mnL,z)<W-50&&Y(mnA,z)-Y(mxA,z)<H-50)break}
+var ox=(X(mxL,z)+X(mnL,z))/2-W/2,oy=(Y(mxA,z)+Y(mnA,z))/2-H/2,h="";
+for(var tx=Math.floor(ox/256);tx<=Math.floor((ox+W)/256);tx++)for(var ty=Math.floor(oy/256);ty<=Math.floor((oy+H)/256);ty++)h+='<img alt="" src="https://tile.openstreetmap.org/'+z+'/'+tx+'/'+ty+'.png" style="left:'+(tx*256-ox)+'px;top:'+(ty*256-oy)+'px">';
+P.forEach(function(p){var a=document.createElement("a");a.className="rs-pin";a.href=p.h;a.title=p.n;a.textContent=p.i;a.style.left=(X(p.lng,z)-ox)+"px";a.style.top=(Y(p.lat,z)-oy)+"px";h+=a.outerHTML});el.innerHTML=h})();<\/script>`;
+}
+
+// A pill that opens a small list of links (filters, sort and the Best-of lists).
+const RESPILL = (label, opts, on, extra) => opts.length ? `<details class="rs-pill${on ? " on" : ""}${extra ? " " + extra : ""}"><summary>${label}<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="rs-pop">${opts.map(x => `<a class="fopt${x.on ? " on" : ""}" href="${x.href}"${/[?&](hood|rating|claim|sort|sub)=/.test(String(x.href)) ? ' rel="nofollow"' : ""}>${E(x.label)}${x.n != null ? `<span class="n">${NUM(x.n)}</span>` : ""}</a>`).join("")}</div></details>` : "";
+
 function RESULTS(d, o) {
   const {title: title, crumb: crumb, total: total, page: page, pages: pages, rows: rows, facets: facets, q: q, sortHref: sortHref, sort: sort, baseHref: baseHref, note: note, featured: featured, faqs: faqs, catName: catName, subChips: subChips, adCards: adCards, banner: banner, topRated: topRated, topRatedLabel: topRatedLabel} = o;
   const itemListLd = rows && rows.length ? {
@@ -5182,11 +5272,44 @@ function RESULTS(d, o) {
     desc: o.metaDesc || "",
     can: S.dom + (o.canonical || baseHref),
     ld: [FAQLD(faqs), itemListLd, breadcrumbLd].filter(Boolean),
-    body: `<div class="wrap">\n<nav class="crumb">${crumb}</nav>\n<div style="padding:14px 0 22px"><h1>${E(title)}</h1>\n<p style="color:${T.muted};font-size:14px;margin:8px 0 0">${NUM(total)} ${total === 1 ? "result" : "results"}${pages > 1 ? ` · page ${page} of ${pages}` : ""}${note ? ` · ${E(note)}` : ""}</p></div>\n<div style="max-width:760px;margin-bottom:${subChips && subChips.length ? "14" : "26"}px">${SEARCHBOX(q, baseHref, catName ? `Search ${catName}…` : undefined)}</div>\n${o.bestLinks || ""}${banner || ""}\n${subChips && subChips.length ? `<div class="subchip-row" style="margin-bottom:26px">\n<button type="button" class="subchip-arrow subchip-prev" aria-label="Show previous categories">${ICO.chevL || "‹"}</button>\n<div class="subchip-track">\n${subChips.map(c => `<a href="${E(c.href)}" class="btn btn-o btn-sm"${c.on ? ` style="background:${T.navy};color:#fff;border-color:${T.navy}"` : ""}>${E(c.label)}${c.n ? ` (${NUM(c.n)})` : ""}</a>`).join("")}\n</div>\n<button type="button" class="subchip-arrow subchip-next" aria-label="Show more categories">${ICO.chevR || "›"}</button>\n</div>` : ""}\n${featured && featured.length ? `<div style="margin-bottom:26px">\n<div class="sec-h" style="margin-bottom:14px"><div><div class="kicker">Featured</div></div></div>\n<div class="grid g2">${featured.map(CARD).join("")}</div></div>` : ""}\n${topRated && topRated.length ? `<div style="margin-bottom:26px">\n<div class="sec-h" style="margin-bottom:14px"><div><div class="kicker">Highest rated</div><h2 style="font-size:20px">${E(topRatedLabel || "Top rated")}</h2></div></div>\n<div class="slider-wrap">\n<div class="slider-row" id="hoodTopRatedSlider">${topRated.map(b => CARD(b)).join("")}</div>\n${topRated.length > 3 ? `<button type="button" class="slider-arrow l" onclick="document.getElementById('hoodTopRatedSlider').scrollBy({left:-320,behavior:'smooth'})" aria-label="Previous">${ICO.chevL || "‹"}</button>\n<button type="button" class="slider-arrow r" onclick="document.getElementById('hoodTopRatedSlider').scrollBy({left:320,behavior:'smooth'})" aria-label="Next">${ICO.chevR || "›"}</button>` : ""}\n</div>\n</div>` : ""}\n<div class="filterbar">\n<details class="facc facc-filters"><summary>${ICO.filter} Filters\n<svg class="fchev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary>\n<div class="facc-panel facc-panel-wide">\n${facets.map(f => `<details class="facc-sub"><summary>${E(f.label)}\n<svg class="fchev2" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary>\n<div class="facc-sub-body${f.scroll ? " fscroll" : ""}">\n${f.opts.map(x => `<a class="fopt${x.on ? " on" : ""}" href="${x.href}"${/[?&](hood|rating|claim|sort|sub)=/.test(String(x.href)) ? ' rel="nofollow"' : ""}>${E(x.label)}${x.n != null ? `<span class="n">${NUM(x.n)}</span>` : ""}</a>`).join("")}\n</div></details>`).join("")}\n</div>\n</details>\n<details class="facc"><summary>Sort by\n<svg class="fchev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary>\n<div class="facc-panel">\n<a class="fopt${sort === "relevance" ? " on" : ""}" href="${sortHref("")}">Relevance</a>\n<a class="fopt${sort === "rating" ? " on" : ""}" href="${sortHref("rating")}">Top rated</a>\n<a class="fopt${sort === "reviews" ? " on" : ""}" href="${sortHref("reviews")}">Most reviewed</a>\n<a class="fopt${sort === "name" ? " on" : ""}" href="${sortHref("name")}">A–Z</a>\n</div>\n</details>\n<a class="clearlink" href="${baseHref}">Clear all</a>\n</div>\n<div class="results-layout">\n${facets.length ? `<aside class="sidebar-filters">\n${facets.map(f => `<div class="sidebar-facet"><div class="sidebar-facet-h">${E(f.label)}</div>\n<div class="sidebar-facet-body${f.scroll ? " fscroll" : ""}">\n${f.opts.map(x => `<a class="fopt${x.on ? " on" : ""}" href="${x.href}"${/[?&](hood|rating|claim|sort|sub)=/.test(String(x.href)) ? ' rel="nofollow"' : ""}>${E(x.label)}${x.n != null ? `<span class="n">${NUM(x.n)}</span>` : ""}</a>`).join("")}\n</div></div>`).join("")}\n<a class="clearlink" href="${baseHref}">Clear all filters</a>\n</aside>` : ""}\n<div class="results-main">\n${rows.length ? (() => {
-      const cards = rows.map(HCARD);
-      if (adCards && adCards.length) cards.splice(0, 0, ...adCards);
-      return `<div class="hcard-list">${cards.join("")}</div>`;
-    })() : adCards && adCards.length ? `<div class="hcard-list">${adCards.join("")}</div>` : `<div class="empty"><b>Nothing matched those filters.</b><p style="margin:8px 0 0"><a href="${baseHref}">Clear filters</a> and try again.</p></div>`}\n${pages > 1 ? `<div class="pager">${o.pageLinks}</div>` : ""}\n</div>\n</div>\n${FAQBLOCK(faqs)}\n${o.blogPosts && o.blogPosts.length ? `<div style="margin-top:40px">
+    body: `<div class="wrap">
+<nav class="crumb">${crumb}</nav>
+<div class="rs-ttl"><div><h1>${E(title)}</h1>
+<p class="rs-meta">${NUM(total)} ${total === 1 ? "business" : "businesses"}${pages > 1 ? ` · page ${page} of ${pages}` : ""}${note ? ` · ${E(note)}` : ""}</p></div>
+<div class="rs-srch">${SEARCHBOX(q, baseHref, catName ? `Search ${catName}…` : undefined)}</div></div>
+${banner ? `<div class="rs-ban">${banner}</div>` : ""}
+${subChips && subChips.length ? `<div class="subchip-row rs-chips">
+<button type="button" class="subchip-arrow subchip-prev" aria-label="Show previous categories">${ICO.chevL || "‹"}</button>
+<div class="subchip-track">
+${subChips.map(c => `<a href="${E(c.href)}" class="rs-chip${c.on ? " on" : ""}">${E(c.label)}${c.n ? `<span>${NUM(c.n)}</span>` : ""}</a>`).join("")}
+</div>
+<button type="button" class="subchip-arrow subchip-next" aria-label="Show more categories">${ICO.chevR || "›"}</button>
+</div>` : ""}
+<div class="rs-bar">
+${facets.filter(f => !(subChips && subChips.length && /^sub/i.test(f.label))).map(f => {
+      const cur = f.opts.find(x => x.on && !/^(all|any)/i.test(x.label));
+      return RESPILL(E(cur ? `${f.label}: ${cur.label}` : f.label), f.opts, !!cur);
+    }).join("")}
+${sortHref ? RESPILL(`Sort: ${{ rating: "Top rated", reviews: "Most reviewed", name: "A–Z" }[sort] || "Best match"}`, [ { label: "Best match", href: sortHref(""), on: !sort || sort === "relevance" }, { label: "Top rated", href: sortHref("rating"), on: sort === "rating" }, { label: "Most reviewed", href: sortHref("reviews"), on: sort === "reviews" }, { label: "A–Z", href: sortHref("name"), on: sort === "name" } ], false) : ""}
+${o.bestList && o.bestList.length ? RESPILL(`${TROPHY} Top 10 lists`, o.bestList.map(t => ({ label: `Best ${BEST_NOUN(t.n)}`, href: `/best/${t.s}` })), false, "rs-best") : ""}
+<a class="rs-clear" href="${baseHref}">Clear</a>
+</div>
+${o.bestList ? "" : o.bestLinks || ""}
+${featured && featured.length ? `<div style="margin-bottom:18px"><div class="kicker" style="margin-bottom:10px">Featured</div><div class="rs-list">${featured.map(b => RESROW(b)).join("")}</div></div>` : ""}
+<div class="rs-lay"><div class="rs-main">
+${rows.length || (adCards && adCards.length) ? `<div class="rs-list">${(adCards || []).join("")}${rows.map((b, i) => RESROW(b, page === 1 && i < 3 && (sort === "rating" || sort === "reviews") ? i + 1 : 0)).join("")}</div>` : `<div class="empty"><b>Nothing matched those filters.</b><p style="margin:8px 0 0"><a href="${baseHref}">Clear filters</a> and try again.</p></div>`}
+${pages > 1 ? `<div class="pager">${o.pageLinks}</div>` : ""}
+</div>
+<aside class="rs-side">
+${RESMAP(rows)}
+${(() => {
+      const hf = facets.find(f => /neighbourhood/i.test(f.label));
+      const top = hf ? hf.opts.filter(x => x.n && !/^(all|any)/i.test(x.label)).sort((a, b) => b.n - a.n).slice(0, 6) : [];
+      return top.length ? `<div class="blk rs-card rs-areas"><h3>Popular areas</h3>${top.map(x => `<a href="${x.href}" rel="nofollow">${E(x.label)}<span>${NUM(x.n)}</span></a>`).join("")}<a href="/neighbourhoods" class="rs-more">All neighbourhoods →</a></div>` : "";
+    })()}
+<div class="blk rs-card rs-own"><h3>Own a business${catName ? ` in ${E(catName)}` : ""}?</h3><p>Claim your free listing — add photos and hours, and get customer messages straight to your inbox.</p><a class="btn" href="/claim">Claim free →</a></div>
+</aside></div>
+${FAQBLOCK(faqs)}\n${o.blogPosts && o.blogPosts.length ? `<div style="margin-top:40px">
 <div class="sec-h" style="margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div class="kicker">From our blog</div><h2 style="font-size:22px">${E(catName || title)} guides and tips</h2></div><a href="/blog" style="font-size:14px;font-weight:600">All blog posts →</a></div>
 <div class="slider-wrap">
 <div class="slider-row slider-row-4up" id="catBlogSlider">${o.blogPosts.map(POSTCARD).join("")}</div>
@@ -6569,7 +6692,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.11-shared";
+const BUILD = "v16.13-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11455,11 +11578,10 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         }),
         pageLinks: pageLinksFor(page, pages, qs),
         facets: [ {
-          label: "Category",
+          label: "Browse a category",
           scroll: true,
           opts: d.cats.map(c => ({
             label: c.name,
-            n: c.n,
             href: `/${c.slug}`
           }))
         }, {
@@ -11761,7 +11883,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
               const sb = ROWOF(bizRow);
               const tier = TIER_STYLE[q.position];
               if (!tier) continue;
-              adCards.push(HCARD(sb, tier));
+              adCards.push(RESROW(sb, 0, tier));
             }
           } catch (e) {
             console.log("ad slot lookup failed: " + e.message);
@@ -11801,8 +11923,12 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           bestLinks: await (async () => {
             const bi = await bestIndex(DB);
             if (fSub) return BESTCTA(bi, SL(fSub), fHood);
-            const inCat = bi.types.filter(t => t.cs[0] === p[0]).slice(0, 12);
-            return inCat.length ? `<div class="blk" style="margin-bottom:22px"><h2 style="font-size:17px;margin-bottom:10px">Top-rated ${E(c.name)} in ${E(S.city)}</h2><div class="best-links" style="display:flex;flex-wrap:wrap;gap:8px">${inCat.map(t => `<a class="btn btn-o btn-sm" href="/best/${E(t.s)}">Best ${E(BEST_NOUN(t.n))}</a>`).join("")}</div></div>` : "";
+            return "";
+          })(),
+          bestList: await (async () => {
+            const bi = await bestIndex(DB);
+            if (fSub) return bi.bySlug.get(SL(fSub)) ? [ bi.bySlug.get(SL(fSub)) ] : [];
+            return bi.types.filter(t => t.cs[0] === p[0]).slice(0, 12);
           })(),
           subChips: (c.subs || []).length ? [ {
             label: "All",
