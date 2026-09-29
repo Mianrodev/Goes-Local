@@ -220,3 +220,10 @@ Listings with the same name + phone + address show once on the site: the kept co
 - **Blog/news editor image gallery:** shows every image uploaded to the site (`media` table). Alt text is made from the file name and can be edited. Pictures in posts with no alt text get the post title.
 - **Main category pages** show a row of that category's blog posts (matched on `posts.blog_cat`) under the FAQ.
 - **Best-of pages** `/best…` (v15.95). **Unclaimed listings always show `DEFAULT_LISTING_IMG`** (v15.96).
+
+## Coverage (Eric, 29 Sep)
+- Each site covers its whole county plus nearby businesses: Miami covers Miami-Dade and nearby Broward, and Orlando covers Orange County and nearby Seminole, Osceola, Lake, Polk and Brevard. **Never hide nearby businesses.** Give them a neighbourhood instead.
+- Neighbourhoods added on 29 Sep:
+  - Miami: Allapattah (33142), Silver Bluff (33145), Pinecrest (33156), Opa-locka (33054), Hollywood (33019–33024), Hallandale Beach (33009), Miramar (33025/27/29), Pembroke Pines (33026/28).
+  - Orlando: Titusville (32780/32796/32754).
+- Wrong zip mappings removed: 33142 from Wynwood, 33145 from Coconut Grove, 33156 from Coral Gables.
