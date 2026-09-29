@@ -4468,6 +4468,54 @@ const CSS = `\n@import url('https://fonts.googleapis.com/css2?family=Fraunces:op
 .hd-in .hd-r{grid-column:3;grid-row:1;justify-content:flex-end;flex-wrap:nowrap;margin-left:0}
 .hd-in .nav .mnav-only{display:block}}
 @media(max-width:560px){.hd-in .hd-r .txt{display:none}.hd-in .hd-r .btn{padding:8px 12px;font-size:12.5px}}
+.ln2-hero{height:250px;border-radius:var(--r-lg);background:var(--sand) center/cover no-repeat;position:relative;overflow:hidden}
+.ln2-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,38,63,0) 45%,rgba(18,38,63,.45))}
+.ln2-cap{position:absolute;right:16px;bottom:12px;z-index:1;color:#fff;font-size:12px;opacity:.92}
+.ln2-head{display:flex;gap:22px;align-items:flex-start;margin:-64px 0 0 24px;position:relative;z-index:2}
+.ln2-av{width:128px;height:128px;border-radius:22px;overflow:hidden;background:#fff;border:5px solid #fff;box-shadow:var(--sh);flex-shrink:0}
+.ln2-av img,.ln2-av .fill{width:100%;height:100%;object-fit:cover;display:grid;place-items:center;font-size:48px}
+.ln2-ht{padding-top:72px;min-width:0}
+.ln2-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.ln2-ht h1{font-size:38px;line-height:1.12}
+.ln2-sub{color:var(--body);font-size:15px;margin-top:6px}
+.split.ln2{margin-top:22px}
+.ln2-rate .ln2-rtop{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.ln2-big{font-family:${T.serif};font-size:46px;font-weight:700;color:var(--navy);line-height:1}
+.ln2-stars{display:flex;gap:2px}.ln2-stars svg{width:18px;height:18px}
+.ln2-cnt{font-size:13.5px;color:var(--body)}.ln2-cnt b{color:var(--navy)}
+.ln2-side{margin-left:auto;display:flex;align-items:center;gap:10px;background:#FFF7E8;border:1px solid #F3DDB0;border-radius:14px;padding:10px 14px;font-size:13px;color:var(--navy);line-height:1.35}
+.ln2-side b{font-family:${T.serif};font-size:18px}.ln2-side span{color:var(--coral)}.ln2-side span.m{color:var(--muted)}
+.ln2-side-ic{color:${T.gold};display:grid;place-items:center}.ln2-side-ic svg{width:24px;height:24px}
+.ln2-acts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.ln2-acts.n3{grid-template-columns:repeat(3,1fr)}.ln2-acts.n2{grid-template-columns:repeat(2,1fr)}.ln2-acts.n1{grid-template-columns:1fr}
+.ln2-acts .btn{justify-content:center;gap:7px;padding:11px 10px}
+.ln2-claim{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,${T.coral},#F2A65A);color:#fff;border-radius:var(--r-lg);padding:18px 22px;margin-bottom:18px}
+.ln2-claim-ic{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.2);display:grid;place-items:center;flex-shrink:0}
+.ln2-claim-ic svg{width:22px;height:22px}
+.ln2-claim b{font-family:${T.serif};font-size:18px;display:block}.ln2-claim span{font-size:13px;opacity:.94}
+.ln2-claim .btn{margin-left:auto;background:#fff;color:var(--coral-d);flex-shrink:0}
+.ln2-facts{grid-template-columns:repeat(3,1fr)}
+.ln2-map{height:240px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--sand)}
+.ln2-map iframe{width:100%;height:100%;border:0;display:block}
+.ln2-addr{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;font-size:14px;color:var(--body)}
+.ln2-addr span{display:flex;gap:6px;align-items:flex-start}.ln2-addr span svg{margin-top:4px;flex-shrink:0;color:var(--teal)}
+.ln2-more{display:inline-block;margin-top:10px;font-size:13.5px;font-weight:600}
+.ln2-simblk{margin-top:12px}.ln2-simblk h2{margin-bottom:14px}
+.ln2-sim{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.ln2-si{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff;color:inherit}
+.ln2-si:hover{border-color:var(--coral)}
+.ln2-th{width:58px;height:58px;border-radius:12px;overflow:hidden;background:var(--sand);flex-shrink:0;display:block}
+.ln2-th img,.ln2-th .fill{width:100%;height:100%;object-fit:cover;display:grid;place-items:center}
+.ln2-si b{display:block;font-size:14px;color:var(--navy);line-height:1.3}.ln2-si>span>span{font-size:12.5px;color:var(--muted)}.ln2-si em{font-style:normal;color:${T.gold};font-weight:700}
+@media(max-width:720px){
+.ln2-hero{height:170px;border-radius:16px}
+.ln2-head{margin:-46px 0 0 12px;gap:14px}.ln2-av{width:92px;height:92px;border-radius:18px;border-width:4px}
+.ln2-ht{padding-top:50px}.ln2-ht h1{font-size:26px}.ln2-sub{font-size:13.5px}
+.ln2-ht .ln2-badges{display:none}.ln2-mbadges{display:flex!important;margin-top:12px}
+.ln2-big{font-size:38px}.ln2-side{margin-left:0;width:100%}
+.ln2-acts,.ln2-acts.n3{grid-template-columns:repeat(2,1fr)}
+.ln2-claim{flex-wrap:wrap}.ln2-claim .btn{margin-left:0;width:100%;justify-content:center}
+.ln2-facts{grid-template-columns:1fr 1fr}.ln2-sim{grid-template-columns:1fr}.ln2-addr{flex-wrap:wrap}
+.split-biz.ln2 .contact-blk{order:0;margin-top:inherit}}
 `;
 
 const ICO = {
@@ -5144,6 +5192,83 @@ ${o.blogPosts.length > 3 ? `<button type="button" class="slider-arrow l" onclick
 
 const LIGHTBOX = `<div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-hidden="true">\n<button type="button" class="lightbox-close" aria-label="Close">&times;</button>\n<button type="button" class="lightbox-nav lightbox-prev" aria-label="Previous photo">${ICO.chevL || "‹"}</button>\n<div class="lightbox-body">\n<img id="lightboxImg" src="" alt="">\n<div id="lightboxCaption" class="lightbox-caption"></div>\n</div>\n<button type="button" class="lightbox-nav lightbox-next" aria-label="Next photo">${ICO.chevR || "›"}</button>\n</div>\n<script>(function(){\nvar lb=document.getElementById("lightbox"),lbImg=document.getElementById("lightboxImg"),lbCap=document.getElementById("lightboxCaption");\nif(!lb)return;\nvar items=[],idx=0;\nfunction collect(group){\n  return [].slice.call(document.querySelectorAll('img[data-lb="'+group+'"]'))\n    .filter(function(img){return img.offsetParent!==null})\n    .map(function(img){return{src:img.currentSrc||img.src,caption:img.getAttribute("data-caption")||""}})}\nfunction show(){var it=items[idx];if(!it)return;lbImg.src=it.src;lbCap.textContent=it.caption}\nfunction openAt(group,src){\n  items=collect(group);\n  if(!items.length)return;\n  var found=items.findIndex(function(it){return it.src===src});\n  idx=found>-1?found:0;\n  show();\n  lb.classList.add("open");lb.setAttribute("aria-hidden","false");\n  document.body.style.overflow="hidden"}\nfunction closeLb(){lb.classList.remove("open");lb.setAttribute("aria-hidden","true");document.body.style.overflow="";lbImg.src=""}\nfunction nav(d){if(!items.length)return;idx=(idx+d+items.length)%items.length;show()}\ndocument.addEventListener("click",function(e){\n  var img=e.target.closest("img[data-lb]");\n  if(img){openAt(img.getAttribute("data-lb"),img.currentSrc||img.src);return}\n  if(!lb.classList.contains("open"))return;\n  if(e.target.closest(".lightbox-close")||e.target===lb){closeLb();return}\n  if(e.target.closest(".lightbox-prev")){nav(-1);return}\n  if(e.target.closest(".lightbox-next")){nav(1);return}\n});\ndocument.addEventListener("keydown",function(e){\n  if(!lb.classList.contains("open"))return;\n  if(e.key==="Escape")closeLb();\n  if(e.key==="ArrowLeft")nav(-1);\n  if(e.key==="ArrowRight")nav(1)});\n})();<\/script>`;
 
+// Listing page v2 (approved mockup, 29 Sep): photo hero, big rating box, one row of actions, claim banner near
+// the top for unclaimed listings, friendlier About text, a map, and a compact "similar" list.
+const LN2_DIR = b => b.map || (b.addr ? "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(b.addr) : "");
+const LN2_WEB = b => b.web ? b.web.startsWith("http") ? b.web : "https://" + b.web : "";
+
+function LN2HEAD(b, x) {
+  const sl = withDemo(b), p = panelOf(b.id);
+  const hood = b.hood ? hoodName(b.hood) : "";
+  const heroImg = sl.cover || (b.hood ? HOODIMG(b.hood) : "");
+  const where = hood ? `${hood}, ${b.city || S.city}` : b.city || S.city;
+  const badges = [
+    b.plus ? BDG("bdg-plus", "PRO") : b.premium ? BDG("bdg-feat", "PLUS") : "",
+    b.claimed ? BDG("bdg-ver", "Verified & Approved", ICO.check) : "",
+    parseHrs2(b.hrs2) ? `<span data-open-badge class="bdg" style="background:#eee;color:#555">···</span>` : "",
+    ACHIEVEBDG(b),
+    b.claimed ? "" : `<span class="bdg" style="background:${T.sand};color:${T.body}">Not yet claimed</span>`,
+    ...(b.labels || []).slice(0, 4).map(l => {
+      const c = LBL_COLOR[l] || [ T.sand, T.body ];
+      return `<span class="bdg" style="background:${c[0]};color:${c[1]}">${E(l)}</span>`;
+    })
+  ].filter(Boolean).join("");
+  return `<div class="ln2-hero" style="${heroImg ? `background-image:url('${E(heroImg)}')` : `background:linear-gradient(135deg,${p[0]},${p[1]})`}">${!sl.cover && hood ? `<span class="ln2-cap">${E(hood)}, ${E(S.city)}</span>` : ""}</div>
+<div class="ln2-head"><div class="ln2-av">${AVATARIMG(b)}</div>
+<div class="ln2-ht"><div class="ln2-badges">${badges}</div><h1>${E(b.name)}</h1>
+<div class="ln2-sub">${E(b.sub || b.cat)} · ${E(where)}</div></div></div>
+<div class="ln2-badges ln2-mbadges" style="display:none">${badges}</div>`;
+}
+
+const LN2_RAT = b => ({ rat: b.rat || b.gpRating || 0, rev: b.rev || b.gpReviewCount || 0 });
+
+function LN2RATE(b, x) {
+  const dir = LN2_DIR(b), web = LN2_WEB(b), {rat, rev} = LN2_RAT(b);
+  const side = x.rank ? `<a class="ln2-side" href="/best/${E(x.rank.s)}"><span class="ln2-side-ic">${TROPHY}</span><div><b>#${x.rank.n}</b> in ${E(BEST_LABEL())}<br><span>${E(BEST_TITLECASE(x.rank.t))} →</span></div></a>`
+    : b.claimed && b.yrs ? `<div class="ln2-side"><span class="ln2-side-ic">${ICO.clock}</span><div><b>${E(YRS(b.yrs))}</b><br><span class="m">Trading history</span></div></div>` : "";
+  const acts = [
+    b.pr ? `<a class="btn btn-p" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}">${ICO.phone} Call</a>` : "",
+    dir ? `<a class="btn btn-o" href="${E(dir)}" rel="nofollow noopener" data-track="directions" data-biz="${E(b.id)}">${ICO.pin} Directions</a>` : "",
+    web ? `<a class="btn btn-o" href="${E(web)}" rel="nofollow noopener" data-track="website" data-biz="${E(b.id)}">${ICO.globe} Website</a>` : "",
+    `<button type="button" class="btn btn-o" data-share-url="${E(S.dom)}/${E(b.cs)}/${E(b.slug)}" data-share-name="${E(b.name)}">${ICO.share} Share</button>`
+  ].filter(Boolean);
+  return `<div class="blk ln2-rate">
+${rat || side ? `<div class="ln2-rtop">${rat ? `<div class="ln2-big">${Number(rat).toFixed(1)}</div><div><div class="ln2-stars">${STARROW(rat)}</div><div class="ln2-cnt"><b>${NUM(rev)}</b> Google review${rev === 1 ? "" : "s"}</div></div>` : ""}${side}</div>` : ""}
+<div class="ln2-acts n${acts.length}">${acts.join("")}</div></div>`;
+}
+
+const LN2CLAIM = b => b.owner_email || b.claimed ? "" : `<div class="ln2-claim"><div class="ln2-claim-ic">${ICO.shield}</div><div><b>Is this your business?</b><span>Claim it free — add your photos, hours and services, and get customer messages straight to your inbox.</span></div><a class="btn" href="/claim/start?id=${encodeURIComponent(b.id)}">Claim free →</a></div>`;
+
+function LN2ABOUT(b) {
+  const hood = b.hood ? hoodName(b.hood) : "";
+  const kind = String(b.sub || b.cat || "business");
+  const art = /^[aeiou]/i.test(kind) ? "an" : "a";
+  const {rat, rev} = LN2_RAT(b);
+  const top = rat >= 4.7 && rev >= 100;
+  const text = b.desc ? `<p>${E(b.desc)}</p>` : `<p><b>${E(b.name)}</b> is ${art} ${E(kind.toLowerCase())} in ${E(hood ? hood + ", " + (b.city || S.city) : (b.city || S.city) + ", " + (b.state || S.st))}${b.addr ? `, at ${E(b.addr)}` : ""}.${rat ? ` It's rated <b>${Number(rat).toFixed(1)} stars from ${NUM(rev)} Google review${rev === 1 ? "" : "s"}</b>${top ? ` — one of the highest-rated in ${E(S.city)}` : ""}.` : ""}</p>
+<p>${b.pr ? `Call <b>${E(FMT(b.ph || b.pr))}</b>, or send` : "Send"} an enquiry and ${b.owner_email ? "it goes straight to the business" : "our local team will pass it on"}.</p>`;
+  const facts = [
+    b.claimed ? `<div class="fact"><b>Verified</b><span>Owner-verified, details kept current</span></div>` : "",
+    rat ? `<div class="fact"><b>${Number(rat).toFixed(1)} ★</b><span>Google rating</span></div>` : "",
+    rev ? `<div class="fact"><b>${NUM(rev)}</b><span>Google reviews</span></div>` : "",
+    b.yrs ? `<div class="fact"><b>${E(YRS(b.yrs))}</b><span>Trading history</span></div>` : "",
+    hood ? `<div class="fact"><b>${E(hood)}</b><span>Neighbourhood</span></div>` : ""
+  ].filter(Boolean).slice(0, 3);
+  return `<div class="blk"><h2>About</h2>${text}${facts.length ? `<div class="facts ln2-facts">${facts.join("")}</div>` : ""}</div>`;
+}
+
+function LN2MAP(b) {
+  const q = b.lat && b.lng ? `${b.lat},${b.lng}` : b.addr ? `${b.name}, ${b.addr}` : "";
+  if (!q) return "";
+  const dir = LN2_DIR(b), hood = b.hood ? HOODS_LIVE().find(h => h.slug === b.hood) : null;
+  return `<div class="blk"><h2>Location</h2>
+<div class="ln2-map"><iframe title="Map showing ${E(b.name)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${encodeURIComponent(q)}&z=15&output=embed"></iframe></div>
+<div class="ln2-addr"><span>${ICO.pin} ${E(b.addr || hoodName(b.hood) || S.city)}</span>${dir ? `<a class="btn btn-o btn-sm" href="${E(dir)}" rel="nofollow noopener" data-track="directions" data-biz="${E(b.id)}">Get directions</a>` : ""}</div>
+${hood ? `<a class="ln2-more" href="/neighbourhood/${E(hood.slug)}">Explore more of ${E(hood.name)} →</a>` : ""}</div>`;
+}
+
+const SIMROW = b => `<a class="ln2-si" href="/${E(b.cs)}/${E(b.slug)}"><span class="ln2-th">${PHOTO(b)}</span><span><b>${E(b.name)}</b><span>${b.rat ? `<em>★ ${Number(b.rat).toFixed(1)}</em> (${NUM(b.rev || 0)}) · ` : ""}${E([ b.hood ? hoodName(b.hood) : "", b.sub ].filter(Boolean).join(" · "))}</span></span></a>`;
+
 function BIZPAGE(d, b, rel, x) {
   x = x || {};
   const bpSl = withDemo(b);
@@ -5227,10 +5352,12 @@ function BIZPAGE(d, b, rel, x) {
     desc: `${b.name}. ${b.desc ? CLAMP(b.desc, 120) : b.cat + " in " + (b.hood ? hoodName(b.hood) : S.city) + "."} Address, phone and hours.`,
     can: `${S.dom}/${b.cs}/${b.slug}`,
     ld: [ld, bizBreadcrumbLd],
-    body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / <a href="/${E(b.cs)}">${E(b.cat)}</a>${b.hood ? ` / <a href="/neighbourhood/${E(b.hood)}">${E(hoodName(b.hood))}</a>` : ""} / ${E(b.name)}</nav>\n${(() => {
-      const sl = bpSl, p = bpPanel;
-      return `<div class="lnhead${sl.cover ? "" : " lnhead-empty"}">\n<div class="lnbanner">${sl.cover ? `<img src="${E(sl.cover)}" alt="${E(b.name)}">` : `<span class="fill" style="background:linear-gradient(135deg,${p[0]},${p[1]})">${b.ic || "📍"}</span>`}</div>\n</div>`;
-    })()}\n\n<div class="split split-biz"><div>\n<div class="lnrow2">\n<div class="lnphoto">\n<div class="lnavatar">${AVATARIMG(b)}</div>\n</div>\n<div class="lnname" style="flex:1;min-width:180px;padding-bottom:6px">\n<h1 style="font-size:24px;line-height:1.2">${E(b.name)}</h1>\n<div class="lnquick">${RATE(b)}${b.rat && !b.claimed ? `<span class="lnq-src">Google rating</span>` : ""}${b.sub ? `<span>${E(b.sub)}${b.hood ? " · " + E(hoodName(b.hood)) : ""}</span>` : ""}</div>\n${b.pr ? `<a class="lnphone" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}">${ICO.phone}${E(FMT(b.ph || b.pr))}</a>` : ""}\n</div>\n</div>\n<div class="blk biz-badges-blk" style="padding:14px 18px;margin-top:10px">\n<span class="pin" style="position:static;display:inline-flex;gap:8px;margin-bottom:6px">${b.plus ? BDG("bdg-plus", "PRO") : b.premium ? BDG("bdg-feat", "PLUS") : ""}${b.claimed ? BDG("bdg-ver", "Verified & Approved", ICO.check) : ""}\n${parseHrs2(b.hrs2) ? `<span id="glOpenBadge" class="bdg" style="background:#eee;color:#555">···</span>` : ""}</span>\n<div class="tagrow">${BDG("bdg-cat", b.cat)}\n${b.hood ? BDG("bdg-cat", hoodName(b.hood)) : ""}</div>${LABELROW(b.labels, 8)}\n</div>\n<div class="blk"><h2>About this business</h2>\n${b.desc ? `<p>${E(b.desc)}</p>` : `<p style="color:${T.muted}">${E(b.name)} is ${/^[aeiou]/i.test(b.cat || "") ? "an" : "a"} ${E(b.cat)} business${b.hood ? ` serving the ${E(hoodName(b.hood))} area of ${E(S.city)}` : ` in ${E(b.city || S.city)}, ${E(b.state || S.st)}`}. This page was built from public information and hasn't been confirmed by the owner yet, so some details may be out of date. ${b.claimed ? "" : `<a href="/claim">Are you the owner?</a> Claim this listing for free to add your own description, hours, and photos.`}</p>`}\n<div class="facts">\n${b.claimed ? `<div class="fact"><b>Claimed business</b><span>Owner-verified, details kept current</span></div>` : ""}\n${b.yrs ? `<div class="fact"><b>${E(YRS(b.yrs))}</b><span>Trading history</span></div>` : ""}\n${b.claimed ? STARS(b) : ""}\n</div></div>
+    body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / <a href="/${E(b.cs)}">${E(b.cat)}</a>${b.hood ? ` / <a href="/neighbourhood/${E(b.hood)}">${E(hoodName(b.hood))}</a>` : ""} / ${E(b.name)}</nav>
+${LN2HEAD(b, x)}
+<div class="split split-biz ln2"><div>
+${LN2RATE(b, x)}
+${LN2CLAIM(b)}
+${LN2ABOUT(b)}
 
 ${b.premium && b.photos && b.photos.length ? `<div class="blk"><h2>Photos</h2>\n<div class="gallery">${b.photos.map((p, i) => `<img src="${E(p)}" alt="${E(b.name)}" loading="lazy" data-lb="gallery" data-caption="${E(b.name)} — photo ${i + 1} of ${b.photos.length}">`).join("")}</div>\n</div>` : ""}\n\n${b.claimed && (x.updates || []).length ? `<div class="blk"><h2>Events & Promotions</h2>\n<div class="upd-grid" style="margin-top:14px">${x.updates.map(u => {
       const type = [ "event", "promotion" ].includes(u.type) ? u.type : "general";
@@ -5244,35 +5371,28 @@ ${b.premium && b.photos && b.photos.length ? `<div class="blk"><h2>Photos</h2>\n
         minute: "2-digit"
       }) : "";
       return `<article class="upd-card t-${type}">\n${u.image_url ? `<img class="upd-img" src="${E(u.image_url)}" alt="${E(u.title)}" loading="lazy">` : ""}\n<div class="upd-body">\n<div class="upd-top"><span class="upd-pill t-${type}">${icon}${E(type)}</span>\n${when ? `<span class="upd-when">${E(when)}</span>` : ""}</div>\n<div class="upd-title">${E(u.title)}</div>\n${u.body ? `<p class="upd-text">${E(u.body)}</p>` : ""}\n</div></article>`;
-    }).join("")}</div>\n</div>` : ""}\n\n${(x.blogPosts || []).length ? `<div class="blk"><h2>As featured in our blog</h2>\n<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">\n${x.blogPosts.map(p => `<a href="/blog/${E(p.slug)}" style="font-weight:600">${E(p.title)} →</a>`).join("")}\n</div></div>` : ""}\n\n${b.svc.length ? `<div class="blk"><h2>Services</h2><div class="svc">\n${b.svc.map(s => `<div><span style="color:${T.teal}">${ICO.check}</span>${E(s)}</div>`).join("")}</div></div>` : ""}\n\n${b.claimed && b.code ? b.code : ""}\n\n${b.claimed ? `<div class="blk"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px">\n<h2 style="margin:0">Reviews${(x.reviews || []).length ? ` (${x.reviews.length})` : ""}</h2>\n${REVIEWSUMMARY(x.reviews || [])}\n</div>\n${(x.reviews || []).length ? `<div class="rev-list">${x.reviews.map(r => SITEREVIEWCARD(r, b.name)).join("")}</div>` : `<p style="color:${T.muted}">No reviews yet — be the first.</p>`}\n${x.session ? x.myReview ? `<p style="margin-top:14px;color:${T.muted};font-size:13px">You reviewed this business — status: ${E(x.myReview.status)}.</p>` : `<form method="POST" action="/api/review" enctype="multipart/form-data" style="margin-top:16px">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<div class="fld2"><label>Your rating</label>\n<div id="rrStars" style="font-size:30px;line-height:1;letter-spacing:4px">\n<span class="rrStar" data-v="1" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="2" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="3" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="4" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="5" style="cursor:pointer;color:#ccc">★</span>\n</div>\n<input type="hidden" id="rr" name="rating" value="" required></div>\n<script>(function(){\nvar box=document.getElementById("rrStars");if(!box)return;\nvar stars=box.querySelectorAll(".rrStar");var input=document.getElementById("rr");\nfunction paint(n){stars.forEach(function(s){s.style.color=parseInt(s.getAttribute("data-v"))<=n?"${T.gold}":"#ccc"})}\nstars.forEach(function(s){\ns.addEventListener("mouseenter",function(){paint(parseInt(s.getAttribute("data-v")))});\ns.addEventListener("click",function(){input.value=s.getAttribute("data-v");paint(parseInt(input.value))})});\nbox.addEventListener("mouseleave",function(){paint(parseInt(input.value)||0)})})();<\/script>\n<div class="fld2"><label for="rb">Your review</label><textarea id="rb" name="body" maxlength="1000"></textarea></div>\n<div class="fld2"><label for="rp">Add a photo (optional)</label><input id="rp" name="photo" type="file" accept="image/*"></div>\n<button class="btn btn-p">Submit review</button>\n<p style="font-size:11px;color:${T.faint};margin-top:6px">Your review will be moderated before it appears.</p>\n</form>` : `<p style="margin-top:14px"><a href="/signup">Create an account</a> or <a href="/login">sign in</a> to leave a review.</p>`}\n</div>\n\n${GOOGLEREVIEWS(b)}\n\n<div class="blk"><h2>Photos${(x.photos || []).length ? ` (${x.photos.length})` : ""}</h2>\n<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">\n<button type="button" id="phTabbusiness" onclick="phTab('business')" class="btn btn-p btn-sm">Business Images</button>\n<button type="button" id="phTabreview" onclick="phTab('review')" class="btn btn-o btn-sm">Review images</button>\n<button type="button" id="phTabuser" onclick="phTab('user')" class="btn btn-o btn-sm">User images</button>\n</div>\n<div class="gallery" id="phGallery">${(x.photos || []).map(p => {
+    }).join("")}</div>\n</div>` : ""}\n\n${(x.blogPosts || []).length ? `<div class="blk"><h2>As featured in our blog</h2>\n<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">\n${x.blogPosts.map(p => `<a href="/blog/${E(p.slug)}" style="font-weight:600">${E(p.title)} →</a>`).join("")}\n</div></div>` : ""}\n\n${b.svc.length ? `<div class="blk"><h2>Services</h2><div class="svc">\n${b.svc.map(s => `<div><span style="color:${T.teal}">${ICO.check}</span>${E(s)}</div>`).join("")}</div></div>` : ""}\n\n${b.claimed && b.code ? b.code : ""}\n\n${LN2MAP(b)}\n\n${b.claimed ? `${(x.reviews || []).length || x.session ? `<div class="blk"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px">\n<h2 style="margin:0">Reviews${(x.reviews || []).length ? ` (${x.reviews.length})` : ""}</h2>\n${REVIEWSUMMARY(x.reviews || [])}\n</div>\n${(x.reviews || []).length ? `<div class="rev-list">${x.reviews.map(r => SITEREVIEWCARD(r, b.name)).join("")}</div>` : `<p style="color:${T.muted}">No reviews yet — be the first.</p>`}\n${x.session ? x.myReview ? `<p style="margin-top:14px;color:${T.muted};font-size:13px">You reviewed this business — status: ${E(x.myReview.status)}.</p>` : `<form method="POST" action="/api/review" enctype="multipart/form-data" style="margin-top:16px">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<div class="fld2"><label>Your rating</label>\n<div id="rrStars" style="font-size:30px;line-height:1;letter-spacing:4px">\n<span class="rrStar" data-v="1" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="2" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="3" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="4" style="cursor:pointer;color:#ccc">★</span><span class="rrStar" data-v="5" style="cursor:pointer;color:#ccc">★</span>\n</div>\n<input type="hidden" id="rr" name="rating" value="" required></div>\n<script>(function(){\nvar box=document.getElementById("rrStars");if(!box)return;\nvar stars=box.querySelectorAll(".rrStar");var input=document.getElementById("rr");\nfunction paint(n){stars.forEach(function(s){s.style.color=parseInt(s.getAttribute("data-v"))<=n?"${T.gold}":"#ccc"})}\nstars.forEach(function(s){\ns.addEventListener("mouseenter",function(){paint(parseInt(s.getAttribute("data-v")))});\ns.addEventListener("click",function(){input.value=s.getAttribute("data-v");paint(parseInt(input.value))})});\nbox.addEventListener("mouseleave",function(){paint(parseInt(input.value)||0)})})();<\/script>\n<div class="fld2"><label for="rb">Your review</label><textarea id="rb" name="body" maxlength="1000"></textarea></div>\n<div class="fld2"><label for="rp">Add a photo (optional)</label><input id="rp" name="photo" type="file" accept="image/*"></div>\n<button class="btn btn-p">Submit review</button>\n<p style="font-size:11px;color:${T.faint};margin-top:6px">Your review will be moderated before it appears.</p>\n</form>` : `<p style="margin-top:14px"><a href="/signup">Create an account</a> or <a href="/login">sign in</a> to leave a review.</p>`}\n</div>` : ""}\n\n${GOOGLEREVIEWS(b)}\n\n${(x.photos || []).length || x.session ? `<div class="blk"><h2>Photos${(x.photos || []).length ? ` (${x.photos.length})` : ""}</h2>\n<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">\n<button type="button" id="phTabbusiness" onclick="phTab('business')" class="btn btn-p btn-sm">Business Images</button>\n<button type="button" id="phTabreview" onclick="phTab('review')" class="btn btn-o btn-sm">Review images</button>\n<button type="button" id="phTabuser" onclick="phTab('user')" class="btn btn-o btn-sm">User images</button>\n</div>\n<div class="gallery" id="phGallery">${(x.photos || []).map(p => {
       const srcLabel = {
         business: "Business Image",
         review: "Review Image",
         user: "User Image"
       }[p.source || "user"] || "Photo";
       return `<img data-src="${E(p.source || "user")}" style="display:${(p.source || "user") === "business" ? "block" : "none"}" src="${E(p.url)}" alt="${E(b.name)}" loading="lazy" data-lb="visitor" data-caption="${E(srcLabel)} — ${E(b.name)}">`;
-    }).join("")}</div>\n<p id="phEmpty" style="color:${T.muted};display:${(x.photos || []).some(p => (p.source || "user") === "business") ? "none" : "block"}">No photos in this category yet.</p>\n${x.session ? `<form method="POST" action="/api/photo" enctype="multipart/form-data" style="margin-top:14px">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<div class="fld2"><label for="pf">Add a photo</label><input id="pf" name="photo" type="file" accept="image/*" required></div>\n<button class="btn btn-p">Upload photo</button>\n<p style="font-size:11px;color:${T.faint};margin-top:6px">Your photo will be moderated before it appears, under "User images".</p>\n</form>` : `<p style="margin-top:10px"><a href="/signup">Create an account</a> or <a href="/login">sign in</a> to add a photo.</p>`}\n</div>\n<script>function phTab(t){\ndocument.querySelectorAll("#phGallery img").forEach(function(img){img.style.display=img.getAttribute("data-src")===t?"block":"none"});\nvar any=false;document.querySelectorAll("#phGallery img[data-src='"+t+"']").forEach(function(){any=true});\ndocument.getElementById("phEmpty").style.display=any?"none":"block";\n["business","review","user"].forEach(function(k){\ndocument.getElementById("phTab"+k).className=k===t?"btn btn-p btn-sm":"btn btn-o btn-sm"})}<\/script>` : ""}\n</div>\n\n<aside>\n${(() => {
+    }).join("")}</div>\n<p id="phEmpty" style="color:${T.muted};display:${(x.photos || []).some(p => (p.source || "user") === "business") ? "none" : "block"}">No photos in this category yet.</p>\n${x.session ? `<form method="POST" action="/api/photo" enctype="multipart/form-data" style="margin-top:14px">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<div class="fld2"><label for="pf">Add a photo</label><input id="pf" name="photo" type="file" accept="image/*" required></div>\n<button class="btn btn-p">Upload photo</button>\n<p style="font-size:11px;color:${T.faint};margin-top:6px">Your photo will be moderated before it appears, under "User images".</p>\n</form>` : `<p style="margin-top:10px"><a href="/signup">Create an account</a> or <a href="/login">sign in</a> to add a photo.</p>`}\n</div>\n<script>function phTab(t){\ndocument.querySelectorAll("#phGallery img").forEach(function(img){img.style.display=img.getAttribute("data-src")===t?"block":"none"});\nvar any=false;document.querySelectorAll("#phGallery img[data-src='"+t+"']").forEach(function(){any=true});\ndocument.getElementById("phEmpty").style.display=any?"none":"block";\n["business","review","user"].forEach(function(k){\ndocument.getElementById("phTab"+k).className=k===t?"btn btn-p btn-sm":"btn btn-o btn-sm"})}<\/script>` : ""}` : ""}\n</div>\n\n<aside>\n${(() => {
       const sl = withDemo(b);
       const shots = [ [ sl.store, "Store" ], [ sl.location, "Location" ] ].concat((sl.extra || []).slice(0, 4).map(u2 => [ u2, "More" ])).filter(x => /^https?:\/\//i.test(String(x[0] || "")));
       return shots.length ? `<div class="blk"><h2>Photos</h2>\n<div class="slotgrid" style="grid-template-columns:1fr 1fr">${shots.map(x => `<figure><img src="${E(x[0])}" alt="${E(b.name)} - ${E(x[1])}" loading="lazy" data-lb="slots" data-caption="${E(x[1])} — ${E(b.name)}">\n<figcaption>${E(x[1])}</figcaption></figure>`).join("")}</div></div>` : "";
-    })()}\n<div class="blk contact-blk"><h2>Contact</h2>\n${b.addr ? `<div class="meta" style="margin-bottom:10px"><span class="ic">${ICO.pin}</span><span>${E(b.addr)}</span></div>` : ""}\n${b.ph ? `<div class="meta" style="margin-bottom:10px"><span class="ic">${ICO.phone}</span><b style="color:${T.navy}">${E(FMT(b.ph))}</b></div>` : ""}\n${web ? `<div class="meta" style="margin-bottom:14px"><span class="ic">${ICO.globe}</span><a href="${E(web)}" rel="nofollow noopener" data-track="website" data-biz="${E(b.id)}">${E(b.web)}</a></div>` : ""}\n${b.email ? `<div class="meta" style="margin-bottom:14px"><span class="ic">${ICO.mail || "✉"}</span><a href="mailto:${E(b.email)}">${E(b.email)}</a></div>` : ""}\n${b.pr ? `<a class="btn btn-p btn-w" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}">Call business</a>` : ""}\n${b.map ? `<a class="btn btn-o btn-w" style="margin-top:8px" href="${E(b.map)}" rel="nofollow noopener" data-track="directions" data-biz="${E(b.id)}">Directions</a>` : ""}\n<button type="button" class="btn btn-o btn-w" style="margin-top:8px" data-share-url="${E(S.dom)}/${E(b.cs)}/${E(b.slug)}" data-share-name="${E(b.name)}">Share this business</button>\n${x.session ? `<form method="POST" action="/api/follow" style="margin-top:8px">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<button class="btn ${x.following ? "btn-p" : "btn-o"} btn-w">${x.following ? "Following ✓" : "Follow this business"}</button></form>` : `<a class="btn btn-o btn-w" style="margin-top:8px" href="/signup">Follow this business</a>`}\n</div>\n${(() => {
+    })()}\n<div class="blk contact-blk"><h2>Contact</h2>\n${b.addr ? `<div class="meta" style="margin-bottom:10px"><span class="ic">${ICO.pin}</span><span>${E(b.addr)}</span></div>` : ""}\n${b.ph ? `<div class="meta" style="margin-bottom:10px"><span class="ic">${ICO.phone}</span><b style="color:${T.navy}">${E(FMT(b.ph))}</b></div>` : ""}\n${web ? `<div class="meta" style="margin-bottom:14px"><span class="ic">${ICO.globe}</span><a href="${E(web)}" rel="nofollow noopener" data-track="website" data-biz="${E(b.id)}">${E(b.web)}</a></div>` : ""}\n${b.email ? `<div class="meta" style="margin-bottom:14px"><span class="ic">${ICO.mail || "✉"}</span><a href="mailto:${E(b.email)}">${E(b.email)}</a></div>` : ""}\n${b.pr ? `<a class="btn btn-p btn-w" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}">Call business</a>` : ""}\n${x.session ? `<form method="POST" action="/api/follow" style="margin-top:8px">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<button class="btn ${x.following ? "btn-p" : "btn-o"} btn-w">${x.following ? "Following ✓" : "Follow this business"}</button></form>` : `<a class="btn btn-o btn-w" style="margin-top:8px" href="/signup">Follow this business</a>`}\n</div>\n${(() => {
       const h2 = parseHrs2(b.hrs2);
-      if (!h2) return "";
+      if (!h2) return b.pr ? `<div class="blk"><h2><span style="color:${T.teal};vertical-align:-2px">${ICO.clock}</span> Hours</h2><p style="color:${T.muted};margin:0">Hours haven't been added yet — call <b style="color:${T.navy}">${E(FMT(b.ph || b.pr))}</b> to check they're open.</p></div>` : "";
       return `<div class="blk hrs"><h2><span style="color:${T.teal};vertical-align:-2px">${ICO.clock}</span> Hours</h2>\n${DAYS.map(([k, label]) => {
         const d = h2[k];
         return `<div class="r" data-hours-day="${k}"><span>${label}</span><span>${d ? fmtHM(d.o) + " – " + fmtHM(d.c) : "Closed"}</span></div>`;
-      }).join("")}\n</div>\n<script>(function(){\nvar H=${SJ(h2)};\nvar parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date());\nvar wd={Mon:"mon",Tue:"tue",Wed:"wed",Thu:"thu",Fri:"fri",Sat:"sat",Sun:"sun"};\nvar day="",hh=0,mm=0;\nparts.forEach(function(p){if(p.type==="weekday")day=wd[p.value];if(p.type==="hour")hh=parseInt(p.value,10)%24;if(p.type==="minute")mm=parseInt(p.value,10)});\nvar nowMin=hh*60+mm;\nfunction toMin(v){var b=v.split(":");return parseInt(b[0],10)*60+parseInt(b[1],10)}\nvar order=["mon","tue","wed","thu","fri","sat","sun"];\nvar todayIdx=order.indexOf(day),open=false;\n[day,order[(todayIdx+6)%7]].forEach(function(dk,i){ // today, then yesterday (for spans past midnight)\n  var d=H[dk];if(!d)return;\n  var o=toMin(d.o),c=toMin(d.c),t=i===0?nowMin:nowMin+1440;\n  if(c<=o)c+=1440; // overnight hours (e.g. open 6pm, close 2am)\n  if(t>=o&&t<c)open=true});\nvar b=document.getElementById("glOpenBadge");\nif(b){b.textContent=open?"Open now":"Closed now";\n  b.style.background=open?"#E6F4EA":"#FDECEA";b.style.color=open?"#1E7E34":"#B3261E"}\nvar row=document.querySelector('[data-hours-day="'+day+'"]');\nif(row)row.style.fontWeight="700"\n})();<\/script>`;
-    })()}\n${`<div class="blk" id="enquiry"><h2>Send an enquiry</h2>\n<form method="POST" action="/api/lead">\n<input type="hidden" name="business" value="${E(b.name)}">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<div class="fld2"><label for="qn">Your name *</label><input id="qn" name="name" required></div>\n<div class="fld2"><label for="qe">Your email *</label><input id="qe" name="email" type="email" required></div>\n<div class="fld2"><label for="qp">Your phone</label><input id="qp" name="phone" type="tel"></div>\n<div class="fld2"><label for="qd">What do you need?</label><textarea id="qd" name="details" placeholder="Tell them a bit about what you're looking for"></textarea></div>\n<button class="btn btn-p btn-w">Send enquiry</button>\n<p style="font-size:11px;color:${T.faint};text-align:center;margin:9px 0 0">${b.owner_email ? "Sent directly to the business." : "Our local team will pass your message on to the business."}</p>\n</form></div>`}\n${b.owner_email ? "" : `<div class="claimbox"><h3>Is this your business?</h3>\n<p>Claim this page to manage hours, services and photos — free for ${E(S.city)} owners.</p>\n<a class="btn btn-w" href="/claim?q=${encodeURIComponent(b.name)}">Claim Listing</a></div>`}\n</aside></div>\n${x.bestCta || ""}
-${!b.premium && rel.length ? `<div class="blk" style="background:transparent;border:0;padding:0;margin-top:12px">\n<h2 style="margin-bottom:16px">Similar businesses nearby</h2>\n<div class="grid g2">${rel.map(CARD).join("")}</div></div>` : ""}\n${x.isOwner ? `<div style="text-align:center;margin-top:26px;padding-top:22px;border-top:1px solid ${T.line}">
+      }).join("")}\n</div>\n<script>(function(){\nvar H=${SJ(h2)};\nvar parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date());\nvar wd={Mon:"mon",Tue:"tue",Wed:"wed",Thu:"thu",Fri:"fri",Sat:"sat",Sun:"sun"};\nvar day="",hh=0,mm=0;\nparts.forEach(function(p){if(p.type==="weekday")day=wd[p.value];if(p.type==="hour")hh=parseInt(p.value,10)%24;if(p.type==="minute")mm=parseInt(p.value,10)});\nvar nowMin=hh*60+mm;\nfunction toMin(v){var b=v.split(":");return parseInt(b[0],10)*60+parseInt(b[1],10)}\nvar order=["mon","tue","wed","thu","fri","sat","sun"];\nvar todayIdx=order.indexOf(day),open=false;\n[day,order[(todayIdx+6)%7]].forEach(function(dk,i){ // today, then yesterday (for spans past midnight)\n  var d=H[dk];if(!d)return;\n  var o=toMin(d.o),c=toMin(d.c),t=i===0?nowMin:nowMin+1440;\n  if(c<=o)c+=1440; // overnight hours (e.g. open 6pm, close 2am)\n  if(t>=o&&t<c)open=true});\ndocument.querySelectorAll("[data-open-badge],#glOpenBadge").forEach(function(b){b.textContent=open?"Open now":"Closed now";\n  b.style.background=open?"#E6F4EA":"#FDECEA";b.style.color=open?"#1E7E34":"#B3261E"});\nvar row=document.querySelector('[data-hours-day="'+day+'"]');\nif(row)row.style.fontWeight="700"\n})();<\/script>`;
+    })()}\n${`<div class="blk" id="enquiry"><h2>Send an enquiry</h2>\n<form method="POST" action="/api/lead">\n<input type="hidden" name="business" value="${E(b.name)}">\n<input type="hidden" name="ghlId" value="${E(b.id)}">\n<div class="fld2"><label for="qn">Your name *</label><input id="qn" name="name" required></div>\n<div class="fld2"><label for="qe">Your email *</label><input id="qe" name="email" type="email" required></div>\n<div class="fld2"><label for="qp">Your phone</label><input id="qp" name="phone" type="tel"></div>\n<div class="fld2"><label for="qd">What do you need?</label><textarea id="qd" name="details" placeholder="Tell them a bit about what you're looking for"></textarea></div>\n<button class="btn btn-p btn-w">Send enquiry</button>\n<p style="font-size:11px;color:${T.faint};text-align:center;margin:9px 0 0">${b.owner_email ? "Sent directly to the business." : "Our local team will pass your message on to the business."}</p>\n</form></div>`}\n</aside></div>\n${x.rank ? "" : x.bestCta || ""}
+${!b.premium && rel.length ? `<div class="blk ln2-simblk"><h2>${E(x.simTitle || "Similar businesses nearby")}</h2>\n<div class="ln2-sim">${rel.map(SIMROW).join("")}</div></div>` : ""}\n${x.isOwner ? `<div style="text-align:center;margin-top:26px;padding-top:22px;border-top:1px solid ${T.line}">
 <a class="btn btn-p btn-lg" href="/manage/hub?id=${encodeURIComponent(b.id)}">Manage your business</a>
 </div>` : ""}
-${(() => {
-      const sparse = !b.svc.length && !(b.premium && b.photos && b.photos.length) && !(b.claimed && b.code);
-      if (!sparse) return "";
-      const hood = HOODS_LIVE().find(h => h.slug === b.hood);
-      if (hood) return `<div class="blk" style="padding:0;overflow:hidden;margin-top:12px">\n<img src="${E(HOODIMG(hood.slug))}" alt="${E(hood.name)} neighbourhood in ${E(S.city)}" style="width:100%;height:170px;object-fit:cover;display:block">\n<div style="padding:22px"><h3 style="margin-bottom:6px">Explore more of ${E(hood.name)}</h3>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:14px">${E(hood.blurb)}</p>\n<a class="btn btn-o" href="/neighbourhood/${E(hood.slug)}">Browse ${E(hood.name)} →</a></div></div>`;
-      return `<div class="blk" style="margin-top:12px"><h2 style="margin-bottom:14px">Why ${E(S.brand)}</h2>\n<div class="trust" style="grid-template-columns:1fr">\n${TRUST().map((t, i) => `<div class="tr"><span class="ic">${[ ICO.shield, ICO.gift, ICO.compass ][i]}</span>\n<div><b>${E(t.t)}</b><p>${E(t.s)}</p></div></div>`).join("")}\n</div></div>`;
-    })()}
 ${LIGHTBOX}
 ${b.pr || b.map ? `<div class="mcta">${b.pr ? `<a class="btn btn-p" href="tel:${E(b.pr)}" data-track="call" data-biz="${E(b.id)}">${ICO.phone} Call</a>` : ""}${b.map ? `<a class="btn btn-o" href="${E(b.map)}" rel="nofollow noopener" data-track="directions" data-biz="${E(b.id)}">${ICO.pin} Directions</a>` : ""}</div>` : ""}
 </div>`
@@ -6443,7 +6563,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.07-shared";
+const BUILD = "v16.09-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11805,13 +11925,41 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const r = await DB.prepare("SELECT * FROM businesses WHERE cs=?1 AND slug=?2").bind(p[0], p[1]).first();
       if (r) {
         const b = ROWOF(r);
-        const relLimit = b.claimed ? 2 : 6;
-        const rel = ((await DB.prepare(`SELECT * FROM businesses WHERE cs=?1 AND slug<>?2 ORDER BY plus DESC, premium DESC, rat DESC LIMIT ${relLimit}`).bind(p[0], p[1]).all()).results || []).map(ROWOF);
+        // "Similar" list: same business type first, then same category in the same neighbourhood, then anything
+        // in the neighbourhood (so a thin category never shows unrelated businesses). Each step uses an index.
+        let rel = [], simTitle = "Similar businesses nearby";
+        const relOf = async (sql, ...a) => ((await DB.prepare(sql).bind(...a).all()).results || []).map(ROWOF);
+        if (b.sub) {
+          rel = await relOf("SELECT * FROM businesses WHERE cs=?1 AND sub=?2 AND slug<>?3 ORDER BY premium DESC, claimed DESC, rat DESC, rev DESC LIMIT 4", p[0], b.sub, p[1]);
+          if (rel.length >= 2) simTitle = `More ${BEST_NOUN(b.sub)} nearby`;
+        }
+        if (rel.length < 2 && b.hood) {
+          rel = await relOf("SELECT * FROM businesses WHERE cs=?1 AND hood=?2 AND slug<>?3 ORDER BY rat DESC, rev DESC LIMIT 4", p[0], b.hood, p[1]);
+          simTitle = `More ${b.cat} in ${hoodName(b.hood)}`;
+        }
+        if (rel.length < 2 && b.hood) {
+          rel = await relOf("SELECT * FROM businesses WHERE hood=?1 AND slug<>?2 AND rev>0 ORDER BY rev DESC LIMIT 4", b.hood, p[1]);
+          simTitle = `More in ${hoodName(b.hood)}`;
+        }
+        // Position in the city-wide Best-of list for this business type (shown only when top 10).
+        let rank = null;
+        const bIdx = b.sub ? await bestIndex(DB) : null, bt = bIdx && bIdx.bySlug.get(SL(b.sub));
+        if (bt && b.rat >= 4 && b.rev >= 5) try {
+          const csQ = bt.cs.map((_, i) => "?" + (i + 1)).join(","), subQ = bt.subs.map((_, i) => "?" + (bt.cs.length + i + 1)).join(",");
+          const n = bt.cs.length + bt.subs.length;
+          const better = await DB.prepare(`SELECT COUNT(*) n FROM businesses WHERE cs IN (${csQ}) AND sub IN (${subQ}) AND rat>=4 AND rev>=5 AND (rat*rev+86.0)/(rev+20.0) > ?${n + 1}`).bind(...bt.cs, ...bt.subs, BEST_SCORE(b)).first();
+          const pos = (better ? better.n : 99) + 1;
+          if (pos <= 10) rank = { n: pos, s: bt.s, t: bt.n };
+        } catch (e) {
+          console.log("listing rank failed: " + e.message);
+        }
         const s = await session(env, req);
         const isOwner = s ? (await ownedIds(env, s.email)).includes(b.id) : false;
         const [reviews, following, myReview, photos, updates, blogPosts] = await Promise.all([ approvedReviews(DB, b.id), s ? isFollowing(DB, b.id, s.email) : false, s ? myReviewOn(DB, b.id, s.email) : null, approvedPhotos(DB, b.id), bizUpdates(DB, b.id), bizBlogPosts(DB, b.id) ]);
         return R(BIZPAGE(d, b, rel, {
-          bestCta: b.sub ? BESTCTA(await bestIndex(DB), SL(b.sub), b.hood) : "",
+          bestCta: bIdx ? BESTCTA(bIdx, SL(b.sub), b.hood) : "",
+          rank: rank,
+          simTitle: simTitle,
           session: s,
           isOwner: isOwner,
           reviews: reviews,
@@ -11989,7 +12137,7 @@ export default {
     const h = new Headers(out.headers);
     h.set("x-gl-cache", cacheState);
     if (cacheState === "HIT") h.set("cache-control", "public, max-age=120"); else if (cacheState === "BYPASS" && /(?:^|;\s*)(gl_sess|gl_adm)=[^;\s]/.test(req.headers.get("Cookie") || "")) h.set("cache-control", "private, no-cache");
-    h.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; worker-src 'self'");
+    h.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.google.com; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; worker-src 'self'");
     h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     h.set("X-Frame-Options", "DENY");
     h.set("X-Content-Type-Options", "nosniff");
