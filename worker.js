@@ -5247,11 +5247,11 @@ const LN2CLAIM = b => b.owner_email || b.claimed ? "" : `<div class="ln2-claim">
 
 function LN2ABOUT(b) {
   const hood = b.hood ? hoodName(b.hood) : "";
-  const kind = String(b.sub || b.cat || "business");
+  const kind = b.sub && b.sub !== b.cat ? String(b.sub).toLowerCase() : `${b.cat || "local"} business`;
   const art = /^[aeiou]/i.test(kind) ? "an" : "a";
   const {rat, rev} = LN2_RAT(b);
   const top = rat >= 4.7 && rev >= 100;
-  const text = b.desc ? `<p>${E(b.desc)}</p>` : `<p><b>${E(b.name)}</b> is ${art} ${E(kind.toLowerCase())} in ${E(hood ? hood + ", " + (b.city || S.city) : (b.city || S.city) + ", " + (b.state || S.st))}${b.addr ? `, at ${E(b.addr)}` : ""}.${rat ? ` It's rated <b>${Number(rat).toFixed(1)} stars from ${NUM(rev)} Google review${rev === 1 ? "" : "s"}</b>${top ? ` — one of the highest-rated in ${E(S.city)}` : ""}.` : ""}</p>
+  const text = b.desc ? `<p>${E(b.desc)}</p>` : `<p><b>${E(b.name)}</b> is ${art} ${E(kind)} in ${E(hood ? hood + ", " + (b.city || S.city) : (b.city || S.city) + ", " + (b.state || S.st))}${b.addr ? `, at ${E(b.addr)}` : ""}.${rat ? ` It's rated <b>${Number(rat).toFixed(1)} stars from ${NUM(rev)} Google review${rev === 1 ? "" : "s"}</b>${top ? ` — one of the highest-rated in ${E(S.city)}` : ""}.` : ""}</p>
 <p>${b.pr ? `Call <b>${E(FMT(b.ph || b.pr))}</b>, or send` : "Send"} an enquiry and ${b.owner_email ? "it goes straight to the business" : "our local team will pass it on"}.</p>`;
   const facts = [
     b.claimed ? `<div class="fact"><b>Verified</b><span>Owner-verified, details kept current</span></div>` : "",
@@ -6569,7 +6569,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.10-shared";
+const BUILD = "v16.11-shared";
 
 const APP_COOKIE = "gl_app";
 
