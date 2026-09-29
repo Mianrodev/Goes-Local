@@ -2054,7 +2054,13 @@ async function syncStep(env, DB, maxPages) {
     }
     const passId = progress ? progress.passId : Date.now();
     let nextUrl = progress ? progress.nextUrl : `${API}/contacts/?locationId=${env.GHL_LOCATION_ID}&limit=100`;
-    const isPerson = c => (c.tags || []).some(t => /^(consumer|owner-account|pending-listing)$/i.test(String(t).trim()));
+    // A contact the team has approved as a listing (tagged "claimed" by the Listing Verification webhook) is a
+    // business even if it started life as someone's login contact ("consumer"/"owner-account") — otherwise an
+    // approved listing appears for a few minutes and is then dropped by the next two sync passes.
+    const isPerson = c => {
+      const tags = (c.tags || []).map(t => String(t).trim().toLowerCase());
+      return !tags.includes("claimed") && tags.some(t => /^(consumer|owner-account|pending-listing)$/.test(t));
+    };
     const existingSlugs = new Map;
     const priorByGhlId = new Map;
     try {
@@ -6563,7 +6569,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.09-shared";
+const BUILD = "v16.10-shared";
 
 const APP_COOKIE = "gl_app";
 
