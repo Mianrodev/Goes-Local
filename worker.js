@@ -746,7 +746,8 @@ const ART_PALETTES = [ [ "#2E8B8B", "#5FBDBD" ], [ "#E4572E", "#F2A65A" ], [ "#1
 
 const HOOD_ICONS = [ "🌴", "🏙️", "🌳", "🌊", "🏛️", "☀️", "⛵", "🌺", "🏘️", "🎡" ];
 
-const ARTURL = (kind, slug) => `/art/${kind}/${encodeURIComponent(String(slug || "x"))}.svg`;
+// ?v= changes when the artwork design changes, so browsers drop their 7-day copy.
+const ARTURL = (kind, slug) => `/art/${kind}/${encodeURIComponent(String(slug || "x"))}.svg?v=2`;
 
 function ARTSVG(kind, slug, icon) {
   let h = 0;
@@ -762,7 +763,9 @@ function ARTSVG(kind, slug, icon) {
     sky += ` L${x} ${top + 40 + (h >>> 20) % 60}`;
   }
   sky += " L1200 800 Z";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="1200" height="800" fill="url(#g)"/><circle cx="1010" cy="130" r="330" fill="#fff" fill-opacity=".08"/><circle cx="120" cy="800" r="260" fill="#fff" fill-opacity=".06"/><path d="${sky}" fill="#fff" fill-opacity=".14"/><text x="600" y="330" font-size="170" text-anchor="middle" dominant-baseline="middle">${ic}</text></svg>`;
+  // Business-type art sits behind a title on the Best-of cards, so its icon goes top-right, clear of the text.
+  const [tx, ty, fs] = kind === "type" ? [980, 230, 150] : [600, 330, 170];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="1200" height="800" fill="url(#g)"/><circle cx="1010" cy="130" r="330" fill="#fff" fill-opacity=".08"/><circle cx="120" cy="800" r="260" fill="#fff" fill-opacity=".06"/><path d="${sky}" fill="#fff" fill-opacity=".14"/><text x="${tx}" y="${ty}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${ic}</text></svg>`;
 }
 
 const CATIMG = slug => CIC.d[slug] || CAT_IMG[slug] || ARTURL("cat", slug);
@@ -6424,7 +6427,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.02-shared";
+const BUILD = "v16.03-shared";
 
 const APP_COOKIE = "gl_app";
 
