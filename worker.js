@@ -631,12 +631,25 @@ let CIC = {
   d: {}
 };
 
+let IMG_CREDITS = {};
+
 async function catImgOverrides(DB) {
   if (!DB) return CIC.d;
   const now = Date.now();
   if (now - CIC.t < S.ttl * 1e3) return CIC.d;
   try {
-    const rows = (await DB.prepare("SELECT key,image_url FROM content_images").all()).results || [];
+    let rows = [];
+    try {
+      rows = (await DB.prepare("SELECT key,image_url,credit,credit_url FROM content_images").all()).results || [];
+    } catch {
+      rows = (await DB.prepare("SELECT key,image_url FROM content_images").all()).results || [];
+    }
+    const cr = {};
+    for (const r of rows) if (r.image_url && r.credit) cr[r.key] = {
+      credit: r.credit,
+      url: r.credit_url || ""
+    };
+    IMG_CREDITS = cr;
     const o = {};
     for (const r of rows) if (r.image_url) o[r.key] = r.image_url;
     CIC = {
@@ -727,7 +740,36 @@ const SEOTXT = (key, fallbackTitle, fallbackDesc) => {
 // each page keeps rendering its own built-in schema either way.
 const SEOLD = key => customSchemaLd((SEOC.d[key] || {}).custom_schema || "");
 
-const CATIMG = slug => CIC.d[slug] || CAT_IMG[slug] || DEFAULT_CAT_IMG;
+// Designed artwork for anything without a photo: colours, icon and skyline are picked from the name, so no two
+// places or business types share the same stand-in picture. Served as SVG from /art/{kind}/{slug}.svg.
+const ART_PALETTES = [ [ "#2E8B8B", "#5FBDBD" ], [ "#E4572E", "#F2A65A" ], [ "#12263F", "#3A5A80" ], [ "#C8901F", "#E8C06A" ], [ "#7C5CBF", "#B49BE8" ], [ "#1BA94C", "#5FD08A" ], [ "#B8703F", "#E6B08A" ], [ "#2C6E8F", "#6FB3D2" ], [ "#C2287D", "#F07FB5" ], [ "#3A5A40", "#86A873" ] ];
+
+const HOOD_ICONS = [ "🌴", "🏙️", "🌳", "🌊", "🏛️", "☀️", "⛵", "🌺", "🏘️", "🎡" ];
+
+const ARTURL = (kind, slug) => `/art/${kind}/${encodeURIComponent(String(slug || "x"))}.svg`;
+
+function ARTSVG(kind, slug, icon) {
+  let h = 0;
+  for (const ch of String(slug)) h = h * 31 + ch.charCodeAt(0) >>> 0;
+  const [c1, c2] = ART_PALETTES[h % ART_PALETTES.length];
+  const ic = icon || (kind === "hood" ? HOOD_ICONS[(h >>> 4) % HOOD_ICONS.length] : "📍");
+  let x = 0, sky = "M0 800 L0 610";
+  while (x < 1200) {
+    h = h * 1103515245 + 12345 >>> 0;
+    const w = 60 + h % 90, top = 430 + (h >>> 8) % 180;
+    sky += ` L${x} ${top} L${x + w} ${top}`;
+    x += w + (h >>> 16) % 30;
+    sky += ` L${x} ${top + 40 + (h >>> 20) % 60}`;
+  }
+  sky += " L1200 800 Z";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="1200" height="800" fill="url(#g)"/><circle cx="1010" cy="130" r="330" fill="#fff" fill-opacity=".08"/><circle cx="120" cy="800" r="260" fill="#fff" fill-opacity=".06"/><path d="${sky}" fill="#fff" fill-opacity=".14"/><text x="600" y="330" font-size="170" text-anchor="middle" dominant-baseline="middle">${ic}</text></svg>`;
+}
+
+const CATIMG = slug => CIC.d[slug] || CAT_IMG[slug] || ARTURL("cat", slug);
+
+// Business-type photo (set per type in Admin → Category images), used by Best-of lists and claimed listings
+// without their own picture.
+const TYPEIMG = slug => CIC.d["type-" + slug] || "";
 
 const MEGAIMG = () => CIC.d["mega_promo"] || MEGA_PROMO_IMG;
 
@@ -748,7 +790,7 @@ const OWNER_IMG = "https://assets.cdn.filesafe.space/0a5ao5C3pqUq6QXdQHxe/media/
 
 const DEFAULT_HOOD_IMG = DEFAULT_CAT_IMG;
 
-const HOODIMG = slug => CIC.d["hood-" + slug] || HOOD_IMG_FALLBACK[slug] || DEFAULT_HOOD_IMG;
+const HOODIMG = slug => CIC.d["hood-" + slug] || HOOD_IMG_FALLBACK[slug] || ARTURL("hood", slug);
 
 const MEGA_PROMO_IMG = "https://assets.cdn.filesafe.space/0a5ao5C3pqUq6QXdQHxe/media/6a83324099074f5ef6042cf2.png";
 
@@ -1429,6 +1471,12 @@ async function migrate(DB, env) {
   } catch {}
   try {
     await DB.prepare("CREATE TABLE IF NOT EXISTS content_images(key TEXT PRIMARY KEY, image_url TEXT DEFAULT '', updated_at INTEGER)").run();
+    try {
+      await DB.prepare("ALTER TABLE content_images ADD COLUMN credit TEXT DEFAULT ''").run();
+    } catch {}
+    try {
+      await DB.prepare("ALTER TABLE content_images ADD COLUMN credit_url TEXT DEFAULT ''").run();
+    } catch {}
   } catch {}
   try {
     await DB.prepare("CREATE TABLE IF NOT EXISTS page_schema(key TEXT PRIMARY KEY, schema TEXT DEFAULT '', updated_at INTEGER)").run();
@@ -4475,7 +4523,7 @@ const GOOGLEREVIEWS = b => {
 
 function PHOTO(b, cls) {
   const raw = bizImg(b);
-  const src = raw === DEFAULT_LISTING_IMG && b.claimed ? CATIMG(b.cs) : raw;
+  const src = raw === DEFAULT_LISTING_IMG && b.claimed ? TYPEIMG(SL(b.sub || "")) || CATIMG(b.cs) : raw;
   const fallbackImg = b.claimed ? CATIMG(b.cs) : DEFAULT_LISTING_IMG;
   const alt = `${b.name}${b.city || S.city ? " in " + (b.city || S.city) : ""}`;
   if (src) return `<img src="${E(src)}" alt="${E(alt)}" loading="lazy" onerror="this.onerror=null;this.src='${E(fallbackImg)}'">`;
@@ -4764,7 +4812,7 @@ const LOGO = dark => BRANDLOGO() ? `<a class="lg" href="/"><img src="${E(BRANDLO
 
 const HEADER = d => `<header class="hd"><div class="wrap hd-in">\n<button type="button" class="mnav-toggle" id="mnavToggle" aria-label="Menu" aria-expanded="false">\n<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>\n${LOGO()}\n<nav class="nav" id="mnavList"><a href="/">Discover</a><a href="/login" class="mnav-only">Log in / My account</a>${CATMENU(d)}${NAV.filter(n => n.label !== "Discover" && n.label !== "Categories").map(n => n.href === "/best" ? `<a href="/best" class="nav-best" style="color:${T.coral};font-weight:700;display:inline-flex;align-items:center;gap:6px">${TROPHY}${E(BEST_LABEL())}</a>` : `<a href="${E(n.href)}">${E(n.label)}</a>`).join("")}</nav>\n<span class="hd-r" id="hdAuth"><a class="txt" href="/account" id="hdProfileLink" style="display:none">My Profile</a><a class="txt" href="/login" id="hdAuthLink">Log in</a>\n<a class="btn btn-p" href="/add">List Your Business</a></span></div></header>\n<script>(function(){\nvar mt=document.getElementById("mnavToggle"),mn=document.getElementById("mnavList");\nif(mt&&mn)mt.addEventListener("click",function(){\n  var open=mn.classList.toggle("open");\n  mt.setAttribute("aria-expanded",open?"true":"false")});\nif(document.cookie.indexOf("gl_who=1")>-1){\n  var a=document.getElementById("hdAuthLink");\n  if(a){a.textContent="Sign out";a.href="/logout"}\n  var pr=document.getElementById("hdProfileLink");\n  if(pr)pr.style.display="inline"}\nvar m=document.querySelector(".has-mega");\nif(m){var s=m.querySelector("span");\n  if(s)s.addEventListener("click",function(e){\n    if(window.matchMedia("(hover: hover)").matches)return;\n    e.preventDefault();m.classList.toggle("open")})}\ndocument.addEventListener("click",function(e){\n  var opened=e.target.closest(".facc");\n  document.querySelectorAll(".facc[open]").forEach(function(d){\n    if(d!==opened)d.removeAttribute("open")})\n  var openedSub=e.target.closest(".facc-sub");\n  document.querySelectorAll(".facc-sub[open]").forEach(function(d){\n    if(d!==openedSub)d.removeAttribute("open")})\n});\ndocument.addEventListener("click",function(e){\n  var btn=e.target.closest(".subchip-arrow");\n  if(!btn)return;\n  var row=btn.closest(".subchip-row");\n  var track=row&&row.querySelector(".subchip-track");\n  if(!track)return;\n  var amt=Math.max(track.clientWidth*0.8,160);\n  track.scrollBy({left:btn.classList.contains("subchip-prev")?-amt:amt,behavior:"smooth"})});\ndocument.addEventListener("click",function(e){\n  var t=e.target.closest("[data-share-url]");\n  if(!t)return;\n  var url=t.getAttribute("data-share-url"),name=t.getAttribute("data-share-name")||document.title;\n  if(navigator.share){navigator.share({title:name,url:url}).catch(function(){})}\n  else if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){\n    var old=t.textContent;t.textContent="Copied!";setTimeout(function(){t.textContent=old},1500)})}\n});\n})();<\/script>`;
 
-const FOOTER = d => `<footer class="ft"><div class="wrap"><div class="fg">\n<div>${LOGO()}<p>An independent directory for ${E(S.city)} — helping neighbours find trusted local businesses, and helping owners get discovered for free.</p>\n\n<button type="button" class="btn btn-p btn-sm footer-install-cta footer-install-mobile">Add this app to your phone</button>\n<button type="button" class="btn btn-o btn-sm footer-install-cta footer-install-desktop">Get quicker access — install the app</button>\n</div>\n<div><h4>Categories</h4><div class="fl">${(d.cats || []).slice(0, 6).map(c => `<a href="/${E(c.slug)}">${E(c.name)}</a>`).join("")}<a href="/best">${E(BEST_LABEL())} →</a></div></div>\n<div><h4>Neighbourhoods</h4><div class="fl">${HOODS_LIVE().slice(0, 6).map(h => `<a href="/neighbourhood/${E(h.slug)}">${E(h.name)}</a>`).join("")}${HOODS_LIVE().length > 6 ? `<a href="/neighbourhoods">See all →</a>` : ""}</div></div>\n<div><h4>For Businesses</h4><div class="fl"><a href="/add">List your business</a><a href="/claim">Claim a listing</a>\n<a href="/login">Log in</a><a href="/claim">Verification</a></div></div>\n<div><h4>Company</h4><div class="fl"><a href="/about">About</a><a href="/blog">Blog</a><a href="/news">News</a><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a>\n<a href="/terms">Terms</a></div></div>\n</div><div class="fb">\n<span>Owned and Operated by Mianro Systems · © ${(new Date).getFullYear()} ${E(S.brand)}</span>\n<span>Made with <span style="color:${T.coral}">&#10084;</span> by <a href="https://mianrosystems.com" rel="noopener">Mianro Systems</a></span>\n</div></div></footer>`;
+const FOOTER = d => `<footer class="ft"><div class="wrap"><div class="fg">\n<div>${LOGO()}<p>An independent directory for ${E(S.city)} — helping neighbours find trusted local businesses, and helping owners get discovered for free.</p>\n\n<button type="button" class="btn btn-p btn-sm footer-install-cta footer-install-mobile">Add this app to your phone</button>\n<button type="button" class="btn btn-o btn-sm footer-install-cta footer-install-desktop">Get quicker access — install the app</button>\n</div>\n<div><h4>Categories</h4><div class="fl">${(d.cats || []).slice(0, 6).map(c => `<a href="/${E(c.slug)}">${E(c.name)}</a>`).join("")}<a href="/best">${E(BEST_LABEL())} →</a></div></div>\n<div><h4>Neighbourhoods</h4><div class="fl">${HOODS_LIVE().slice(0, 6).map(h => `<a href="/neighbourhood/${E(h.slug)}">${E(h.name)}</a>`).join("")}${HOODS_LIVE().length > 6 ? `<a href="/neighbourhoods">See all →</a>` : ""}</div></div>\n<div><h4>For Businesses</h4><div class="fl"><a href="/add">List your business</a><a href="/claim">Claim a listing</a>\n<a href="/login">Log in</a><a href="/claim">Verification</a></div></div>\n<div><h4>Company</h4><div class="fl"><a href="/about">About</a><a href="/blog">Blog</a><a href="/news">News</a><a href="/pricing">Pricing</a><a href="/privacy">Privacy</a>\n<a href="/terms">Terms</a><a href="/photo-credits">Photo credits</a></div></div>\n</div><div class="fb">\n<span>Owned and Operated by Mianro Systems · © ${(new Date).getFullYear()} ${E(S.brand)}</span>\n<span>Made with <span style="color:${T.coral}">&#10084;</span> by <a href="https://mianrosystems.com" rel="noopener">Mianro Systems</a></span>\n</div></div></footer>`;
 
 const VISITORBAR = `<div id="glVisitBar" style="background:${T.navy};color:#fff;text-align:center;font-size:11.5px;padding:6px 10px;letter-spacing:.2px">Today's visitors: <b id="glVisitCount">—</b></div>\n<script>(function(){\nfunction seed(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0}return h}\nfunction rnd(x){x+=0x6D2B79F5;var t=Math.imul(x^x>>>15,x|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}\nfunction compute(){\n  var now=new Date();\n  var day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);\n  var ds=seed(day);\n  var start=3000+Math.floor(rnd(ds)*700);\n  var end=4300+Math.floor(rnd(ds+1)*700);\n  var parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(now);\n  var hh=0,mm=0;parts.forEach(function(p){if(p.type==="hour")hh=parseInt(p.value,10)%24;if(p.type==="minute")mm=parseInt(p.value,10)});\n  var minutes=hh*60+mm;\n  var frac=minutes/1440;\n  var base=start+(end-start)*frac;\n  var bucket=Math.floor(minutes/5);\n  var jitter=(rnd(ds+1000+bucket)-0.5)*24;\n  return Math.max(0,Math.round(base+jitter));\n}\nfunction paint(){var el=document.getElementById("glVisitCount");if(el)el.textContent=compute().toLocaleString("en-US")}\npaint();\nsetInterval(paint,30000);\n})();<\/script>`;
 // Per-page SEO overrides from Admin → SEO → "Any other page" (site_seo rows keyed "path:/some/page"):
@@ -5551,11 +5599,11 @@ const ADMINCATEGORIES = (role, d) => {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Categories — Admin | ${S.brand}</title><style>${CSS}\n.ctab{width:100%;border-collapse:collapse;font-size:13.5px}.ctab td,.ctab th{padding:9px 8px;border-bottom:1px solid ${T.line};text-align:left;vertical-align:middle}.ctab th{font-size:12px;color:${T.muted};font-weight:600}.ctab select,.ctab input{font-size:13px;padding:6px 8px;border:1px solid ${T.line};border-radius:8px;background:#fff}</style></head><body>\n${ADMINNAV("/admin/categories", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:1040px">\n<h1 style="margin-bottom:6px">Categories</h1>\n<p style="color:${T.muted};margin-bottom:18px">Every listing has a <b>business type</b> (like “Plumber” or “Toyota Dealer”) that sits inside one <b>main category</b> (like “Home Repair &amp; Maintenance”). Pick a different main category for any business type here — or type a new main category name to create one. Listings move the next time the listing sync runs (usually within 30 minutes), and their old web addresses forward to the new ones automatically.</p>\n${d.err ? `<div class="note note-err" style="margin-bottom:18px">${E(d.err)}</div>` : ""}${d.ok ? `<div class="note note-ok" style="margin-bottom:18px">Saved — listings move on the next sync.</div>` : ""}\n<h2 style="font-size:17px;margin:6px 0 10px">Main categories on this site</h2>\n<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px">${d.cats.map(c => `<a href="${E(qs({ main: c.name, q: "" }))}" class="chip" style="text-decoration:none${d.main === c.name ? `;border-color:${T.coral};color:${T.coral}` : ""}">${E(c.name)} · ${NUM(c.n)}</a>`).join("")}${d.main || d.q ? `<a href="/admin/categories?all=1" class="chip" style="text-decoration:none">Show all</a>` : ""}</div>\n<form method="GET" action="/admin/categories" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"><input name="q" value="${E(d.q)}" placeholder="Search business types, e.g. dealer" style="flex:1;min-width:220px;padding:9px 12px;border:1px solid ${T.line};border-radius:8px">${d.main ? `<input type="hidden" name="main" value="${E(d.main)}">` : ""}<button class="btn btn-o btn-sm">Search</button></form>\n<p style="font-size:12.5px;color:${T.faint};margin-bottom:8px">${d.main ? `Business types in <b>${E(d.main)}</b>` : d.q ? "Matching business types" : "Biggest business types"} — showing ${NUM(d.rows.length)}${d.rows.length >= 200 ? " (first 200 — search to narrow down)" : ""}.</p>\n<table class="ctab"><tr><th>Business type</th><th>Listings</th><th>Main category now</th><th>Move to</th></tr>\n${d.rows.map(r => `<tr><td>${E(r.sub)}${d.map[SL(r.sub)] ? ` <span class="bdg" style="background:${T.sand}">custom</span>` : ""}</td><td>${NUM(r.n)}</td><td>${E(r.cat)}</td><td><form method="POST" action="/admin/categories/set" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="hidden" name="sub" value="${E(r.sub)}"><input type="hidden" name="back" value="${E(qs({}))}"><select name="main">${opts(d.map[SL(r.sub)] || r.cat)}</select><input name="newmain" placeholder="or new main category" style="width:170px"><button class="btn btn-p btn-sm">Save</button></form></td></tr>`).join("")}</table>\n${d.custom.length ? `<h2 style="font-size:17px;margin:34px 0 10px">Your custom choices (${NUM(d.custom.length)})</h2>\n<table class="ctab"><tr><th>Business type</th><th>Goes into</th><th></th></tr>${d.custom.map(c => `<tr><td>${E(c.sub || c.sub_slug)}</td><td>${E(c.main)}</td><td><form method="POST" action="/admin/categories/unset"><input type="hidden" name="sub_slug" value="${E(c.sub_slug)}"><input type="hidden" name="back" value="${E(qs({}))}"><button class="btn btn-o btn-sm">Undo</button></form></td></tr>`).join("")}</table>` : ""}\n</div></body></html>`;
 };
 
-const ADMINIMAGES = (role, cats, overrides, err, ok) => `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Category images — Admin | ${S.brand}</title><style>${CSS}</style></head><body>\n${ADMINNAV("/admin/images", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:900px">\n<h1 style="margin-bottom:6px">Category tile images</h1>\n<p style="color:${T.muted};margin-bottom:24px">Controls the picture shown for each category — on the homepage tiles, in the "Categories" menu, and in the hero's category cards. A category with no custom image here just uses the site's default picture, so nothing breaks by leaving one unset.</p>\n${err ? `<div class="note note-err" style="margin-bottom:18px">${E(err)}</div>` : ""}\n${ok ? `<div class="note note-ok" style="margin-bottom:18px">Saved.</div>` : ""}\n<div class="rows">\n${cats.map(c => {
+const ADMINIMAGES = (role, cats, overrides, err, ok, types) => `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Category images — Admin | ${S.brand}</title><style>${CSS}</style></head><body>\n${ADMINNAV("/admin/images", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:900px">\n<h1 style="margin-bottom:6px">Category tile images</h1>\n<p style="color:${T.muted};margin-bottom:24px">Controls the picture shown for each category — on the homepage tiles, in the "Categories" menu, and in the hero's category cards. A category with no custom image here just uses the site's default picture, so nothing breaks by leaving one unset.</p>\n${err ? `<div class="note note-err" style="margin-bottom:18px">${E(err)}</div>` : ""}\n${ok ? `<div class="note note-ok" style="margin-bottom:18px">Saved.</div>` : ""}\n<div class="rows">\n${cats.map(c => {
   const cur = overrides[c.slug] || "";
   const eff = cur || CAT_IMG[c.slug] || DEFAULT_CAT_IMG;
   return `<div class="row" style="padding:14px 0;border-bottom:1px solid ${T.line};display:flex;gap:14px;align-items:center">\n<img src="${E(eff)}" alt="" style="width:90px;aspect-ratio:4/3;object-fit:cover;border-radius:${T.r};flex-shrink:0">\n<div style="flex:1;min-width:0">\n<b style="display:block">${E(c.name)}</b>\n<span style="font-size:11.5px;color:${T.faint}">${cur ? "Custom image set" : "Using default picture"}</span>\n</div>\n<form method="POST" action="/admin/images/set" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-shrink:0">\n<input type="hidden" name="slug" value="${E(c.slug)}">\n<input name="image" type="file" accept="image/*" required style="max-width:170px">\n<button class="btn btn-o btn-sm">${cur ? "Replace" : "Set image"}</button>\n</form>\n${cur ? `<form method="POST" action="/admin/images/reset">\n<input type="hidden" name="slug" value="${E(c.slug)}">\n<button class="btn btn-o btn-sm">Reset</button></form>` : ""}\n</div>`;
-}).join("")}\n</div>\n</div></body></html>`;
+}).join("")}\n</div>\n\n${(types || []).length ? `<h2 style="font-size:19px;margin:34px 0 6px">Business type photos</h2>\n<p style="color:${T.muted};margin-bottom:16px">Used on the ${E(S.city)}'s Best lists and for claimed businesses of that type that haven't added their own picture. A type without a photo shows designed artwork instead.</p>\n<div class="rows">${types.map(t => { const k = "type-" + t.s; const cur = overrides[k] || ""; return `<div class="row" style="padding:12px 0;border-bottom:1px solid ${T.line};display:flex;gap:14px;align-items:center"><img src="${E(cur || ARTURL("type", t.s))}" alt="" style="width:96px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0"><div style="flex:1;min-width:0"><b>${E(BEST_TITLECASE(t.n))}</b>${IMG_CREDITS[k] ? `<div style="font-size:11.5px;color:${T.faint}">${E(IMG_CREDITS[k].credit)}</div>` : ""}</div><form method="POST" action="/admin/images/set" enctype="multipart/form-data" style="display:flex;gap:6px"><input type="hidden" name="slug" value="${E(k)}"><input name="image" type="file" accept="image/*" required style="max-width:160px"><button class="btn btn-o btn-sm">${cur ? "Replace" : "Set photo"}</button></form>${cur ? `<form method="POST" action="/admin/images/reset"><input type="hidden" name="slug" value="${E(k)}"><button class="btn btn-o btn-sm">Remove</button></form>` : ""}</div>`; }).join("")}</div>` : ""}</div></body></html>`;
 
 const ADMINBANNERIMAGES = (role, cats, bySlug, err, ok) => `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Category banner photos — Admin | ${S.brand}</title><style>${CSS}</style></head><body>\n${ADMINNAV("/admin/banner-images", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:900px">\n<h1 style="margin-bottom:6px">Category banner photos</h1>\n<p style="color:${T.muted};margin-bottom:10px">The wide photos shown in the rotating banner strip at the top of each category page — for the "advertise here" slide, and for any real business shown there that hasn't been sold as a paid ad. Add a few photos to a category and the strip rotates through a different one each time, instead of repeating the same picture. Every city starts with this same set, so a brand new city launch looks finished from day one; changing these updates them everywhere they're used on this city. A category with none set here just falls back to its tile picture.</p>\n<div style="margin:0 0 22px;padding:10px 12px;background:${T.sand};border-radius:8px;font-size:12.5px;color:${T.body};line-height:1.5">📐 Use a wide photo, about 1600 × 600 pixels — like a banner, not a square photo. A square photo here will look stretched.</div>\n${err ? `<div class="note note-err" style="margin-bottom:18px">${E(err)}</div>` : ""}\n${ok ? `<div class="note note-ok" style="margin-bottom:18px">Saved.</div>` : ""}\n<div class="rows">\n${cats.map(c => {
   const imgs = bySlug[c.slug] || [];
@@ -6306,7 +6354,7 @@ function BESTPAGE(d, t, hood, rows, idx) {
     ld: [ itemList, crumbLd, FAQLD(faqs) ],
     body: `${BEST_CSS}<div class="wrap">
 <nav class="crumb"><a href="/">Home</a> / <a href="/best">${E(BEST_LABEL())}</a>${hood ? ` / <a href="/best/${E(t.s)}">${E(BEST_TITLECASE(t.n))}</a>` : ""} / ${E(place)}</nav>
-<header class="bh" style="background-image:url('${E(CATIMG(t.cs[0]))}')">
+<header class="bh" style="background-image:url('${E(TYPEIMG(t.s) || CATIMG(t.cs[0]))}')">
 <div class="kicker">${TROPHY} ${E(BEST_LABEL())}</div>
 <h1>${E(h1)}</h1>
 <div class="bh-sub"><span>${ICO.star} Ranked by Google rating &amp; reviews</span><span>${NUM(rows.length)} rated 4★+ in ${E(place)}</span><span>Updated ${E(when)}</span></div>
@@ -6352,7 +6400,7 @@ function BESTHOME(d, idx) {
 <div class="bsearch"><input type="search" id="bestQ" placeholder="What are you looking for? e.g. plumber, nail salon" aria-label="Search the lists"></div>
 </header>
 <section><h2 style="font-size:20px;margin-bottom:12px">Most popular lists</h2>
-<div class="bcards">${popular.map(t => `<a class="bcard" href="/best/${E(t.s)}" style="background-image:url('${E(CATIMG(t.cs[0]))}')"><small>Top 10</small><b>${E(BEST_TITLECASE(t.n))}</b><span>${NUM(t.k)} ranked</span></a>`).join("")}</div></section>
+<div class="bcards">${popular.map(t => `<a class="bcard" href="/best/${E(t.s)}" style="background-image:url('${E(TYPEIMG(t.s) || ARTURL("type", t.s))}')"><small>Top 10</small><b>${E(BEST_TITLECASE(t.n))}</b><span>${NUM(t.k)} ranked</span></a>`).join("")}</div></section>
 <section class="bsec" id="bestAll"><h2>All lists by category</h2>
 ${ordered.map(g => `<div class="bgrp"><div class="bgrp-h">${g.cat ? `<img src="${E(CATIMG(g.cat.slug))}" alt="${E(g.cat.name)} in ${E(S.city)}" loading="lazy">` : ""}<div><h2>${E(g.cat ? g.cat.name : "Other")}</h2><span>${NUM(g.ts.length)} lists</span></div></div>
 <div class="btiles">${g.ts.map((t, i) => `<a class="btile${i >= 8 ? " more" : ""}" href="/best/${E(t.s)}" data-q="${E(t.n.toLowerCase())}">Best ${E(BEST_NOUN(t.n))}<em>${NUM(t.k)}</em></a>`).join("")}</div>
@@ -6376,7 +6424,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.01-shared";
+const BUILD = "v16.02-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -7512,7 +7560,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         const up = await ghlUploadMedia(env, img);
         if (!up.ok) return back("?err=" + encodeURIComponent("Upload failed: " + up.err));
         try {
-          await DB.prepare("INSERT INTO content_images(key,image_url,updated_at) VALUES(?1,?2,?3) ON CONFLICT(key) DO UPDATE SET image_url=excluded.image_url,updated_at=excluded.updated_at").bind(slug, up.url, Date.now()).run();
+          await DB.prepare("INSERT INTO content_images(key,image_url,updated_at) VALUES(?1,?2,?3) ON CONFLICT(key) DO UPDATE SET image_url=excluded.image_url,updated_at=excluded.updated_at,credit='',credit_url=''").bind(slug, up.url, Date.now()).run();
         } catch (e) {
           console.log("images/set insert failed: " + e.message);
           return back("?err=" + encodeURIComponent("Couldn't save that image — " + e.message));
@@ -7547,7 +7595,8 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         }
         cats.push({ name: "Other", slug: "other" });
         const overrides = await catImgOverrides(DB);
-        return new Response(ADMINIMAGES(role, cats, overrides, u.searchParams.get("err") || "", u.searchParams.has("ok")), {
+        const bestTypes = (await bestIndex(DB)).types;
+        return new Response(ADMINIMAGES(role, cats, overrides, u.searchParams.get("err") || "", u.searchParams.has("ok"), bestTypes), {
           headers: {
             "content-type": "text/html;charset=UTF-8",
             "cache-control": "no-store"
@@ -8589,6 +8638,63 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           url: up.url,
           alt: up.alt || ""
         });
+      }
+      if (p[1] === "media" && p[2] === "import" && req.method === "POST") {
+        // Copy a free-licence photo from a web address into this site's image library and use it for a slot
+        // (key = "hood-{slug}", "type-{slug}" or a category slug), with its alt text and photo credit.
+        const JR = (o, st) => new Response(JSON.stringify(o), {
+          status: st || 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+        if (role !== "admin") return JR({
+          error: "admin only"
+        }, 401);
+        const f = await req.formData();
+        const src = String(f.get("url") || ""), key = String(f.get("key") || "").trim();
+        if (!/^https:\/\//.test(src) || !/^(hood-|type-)?[a-z0-9-]+$/.test(key)) return JR({
+          error: "bad url or key"
+        }, 400);
+        try {
+          const r = await fetch(src, {
+            headers: {
+              "user-agent": "GoesLocalImageImport/1.0 (" + S.dom + ")"
+            },
+            redirect: "follow"
+          });
+          const ct = String(r.headers.get("content-type") || "");
+          if (!r.ok || !/^image\//.test(ct)) return JR({
+            error: "fetch failed " + r.status + " " + ct
+          }, 502);
+          const buf = await r.arrayBuffer();
+          if (buf.byteLength > 10 * 1024 * 1024) return JR({
+            error: "over 10MB"
+          }, 400);
+          const name = String(f.get("name") || key + ".jpg");
+          const up = await ghlUploadMedia(env, new File([ buf ], name, {
+            type: ct
+          }));
+          if (!up.ok) return JR({
+            error: up.err
+          }, 502);
+          await DB.prepare("INSERT INTO content_images(key,image_url,credit,credit_url,updated_at) VALUES(?1,?2,?3,?4,?5) ON CONFLICT(key) DO UPDATE SET image_url=excluded.image_url,credit=excluded.credit,credit_url=excluded.credit_url,updated_at=excluded.updated_at").bind(key, up.url, String(f.get("credit") || "").slice(0, 200), String(f.get("credit_url") || "").slice(0, 300), Date.now()).run();
+          const alt = String(f.get("alt") || "").slice(0, 125);
+          if (alt) await DB.prepare("UPDATE media SET alt=?1 WHERE url=?2").bind(alt, up.url).run().catch(() => {});
+          CIC = {
+            t: 0,
+            d: {}
+          };
+          MEDIA_ALT.t = 0;
+          return JR({
+            ok: true,
+            url: up.url
+          });
+        } catch (e) {
+          return JR({
+            error: e.message
+          }, 500);
+        }
       }
       if (p[1] === "media" && p[2] === "list") {
         if (![ "admin", "agent" ].includes(role)) return new Response("[]", {
@@ -10457,6 +10563,32 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         results: []
       }))).results || [];
       return XMLRESP(XMLURLSET([ "/news", ...items.map(n => `/news/${n.slug}`) ]));
+    }
+    if (p[0] === "art" && p.length === 3 && /\.svg$/.test(p[2])) {
+      const kind = [ "hood", "cat", "type" ].includes(p[1]) ? p[1] : "cat";
+      const slug = decodeURIComponent(p[2].replace(/\.svg$/, "")).slice(0, 80);
+      let icon = "";
+      if (kind === "cat") icon = IC[slug] || "";
+      if (kind === "type") {
+        const t = (await bestIndex(DB)).bySlug.get(slug);
+        icon = t ? IC[t.cs[0]] || "" : "";
+      }
+      return new Response(ARTSVG(kind, slug, icon), {
+        headers: {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=604800"
+        }
+      });
+    }
+    if (u.pathname === "/photo-credits") {
+      const rows = Object.entries(IMG_CREDITS).sort((a, b) => a[0].localeCompare(b[0]));
+      const label = k => k.startsWith("hood-") ? hoodName(k.slice(5)) : k.startsWith("type-") ? TC(k.slice(5).replace(/-/g, " ")) : (d.cats.find(c => c.slug === k) || {}).name || k;
+      return R(PAGE(d, {
+        title: `Photo credits | ${S.brand}`,
+        desc: `Credits for the photographs used on ${S.brand}.`,
+        can: S.dom + "/photo-credits",
+        body: `<div class="wrap" style="max-width:860px;padding-bottom:40px"><nav class="crumb"><a href="/">Home</a> / Photo credits</nav><h1 style="margin:14px 0 10px">Photo credits</h1><p style="color:${T.muted};margin-bottom:20px">Some photos on this site are used under free licences (Creative Commons or public domain). Thank you to the photographers below.</p>${rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:14px">${rows.map(([k, c]) => `<tr style="border-top:1px solid ${T.line}"><td style="padding:9px 6px;font-weight:600">${E(label(k))}</td><td style="padding:9px 6px">${c.url ? `<a href="${E(c.url)}" rel="nofollow noopener" target="_blank">${E(c.credit)}</a>` : E(c.credit)}</td></tr>`).join("")}</table>` : `<p>No credited photos yet.</p>`}</div>`
+      }));
     }
     if (u.pathname === "/sitemap-best.xml") {
       const idx = await bestIndex(DB);
