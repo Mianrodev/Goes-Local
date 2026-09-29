@@ -4381,6 +4381,8 @@ const NOTIFY_TPL = {
   deletion_request: "admin_deletion_request",
   enquiry: "admin_enquiry"
 };
+const DEFAULT_NOTIFY_EMAIL = "dev1@mianrosystems.com";
+
 async function getNotifyEmails(DB, env, kind) {
   if (DB) try {
     const row = await DB.prepare("SELECT v FROM meta WHERE k=?1").bind("notify_" + kind).first();
@@ -4388,7 +4390,9 @@ async function getNotifyEmails(DB, env, kind) {
   } catch (e) {
     console.log("getNotifyEmails failed: " + e.message);
   }
-  return env.ADMIN_NOTIFY_EMAIL ? [ env.ADMIN_NOTIFY_EMAIL ] : [];
+  // No list saved for this alert: use ADMIN_NOTIFY_EMAIL if it is a real address, else the company default (Eric, 29 Sep).
+  const fb = String(env.ADMIN_NOTIFY_EMAIL || "").trim();
+  return [ /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fb) ? fb : DEFAULT_NOTIFY_EMAIL ];
 }
 async function setNotifyEmails(DB, kind, emailsStr) {
   const v = String(emailsStr || "").split(",").map(s => s.trim()).filter(Boolean).join(",");
@@ -6439,7 +6443,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.06-shared";
+const BUILD = "v16.07-shared";
 
 const APP_COOKIE = "gl_app";
 
