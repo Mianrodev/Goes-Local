@@ -227,3 +227,12 @@ Listings with the same name + phone + address show once on the site: the kept co
   - Miami: Allapattah (33142), Silver Bluff (33145), Pinecrest (33156), Opa-locka (33054), Hollywood (33019–33024), Hallandale Beach (33009), Miramar (33025/27/29), Pembroke Pines (33026/28).
   - Orlando: Titusville (32780/32796/32754).
 - Wrong zip mappings removed: 33142 from Wynwood, 33145 from Coconut Grove, 33156 from Coral Gables.
+
+## Lead-source tags (since v16.04, requested by SG)
+- Website leads are tagged in the CRM by how they found the site. This applies to "List your business" and "Claim a listing".
+- **`seoinbound`:** the lead came from a search engine or an AI assistant.
+- **`emailinbound`:** the lead clicked a link in one of our emails. That is either a link with `utm_medium=email`, or a visit from a webmail site.
+- **Direct and social visits** get neither tag.
+- **Campaign links must carry** `?utm_source=ghl&utm_medium=email&utm_campaign=<name>`. Many email apps hide where a click came from.
+- **Email replies:** a positive email *reply* never reaches the website, so the team (or a GHL workflow) adds `emailinbound` in the CRM.
+- **Where the rules live:** `leadChannelTag()` in worker.js.
