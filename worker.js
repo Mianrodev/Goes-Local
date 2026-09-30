@@ -4789,7 +4789,9 @@ const CATBANNER_SLIDE = (pl, catSlug, imgIdx) => {
 const CATBANNER_OPEN_SLIDE = (catSlug, catName, sub) => {
   const where = sub || catName;
   const href = `/advertise?cat=${encodeURIComponent(catSlug)}${sub ? "&sub=" + encodeURIComponent(sub) : ""}`;
-  const catPic = CATBANNERIMG_SET(catSlug);
+  // The plain category photo (home-page tile) rather than the banner artwork, which often has an old ad's
+  // wording baked in and clashes with the "Advertise here" text.
+  const catPic = CATIMG_SET(catSlug) || CATBANNERIMG_SET(catSlug);
   return `<a href="${href}" class="catbanner-slide catbanner-fill catbanner-open" data-secs="8">\n${catPic ? `<img class="catbanner-img" src="${E(catPic)}" alt="${E(where)} in ${E(S.city)}">` : CATBANNER_ICONFILL(catSlug)}\n<span class="catbanner-shade"></span>\n<span class="catbanner-tag">Ad space available</span>\n<span class="catbanner-cap"><b>Your business, front and center in ${E(where)}</b><span>Everyone browsing ${E(where)} in ${E(S.city)} sees this spot first.</span><span class="catbanner-cta">Advertise here →</span></span>\n</a>`;
 };
 
@@ -6692,7 +6694,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.13-shared";
+const BUILD = "v16.14-shared";
 
 const APP_COOKIE = "gl_app";
 
