@@ -243,8 +243,26 @@ function sanitizeFreeHTML(raw) {
   return html;
 }
 
+// The editor sends HTML that already contains entities ("&amp;", "&nbsp;"); escaping the whole string turned
+// them into "&amp;amp;", which showed as "&amp;" in posts and broke links with "&" in them. Collapse those back
+// (never "&lt;"/"&gt;", so escaped text can't turn into tags).
+const FIXAMP = h => {
+  let prev;
+  do {
+    prev = h;
+    h = h.replace(/&amp;(amp|quot|#0?39|nbsp|#\d{2,5}|#x[0-9a-f]{2,4});/gi, "&$1;");
+  } while (h !== prev);
+  return h;
+};
+
+// A heading that is only a URL-style anchor ("cheapest-parking-options") becomes readable text.
+const FIXSLUGHEAD = h => h.replace(/<(h[2-4])([^>]*)>(<strong>)?([a-z0-9]+(?:-[a-z0-9]+)+)(<\/strong>)?<\/\1>/g, (m, t, a, s1, slug, s2) => {
+  const txt = slug.replace(/-/g, " ");
+  return `<${t}${a}>${s1 || ""}${txt.charAt(0).toUpperCase() + txt.slice(1)}${s2 || ""}</${t}>`;
+});
+
 function sanitizeRichHTML(raw) {
-  let html = E(String(raw || ""));
+  let html = FIXAMP(E(String(raw || "")));
   html = html.replace(/&lt;b(\s[\s\S]*?)?\s*\/?&gt;/gi, "&lt;strong&gt;").replace(/&lt;\/b\s*&gt;/gi, "&lt;/strong&gt;");
   html = html.replace(/&lt;i(\s[\s\S]*?)?\s*\/?&gt;/gi, "&lt;em&gt;").replace(/&lt;\/i\s*&gt;/gi, "&lt;/em&gt;");
   for (const t of [ "p", "h2", "h3" ]) {
@@ -334,7 +352,7 @@ const ALTFILL = (html, title) => String(html || "").replace(/<img\b([^>]*?)\balt
 const renderPostBody = (raw, isHtml) => {
   const s = String(raw || "");
   if (!isHtml) return MDLITE(s);
-  return /&amp;(?:amp;)*lt;/.test(s) ? repairRichHTML(s) : stripStaleSpans(s);
+  return FIXSLUGHEAD(FIXAMP(/&amp;(?:amp;)*lt;/.test(s) ? repairRichHTML(s) : stripStaleSpans(s)));
 };
 
 let HOOD_CACHE = {
@@ -6694,7 +6712,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.14-shared";
+const BUILD = "v16.15-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -10576,7 +10594,9 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (u.pathname === "/advertise" && req.method === "GET") {
       const s = await session(env, req);
       const here = "/advertise" + (u.search || "");
-      if (!s) return Response.redirect(AUTH.SITE_URL + "/login?next=" + encodeURIComponent(here), 302);
+      // Visitors who aren't logged in (e.g. from a banner's "Advertise here") see the plans first instead of a
+      // login wall; owners who are logged in go straight to picking a spot.
+      if (!s) return Response.redirect(AUTH.SITE_URL + "/pricing", 302);
       const d = await SHELL(DB, env);
       const ids = await ownedIds(env, s.email);
       if (!ids.length) return R2(NOTICE(d, "Claim a listing first", `Ad space is for businesses already on ${S.brand}. Claim your free listing, then come back here to advertise it.`, "Claim your listing", "/claim"));
