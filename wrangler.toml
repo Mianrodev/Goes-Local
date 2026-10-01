@@ -1,7 +1,7 @@
 # One file (worker.js) deployed once per city. City differences live in the
 # dashboard Variables (CITY_*, GHL tokens, keys) and each city's own D1 — never here.
 #
-# Every value below was copied from the live Workers on 2026-09-25.
+# Orlando and Miami values were copied from the live Workers on 2026-09-25; Tampa was added 2026-10-01.
 # `npm run check-live` compares this file with what is live; the deploy script
 # refuses to run while anything here disagrees.
 
@@ -57,3 +57,27 @@ database_id = "b0226c38-0b16-45d9-84bf-603435efa245"
 [[env.miami.kv_namespaces]]
 binding = "SESSIONS"
 id = "4355959c05424505953f2ccf725eee4c"   # GOES_LOCAL_SESSIONS
+
+[env.tampa]
+name = "goes-local-tampa-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "tampagoeslocal.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }   # D1 lives in APAC (Singapore); run the Worker next to it
+
+[env.tampa.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.tampa.d1_databases]]
+binding = "tampa-directory-db"
+database_name = "tampa-directory-db"
+database_id = "dacebb72-57c8-418e-ae18-8fa9697ea4ed"
+
+[[env.tampa.kv_namespaces]]
+binding = "SESSIONS"
+id = "2c08d7ffc02b40ffbb4faed2aac0411d"   # GOES_LOCAL_TAMPA_SESSIONS
