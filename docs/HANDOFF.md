@@ -191,7 +191,11 @@ Release routine:
 
 History: v15.76 CRM Business Name on existing contacts → v15.77 GA IDs to `CITY_GA_IDS` → v15.78 schema box limit removed → v15.79 SEO nav tab + per-page JSON-LD.
 
-## 8. Launching the next city (Tampa)
+## 8. Launching the next city
+
+**Tampa went live 2 Oct 2026 (v16.18)** following these steps: Worker `goes-local-tampa-api`, D1 `tampa-directory-db`, KV `GOES_LOCAL_TAMPA_SESSIONS`, starter content `seed/tampa.sql`, 25 neighbourhoods, bot rules applied. The custom domain only attaches once the zone's old A/CNAME record for the apex is deleted (error 100117). Until then, check the city with `BASE=https://<worker>.workers.dev node scripts/migrate-verify.mjs <city> <ver>`. Still open for Tampa: logo upload, GA ID, neighbourhood photos, geocoding (maps stay blank until lat/lng is filled), STATUS_WEBHOOK_KEY / PAYMENT_WEBHOOK_KEY.
+
+Steps for the next city:
 
 1. GHL: clone a sub-account from the Miami snapshot; verify the sending domain.
 2. Buy domain, add to Cloudflare.
