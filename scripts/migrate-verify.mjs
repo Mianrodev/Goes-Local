@@ -16,7 +16,8 @@ if (!KEY) { console.error("ADMIN_LOGIN_KEY is not set."); process.exit(2); }
 const CHECK = createHash("sha256").update("gl-check:" + KEY).digest("hex").slice(0, 32);
 const cfg = parse(readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8"));
 const route = (cfg.env[city].routes || []).find(r => r.custom_domain) || cfg.env[city].routes[0];
-const base = "https://" + route.pattern.replace(/\/.*$/, "");
+// BASE=https://<worker>.workers.dev overrides the domain (used while a new city's domain is not attached yet).
+const base = process.env.BASE || ("https://" + route.pattern.replace(/\/.*$/, ""));
 
 const login = await fetch(base + "/admin/login", {
   method: "POST", redirect: "manual", headers: { "x-gl-check": CHECK },

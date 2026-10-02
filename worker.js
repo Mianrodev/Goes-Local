@@ -4977,9 +4977,10 @@ const CATMENU = d => {
 
 const SEARCHBOX = (q, act, placeholder) => `<form class="search" role="search" action="${act || "/search"}">\n<span class="fld"><span style="color:${T.teal}">${ICO.pin}</span><input name="loc" value="${E(S.city)}, ${E(S.st)}" aria-label="Location"></span>\n<span class="fld q"><span style="color:${T.muted}">${ICO.search}</span>\n<input name="q" value="${E(q || "")}" placeholder="${E(placeholder || "Plumber, dentist, croquetas, tow truck…")}" aria-label="Search"></span>\n<button class="btn btn-p">Search</button></form>`;
 
-const BRAND_LOGO_URL = "https://assets.cdn.filesafe.space/0a5ao5C3pqUq6QXdQHxe/media/6a7e1f87cf50f900f2c143d8.png";
 
-const BRANDLOGO = () => CIC.d["brand_logo"] || BRAND_LOGO_URL;
+// Each city uploads its own logo in /admin/hero (content_images.brand_logo). Until it does, LOGO()
+// shows a text logo with the city's own brand name — never another city's picture.
+const BRANDLOGO = () => CIC.d["brand_logo"] || "";
 
 const LOGO = dark => BRANDLOGO() ? `<a class="lg" href="/"><img src="${E(BRANDLOGO())}" alt="${E(S.brand)}" style="height:34px;width:auto;display:block"></a>` : `<a class="lg" href="/"><span class="lg-m">${ICO.palm}</span>\n<span><b${dark ? ` style="color:#fff"` : ""}>${E(S.brand)}</b><span>${E(S.tagline)}</span></span></a>`;
 
@@ -5088,7 +5089,7 @@ function HOME(d, feat, hoodCounts, openNow, homeEvents, homePosts, heroTagRows, 
       "@id": orgId,
       name: S.brand,
       url: S.dom + "/",
-      logo: BRANDLOGO(),
+      logo: BRANDLOGO() || undefined,
       description: `An independent directory for ${S.city} — helping neighbours find trusted local businesses, and helping owners get discovered for free.`,
       areaServed: {
         "@type": "City",
@@ -6132,10 +6133,10 @@ const NEWSPOST = (d, n, taggedBiz) => {
     publisher: {
       "@type": "Organization",
       name: S.brand,
-      logo: {
+      logo: BRANDLOGO() ? {
         "@type": "ImageObject",
         url: BRANDLOGO()
-      }
+      } : undefined
     },
     mainEntityOfPage: {
       "@type": "WebPage",
@@ -6230,10 +6231,10 @@ const BLOGPOST = (d, p, x) => {
     publisher: {
       "@type": "Organization",
       name: S.brand,
-      logo: {
+      logo: BRANDLOGO() ? {
         "@type": "ImageObject",
         url: BRANDLOGO()
-      }
+      } : undefined
     },
     mainEntityOfPage: {
       "@type": "WebPage",
@@ -6758,7 +6759,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.17-shared";
+const BUILD = "v16.18-shared";
 
 const APP_COOKIE = "gl_app";
 
