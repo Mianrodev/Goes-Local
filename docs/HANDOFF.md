@@ -234,3 +234,6 @@ Listings with the same name + phone + address show once on the site: the kept co
 - **Never removed.** Email is tracked in GHL by `emailreplied`, so the site adds no email tag. `emailinbound` from v16.04 was dropped.
 - **`/admin/seotags`** adds the tag to past leads. It's safe to re-run.
 - **Where the rules live:** `leadChannelTag()` in worker.js.
+
+## Statewide trade sites (since v16.18)
+The same code can run a statewide directory for one trade (first planned: Florida plumbers), on its own Worker, D1, KV and GHL sub-account, set up like a new city (§8). Extra Variables, all optional: `CITY_AREA_WORD=City` (pages at `/city/{slug}`, `/cities`), `CITY_AREAS_FROM=city` (listings are grouped by their own town; towns are added automatically during sync), `CITY_VALID_ZIPS=32,33,34` (zip starts allowed), `CITY_HEADLINE`, `CITY_NOUN=Plumbers`, `CITY_SEARCH_HINT`. Suggested core values: `CITY_NAME=Florida`, `CITY_STATE=FL`, `CITY_COUNTY=Florida`. Load `seed/plumbing-categories.sql` into its D1 after the first migrate. See `changelog/v16.18.md`.
