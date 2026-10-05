@@ -2303,8 +2303,10 @@ const ROWOF = r => ({
   logo: BADLOGO.s.has(r.logo) ? "" : r.logo,
   map: r.map,
   ic: r.ic || "📍",
-  rat: r.rat,
-  rev: r.rev,
+  // Once Google Places has refreshed a listing (claimed listings only), its live rating/count win
+  // over the older CRM import, so the page matches the business's Google profile.
+  rat: r.gp_synced_at && r.gp_review_count ? r.gp_rating || r.rat : r.rat,
+  rev: r.gp_synced_at && r.gp_review_count ? r.gp_review_count : r.rev,
   yrs: r.yrs,
   premium: !!r.premium,
   plus: !!r.plus,
@@ -2637,10 +2639,11 @@ async function applyListingVerification(env, DB, cid) {
     // email, so it's what keeps this from sending twice.
     if (biz && !biz.claim_invited_at) {
       if (biz.email && !junkEmail(biz.email)) {
-        const href = `${S.dom}/${biz.cs}/${biz.slug}`;
+        const href = CLAIMLINK(biz);
         const sent = await sendTplEmail(env, DB, biz.email, "claim_invite", {
           business: biz.name,
-          brand: S.brand
+          brand: S.brand,
+          email: biz.owner_email || biz.email
         }, href, undefined, biz.ghl_id);
         if (sent) {
           await DB.prepare("UPDATE businesses SET claim_invited_at=?1 WHERE ghl_id=?2").bind(Date.now(), biz.ghl_id).run();
@@ -3183,10 +3186,11 @@ async function pendingEmailInviteBatch(env, DB, maxUpdates) {
         continue;
       }
       if (!biz.email || junkEmail(biz.email)) continue;
-      const href = `${S.dom}/${biz.cs}/${biz.slug}`;
+      const href = CLAIMLINK(biz);
       const wasSent = await sendTplEmail(env, DB, biz.email, "claim_invite", {
         business: biz.name,
-        brand: S.brand
+        brand: S.brand,
+        email: biz.owner_email || biz.email
       }, href, undefined, biz.ghl_id);
       if (wasSent) {
         await DB.prepare("UPDATE businesses SET claim_invited_at=?1 WHERE ghl_id=?2").bind(Date.now(), biz.ghl_id).run();
@@ -4152,11 +4156,11 @@ const EMAIL_TEMPLATES = {
   claim_invite: {
     label: "Invite a verified business to claim its listing",
     description: "Sent manually by staff to a business whose listing has been verified, inviting them to claim it.",
-    vars: [ "business", "brand" ],
+    vars: [ "business", "brand", "email" ],
     subject: "Claim your free listing on {{brand}}",
     title: "{{business}} is ready to claim",
-    body: "<p>Your business, <b>{{business}}</b>, has been verified on {{brand}}. Claim your free listing to manage your hours, photos and description — it only takes a minute.</p>",
-    btn: "Claim my listing",
+    body: "<p>Your business, <b>{{business}}</b>, has been verified on {{brand}}. To manage your listing — hours, photos, services and customer messages — create your free account with this email address: <b>{{email}}</b>. It only takes a minute.</p><p>Already set a password? Just log in with the same email.</p>",
+    btn: "Manage my listing",
     noExpiry: true
   },
   claim_confirm: {
@@ -4537,7 +4541,7 @@ const CSS = `\n@import url('https://fonts.googleapis.com/css2?family=Fraunces:op
 .ln2-ht .ln2-badges{display:none}.ln2-mbadges{display:flex!important;margin-top:12px}
 .ln2-big{font-size:38px}.ln2-side{margin-left:0;width:100%}
 .ln2-acts,.ln2-acts.n3{grid-template-columns:repeat(2,1fr)}
-.ln2-claim{flex-wrap:wrap}.ln2-claim .btn{margin-left:0;width:100%;justify-content:center}
+.ln2-own{margin:-4px 0 18px;font-size:13.5px;color:var(--muted)}.ln2-own a{font-weight:700}.ln2-claim{flex-wrap:wrap}.ln2-claim .btn{margin-left:0;width:100%;justify-content:center}
 .ln2-facts{grid-template-columns:1fr 1fr}.ln2-sim{grid-template-columns:1fr}.ln2-addr{flex-wrap:wrap}
 .split-biz.ln2 .contact-blk{order:0;margin-top:inherit}}
 .lpx-hero{position:relative;padding:54px 24px 70px;background:var(--navy) center/cover;color:#fff}
@@ -5457,7 +5461,10 @@ ${rat || side ? `<div class="ln2-rtop">${rat ? `<div class="ln2-big">${Number(ra
 <div class="ln2-acts n${acts.length}">${acts.join("")}</div></div>`;
 }
 
-const LN2CLAIM = b => b.owner_email || b.claimed ? "" : `<div class="ln2-claim"><div class="ln2-claim-ic">${ICO.shield}</div><div><b>Is this your business?</b><span>Claim it free — add your photos, hours and services, and get customer messages straight to your inbox.</span></div><a class="btn" href="/claim/start?id=${encodeURIComponent(b.id)}">Claim free →</a></div>`;
+// Claim-invite button: straight to account creation with the email the site will recognise as the owner.
+const CLAIMLINK = biz => `${S.dom}/login?tab=signup&email=${encodeURIComponent(biz.owner_email || biz.email || "")}`;
+
+const LN2CLAIM = b => b.owner_email || b.claimed ? `<p class="ln2-own">Own ${E(b.name)}? <a href="/login" rel="nofollow">Sign in to manage this listing →</a></p>` : `<div class="ln2-claim"><div class="ln2-claim-ic">${ICO.shield}</div><div><b>Is this your business?</b><span>Claim it free — add your photos, hours and services, and get customer messages straight to your inbox.</span></div><a class="btn" href="/claim/start?id=${encodeURIComponent(b.id)}">Claim free →</a></div>`;
 
 function LN2ABOUT(b) {
   const hood = b.hood ? hoodName(b.hood) : "";
@@ -5774,7 +5781,7 @@ const LOGIN = (d, opts) => {
     title: `${tab === "signup" ? "Sign up" : "Log in"} | ${S.brand}`,
     desc: "Sign in to your account, or create a free one.",
     can: S.dom + "/login",
-    body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / ${tab === "signup" ? "Sign up" : "Log in"}</nav>\n<div class="split" style="padding-top:22px">\n<div class="lgp"${opts.img ? ` style="background-image:url('${E(opts.img)}')"` : ""}><div class="lgp-in"><div class="lgp-k">One account for everything</div><h2>${tab === "signup" ? `Join ${E(S.brand)}` : `Welcome back to ${E(S.brand)}`}</h2>\n<div class="lgp-c"><div><b>🏠 For locals</b><ul><li>✓ Follow favourite businesses</li><li>✓ Leave reviews</li><li>✓ Comment on guides</li></ul></div><div><b>🏪 For owners</b><ul><li>✓ Edit hours, photos &amp; services</li><li>✓ Read customer messages</li><li>✓ See how many people view you</li></ul></div></div>\n<p class="lgp-cl">Own a business but haven't claimed it yet? <a href="/claim">Claim it free →</a></p></div></div>\n<aside><div class="blk">\n<div style="display:flex;border-bottom:1px solid ${T.line};margin-bottom:18px">\n<button type="button" id="glTabLogin" onclick="glTab('login')" style="flex:1;padding:10px 0;border:0;background:none;cursor:pointer;font-weight:700;font-size:14px;color:${tab === "login" ? on : off};border-bottom:2px solid ${tab === "login" ? T.coral : "transparent"}">Log in</button>\n<button type="button" id="glTabSignup" onclick="glTab('signup')" style="flex:1;padding:10px 0;border:0;background:none;cursor:pointer;font-weight:700;font-size:14px;color:${tab === "signup" ? on : off};border-bottom:2px solid ${tab === "signup" ? T.coral : "transparent"}">Sign up</button>\n</div>\n<div id="glPaneLogin" style="display:${tab === "login" ? "block" : "none"}">\n${opts.msg ? `<div class="note note-ok">${E(opts.msg)}</div>` : ""}\n${opts.err && tab === "login" ? `<div class="note note-err">${E(opts.err)}</div>` : ""}\n<form method="POST" action="/api/login/password">\n${opts.next ? `<input type="hidden" name="next" value="${E(opts.next)}">` : ""}\n<div class="fld2"><label for="pe">Email</label><input id="pe" name="email" type="email" required placeholder="you@yourbusiness.com" autocomplete="username"></div>\n<div class="fld2"><label for="pp">Password</label><input id="pp" name="password" type="password" required autocomplete="current-password"></div>\n<button class="btn btn-p btn-w">Sign in</button>\n<p style="font-size:12.5px;text-align:center;margin:10px 0 0"><a href="/forgot" style="color:${T.teal}">Forgot your password?</a></p>\n</form>\n<div style="display:flex;align-items:center;gap:10px;margin:18px 0;color:${T.muted};font-size:12px">\n<span style="flex:1;height:1px;background:${T.line}"></span>or sign in with a code<span style="flex:1;height:1px;background:${T.line}"></span></div>\n<form method="POST" action="/api/login/code">\n${opts.next ? `<input type="hidden" name="next" value="${E(opts.next)}">` : ""}\n<div class="fld2"><label for="lc">Email or mobile number</label><input id="lc" name="target" required placeholder="you@yourbusiness.com or (305) 555-0100" autocomplete="username"></div>\n<button class="btn btn-o btn-w">Send me a one-time code</button>\n<p style="font-size:12px;color:${T.muted};text-align:center;margin:10px 0 0">We'll email or text you a 6-digit code. No password needed.</p>\n</form>\n</div>\n<div id="glPaneSignup" style="display:${tab === "signup" ? "block" : "none"}">\n${opts.err && tab === "signup" ? `<div class="note note-err">${E(opts.err)}</div>` : ""}\n<form method="POST" action="/api/signup">\n<div class="fld2"><label for="sn">Your name</label><input id="sn" name="name" required></div>\n<div class="fld2"><label for="se">Email</label><input id="se" name="email" type="email" required></div>\n<div class="fld2"><label for="sp">Password</label><input id="sp" name="password" type="password" required minlength="8"></div>\n<div class="fld2"><label for="sp2">Confirm password</label><input id="sp2" name="password2" type="password" required minlength="8"></div>\n<button class="btn btn-p btn-w">Create account</button>\n<script>(function(){var f=document.currentScript.closest("form");\nf.addEventListener("submit",function(e){\nvar a=f.querySelector('[name="password"]').value,b=f.querySelector('[name="password2"]').value;\nif(a!==b){e.preventDefault();var m=f.querySelector(".pwmismatch");\nif(!m){m=document.createElement("p");m.className="pwmismatch";m.style.cssText="color:#B3261E;font-size:12.5px;margin-top:-8px;margin-bottom:10px";f.querySelector('[name="password2"]').closest(".fld2").after(m)}\nm.textContent="Passwords don't match — check both boxes."}\n});})();<\/script>\n</form>\n</div>\n</div></aside></div></div>\n<script>function glTab(t){\ndocument.getElementById("glPaneLogin").style.display=t==="login"?"block":"none";\ndocument.getElementById("glPaneSignup").style.display=t==="signup"?"block":"none";\ndocument.getElementById("glTabLogin").style.color=t==="login"?"${on}":"${off}";\ndocument.getElementById("glTabLogin").style.borderBottomColor=t==="login"?"${T.coral}":"transparent";\ndocument.getElementById("glTabSignup").style.color=t==="signup"?"${on}":"${off}";\ndocument.getElementById("glTabSignup").style.borderBottomColor=t==="signup"?"${T.coral}":"transparent"}<\/script>`
+    body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / ${tab === "signup" ? "Sign up" : "Log in"}</nav>\n<div class="split" style="padding-top:22px">\n<div class="lgp"${opts.img ? ` style="background-image:url('${E(opts.img)}')"` : ""}><div class="lgp-in"><div class="lgp-k">One account for everything</div><h2>${tab === "signup" ? `Join ${E(S.brand)}` : `Welcome back to ${E(S.brand)}`}</h2>\n<div class="lgp-c"><div><b>🏠 For locals</b><ul><li>✓ Follow favourite businesses</li><li>✓ Leave reviews</li><li>✓ Comment on guides</li></ul></div><div><b>🏪 For owners</b><ul><li>✓ Edit hours, photos &amp; services</li><li>✓ Read customer messages</li><li>✓ See how many people view you</li></ul></div></div>\n<p class="lgp-cl">Own a business but haven't claimed it yet? <a href="/claim">Claim it free →</a></p></div></div>\n<aside><div class="blk">\n<div style="display:flex;border-bottom:1px solid ${T.line};margin-bottom:18px">\n<button type="button" id="glTabLogin" onclick="glTab('login')" style="flex:1;padding:10px 0;border:0;background:none;cursor:pointer;font-weight:700;font-size:14px;color:${tab === "login" ? on : off};border-bottom:2px solid ${tab === "login" ? T.coral : "transparent"}">Log in</button>\n<button type="button" id="glTabSignup" onclick="glTab('signup')" style="flex:1;padding:10px 0;border:0;background:none;cursor:pointer;font-weight:700;font-size:14px;color:${tab === "signup" ? on : off};border-bottom:2px solid ${tab === "signup" ? T.coral : "transparent"}">Sign up</button>\n</div>\n<div id="glPaneLogin" style="display:${tab === "login" ? "block" : "none"}">\n${opts.msg ? `<div class="note note-ok">${E(opts.msg)}</div>` : ""}\n${opts.err && tab === "login" ? `<div class="note note-err">${E(opts.err)}</div>` : ""}\n<form method="POST" action="/api/login/password">\n${opts.next ? `<input type="hidden" name="next" value="${E(opts.next)}">` : ""}\n<div class="fld2"><label for="pe">Email</label><input id="pe" name="email" type="email" required placeholder="you@yourbusiness.com" autocomplete="username" value="${E(opts.email || "")}"></div>\n<div class="fld2"><label for="pp">Password</label><input id="pp" name="password" type="password" required autocomplete="current-password"></div>\n<button class="btn btn-p btn-w">Sign in</button>\n<p style="font-size:12.5px;text-align:center;margin:10px 0 0"><a href="/forgot" style="color:${T.teal}">Forgot your password?</a></p>\n</form>\n<div style="display:flex;align-items:center;gap:10px;margin:18px 0;color:${T.muted};font-size:12px">\n<span style="flex:1;height:1px;background:${T.line}"></span>or sign in with a code<span style="flex:1;height:1px;background:${T.line}"></span></div>\n<form method="POST" action="/api/login/code">\n${opts.next ? `<input type="hidden" name="next" value="${E(opts.next)}">` : ""}\n<div class="fld2"><label for="lc">Email or mobile number</label><input id="lc" name="target" required placeholder="you@yourbusiness.com or (305) 555-0100" autocomplete="username"></div>\n<button class="btn btn-o btn-w">Send me a one-time code</button>\n<p style="font-size:12px;color:${T.muted};text-align:center;margin:10px 0 0">We'll email or text you a 6-digit code. No password needed.</p>\n</form>\n</div>\n<div id="glPaneSignup" style="display:${tab === "signup" ? "block" : "none"}">\n${opts.err && tab === "signup" ? `<div class="note note-err">${E(opts.err)}</div>` : ""}\n<form method="POST" action="/api/signup">\n<div class="fld2"><label for="sn">Your name</label><input id="sn" name="name" required></div>\n<div class="fld2"><label for="se">Email</label><input id="se" name="email" type="email" required value="${E(opts.email || "")}"></div>\n<div class="fld2"><label for="sp">Password</label><input id="sp" name="password" type="password" required minlength="8"></div>\n<div class="fld2"><label for="sp2">Confirm password</label><input id="sp2" name="password2" type="password" required minlength="8"></div>\n<button class="btn btn-p btn-w">Create account</button>\n<script>(function(){var f=document.currentScript.closest("form");\nf.addEventListener("submit",function(e){\nvar a=f.querySelector('[name="password"]').value,b=f.querySelector('[name="password2"]').value;\nif(a!==b){e.preventDefault();var m=f.querySelector(".pwmismatch");\nif(!m){m=document.createElement("p");m.className="pwmismatch";m.style.cssText="color:#B3261E;font-size:12.5px;margin-top:-8px;margin-bottom:10px";f.querySelector('[name="password2"]').closest(".fld2").after(m)}\nm.textContent="Passwords don't match — check both boxes."}\n});})();<\/script>\n</form>\n</div>\n</div></aside></div></div>\n<script>function glTab(t){\ndocument.getElementById("glPaneLogin").style.display=t==="login"?"block":"none";\ndocument.getElementById("glPaneSignup").style.display=t==="signup"?"block":"none";\ndocument.getElementById("glTabLogin").style.color=t==="login"?"${on}":"${off}";\ndocument.getElementById("glTabLogin").style.borderBottomColor=t==="login"?"${T.coral}":"transparent";\ndocument.getElementById("glTabSignup").style.color=t==="signup"?"${on}":"${off}";\ndocument.getElementById("glTabSignup").style.borderBottomColor=t==="signup"?"${T.coral}":"transparent"}<\/script>`
   });
 };
 
@@ -6882,7 +6889,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.21-shared";
+const BUILD = "v16.23-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8710,12 +8717,13 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         if (!biz) return fail("That business wasn't found — look it up again.");
         if (!biz.email) return fail("This business has no email on file, so an invite can't be sent.");
         if (junkEmail(biz.email)) return fail("The email on file (" + biz.email + ") was scraped from a website by mistake and isn't the business's — fix it in the CRM first.");
-        const href = `${S.dom}/${biz.cs}/${biz.slug}`;
+        const href = CLAIMLINK(biz);
         let sent = false;
         try {
           sent = await sendTplEmail(env, DB, biz.email, "claim_invite", {
             business: biz.name,
-            brand: S.brand
+            brand: S.brand,
+            email: biz.owner_email || biz.email
           }, href, undefined, biz.ghl_id);
         } catch (e) {
           console.log("claiminvites/send failed: " + e.message);
@@ -9682,6 +9690,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       } catch {}
       return R2(LOGIN(await SHELL(DB, env), {
         img: loginImg,
+        email: String(u.searchParams.get("email") || "").slice(0, 120),
         tab: u.searchParams.get("tab") === "signup" ? "signup" : "login",
         msg: u.searchParams.has("sent") ? "Check your email — if that address can manage a listing, a sign-in link is on its way." : "",
         err: u.searchParams.get("err") || "",
