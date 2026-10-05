@@ -4089,9 +4089,42 @@ function timeGreeting() {
   return "Good evening";
 }
 
-const MAIL = (title, body, btn, href, noExpiry) => `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">\n<h2 style="color:#12263F;margin:0 0 14px">${title}</h2>\n<div style="color:#333;font-size:14px;line-height:1.55">${body}</div>\n${href ? `<p style="margin:22px 0"><a href="${href}" style="background:#E4572E;color:#fff;text-decoration:none;\npadding:12px 24px;border-radius:999px;font-weight:bold;display:inline-block">${btn}</a></p>\n<p style="color:#888;font-size:12px">Or paste this into your browser:<br>${href}</p>` : ""}\n<p style="color:#888;font-size:12px;border-top:1px solid #eee;padding-top:12px;margin-top:22px">\n${href && !noExpiry ? `This link expires in ${AUTH.LINK_MINUTES} minutes and can only be used once.\nIf you didn't request it, you can ignore this email.` : href ? `This is your business's normal page — it doesn't expire.` : `You're receiving this because you contacted ${S.brand}.`}</p></div>`;
+// Branded email frame (Eric approved, 6 Oct 2026): city logo on top with a coral rule, white card on
+// cream, footer with the brand. Table layout + inline styles so it holds up in Gmail/Outlook.
+const MAILSHELL = (inner, pre) => {
+  const logo = BRANDLOGO();
+  const head = logo ? `<img src="${E(logo)}" alt="${E(S.brand)}" height="38" style="height:38px;width:auto;display:block;border:0">`
+    : `<span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:bold;color:#12263F">${E(S.brand)}</span>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F4EEE3">${pre ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${pre}</div>` : ""}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4EEE3"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px">
+<tr><td style="background:#ffffff;border-radius:18px;overflow:hidden;font-family:Arial,Helvetica,sans-serif">
+<div style="padding:22px 32px;border-bottom:4px solid #E4572E">${head}</div>
+<div style="padding:30px 32px 26px">${inner}</div>
+</td></tr>
+<tr><td align="center" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#7A8CA0;line-height:1.6;padding:18px 20px">
+<b style="color:#12263F">${E(S.brand)}</b> · ${E(S.city)}'s own local business directory<br>
+<a href="${S.dom}" style="color:#7A8CA0">${E(S.dom.replace(/^https?:\/\//, ""))}</a> · <a href="${S.dom}/about" style="color:#7A8CA0">About</a> · <a href="${S.dom}/privacy" style="color:#7A8CA0">Privacy</a></td></tr>
+</table></td></tr></table></body></html>`;
+};
 
-const MAIL_INTERNAL = (title, body, href) => `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">\n<h2 style="color:#12263F;margin:0 0 14px">${title}</h2>\n<div style="color:#333;font-size:14px;line-height:1.6">${body}</div>\n${href ? `<p style="color:#666;font-size:12.5px;border-top:1px solid #eee;padding-top:12px;margin-top:22px">Review in admin: <a href="${href}" style="color:#E4572E">${href}</a></p>` : ""}\n<p style="color:#aaa;font-size:11px;margin-top:8px">Internal notification from ${S.brand} — not sent to the customer.</p></div>`;
+const MAILH = t => `<h1 style="font-family:Georgia,'Times New Roman',serif;font-weight:bold;color:#12263F;font-size:25px;line-height:1.25;margin:0 0 14px">${t}</h1>`;
+const MAILBADGE = (t, warm) => t ? `<div style="display:inline-block;background:${warm ? "#FDEBE4" : "#E4F1F1"};color:${warm ? "#C6461F" : "#2E8B8B"};font-weight:bold;font-size:12px;letter-spacing:.03em;padding:5px 12px;border-radius:999px;margin:0 0 14px">${t}</div>` : "";
+const MAILBTN = (btn, href) => href && btn ? `<p style="margin:24px 0 8px"><a href="${href}" style="background:#E4572E;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:bold;display:inline-block;font-size:15px">${btn}</a></p>` : "";
+
+const MAIL = (title, body, btn, href, noExpiry, badge) => MAILSHELL(`${MAILBADGE(badge, /new|message|enquiry/i.test(badge || ""))}${MAILH(title)}
+<div style="color:#42556B;font-size:15px;line-height:1.6">${body}</div>
+${MAILBTN(btn, href)}${href && /^https?:/.test(href) ? `<p style="color:#9AA8B8;font-size:11.5px;margin:10px 0 0;word-break:break-all">Button not working? Paste this into your browser:<br>${href}</p>` : ""}
+${href && !noExpiry ? `<p style="color:#7A8CA0;font-size:12px;border-top:1px solid #F1E7D6;padding-top:12px;margin:22px 0 0">This link expires in ${AUTH.LINK_MINUTES} minutes and can only be used once. If you didn't request it, you can ignore this email.</p>` : ""}`, title.replace(/<[^>]+>/g, ""));
+
+const MAILCODE = (title, body, code) => MAILSHELL(`${MAILH(title)}<div style="color:#42556B;font-size:15px;line-height:1.6">${body}</div>
+<div style="text-align:center;margin:24px 0"><span style="display:inline-block;background:#12263F;color:#ffffff;font-size:34px;font-weight:bold;letter-spacing:10px;padding:18px 28px;border-radius:14px">${E(code)}</span></div>
+<p style="color:#7A8CA0;font-size:13px;margin:0">This code expires in 15 minutes. Didn't ask for it? You can safely ignore this email — nobody can sign in without it.</p>`, `Your code: ${code}`);
+
+const MAIL_INTERNAL = (title, body, href) => MAILSHELL(`${MAILBADGE("Team notification")}${MAILH(title)}<div style="color:#42556B;font-size:14.5px;line-height:1.6">${body}</div>
+${href ? `<p style="margin:20px 0 0"><a href="${href}" style="color:#E4572E;font-weight:bold">Review in admin →</a></p>` : ""}
+<p style="color:#9AA8B8;font-size:11.5px;margin:16px 0 0">Internal notification from ${E(S.brand)} — not sent to the customer.</p>`, title.replace(/<[^>]+>/g, ""));
 
 async function issueSignupOtp(env, payload) {
   const KV = KVOF(env);
@@ -4196,10 +4229,11 @@ const EMAIL_TEMPLATES = {
     label: "Invite a verified business to claim its listing",
     description: "Sent manually by staff to a business whose listing has been verified, inviting them to claim it.",
     vars: [ "business", "brand", "email" ],
-    subject: "Claim your free listing on {{brand}}",
-    title: "{{business}} is ready to claim",
-    body: "<p>Your business, <b>{{business}}</b>, has been verified on {{brand}}. To manage your listing — hours, photos, services and customer messages — create your free account with this email address: <b>{{email}}</b>. It only takes a minute.</p><p>Already set a password? Just log in with the same email.</p>",
-    btn: "Manage my listing",
+    subject: "{{business}} is verified — manage your free listing",
+    badge: "✓ VERIFIED ON {{brand}}",
+    title: "{{business}} is live — take control of your page",
+    body: "<p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> on {{brand}} has been verified. Create your account to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
+    btn: "Manage my listing →",
     noExpiry: true
   },
   claim_confirm: {
@@ -4233,10 +4267,12 @@ const EMAIL_TEMPLATES = {
     label: "New enquiry (to business owner)",
     description: "Sent to a claimed business's owner when a visitor sends an enquiry through their page.",
     vars: [ "name", "business", "email", "phone", "details" ],
-    subject: "New enquiry for {{business}}",
-    title: "You have a new enquiry",
-    body: "<p><b>{{name}}</b> got in touch through your {{brand}} page.</p>\n<p>Email: {{email}}<br>Phone: {{phone}}</p>\n<p>{{details}}</p>",
-    btn: ""
+    subject: "New message from {{name}} via {{brand}}",
+    badge: "📩 NEW CUSTOMER MESSAGE",
+    title: "{{name}} wants to hear from {{business}}",
+    body: "<p style=\"margin:0 0 12px\">Someone found your page on {{brand}} and sent you a message:</p><div style=\"border-left:4px solid #E4572E;background:#FBF5EA;border-radius:0 12px 12px 0;padding:14px 16px;font-size:15px;color:#1B2A3A;line-height:1.55;margin:4px 0 16px\">“{{details}}”</div><table role=\"presentation\" style=\"font-size:14px;color:#42556B;border-collapse:collapse\"><tr><td style=\"padding:3px 14px 3px 0;color:#7A8CA0\">Name</td><td><b style=\"color:#12263F\">{{name}}</b></td></tr><tr><td style=\"padding:3px 14px 3px 0;color:#7A8CA0\">Email</td><td>{{email}}</td></tr><tr><td style=\"padding:3px 14px 3px 0;color:#7A8CA0\">Phone</td><td>{{phone}}</td></tr></table><p style=\"color:#7A8CA0;font-size:13px;margin:16px 0 0\">Tip: businesses that reply quickly win most new customers.</p>",
+    btn: "Reply to {{name}} →",
+    noExpiry: true
   },
   review_reply: {
     label: "Business replied to your review",
@@ -4406,6 +4442,7 @@ async function getEmailTemplate(DB, key) {
     isCode: def.isCode,
     internal: def.internal,
     noExpiry: def.noExpiry,
+    badge: def.badge,
     vars: def.vars
   };
 }
@@ -4416,16 +4453,19 @@ async function sendTplEmail(env, DB, to, key, vars, href, code, contactId) {
     console.log("sendTplEmail: unknown template key " + key);
     return false;
   }
+  try {
+    await catImgOverrides(DB);
+  } catch {}
   const subject = fillTpl(t.subject, vars);
   const title = fillTpl(t.title, vars);
   const body = fillTpl(t.body, vars);
   let html;
   if (t.isCode) {
-    html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">\n<h2 style="color:#12263F;margin:0 0 14px">${title}</h2>\n<div style="color:#333;font-size:14px;line-height:1.55">${body}</div>\n<p style="margin:24px 0;text-align:center"><span style="display:inline-block;background:#F1E7D6;color:#12263F;\nfont-size:32px;font-weight:bold;letter-spacing:8px;padding:16px 24px;border-radius:12px">${E(code)}</span></p>\n<p style="color:#888;font-size:12px;border-top:1px solid #eee;padding-top:12px;margin-top:10px">\nThis code expires in 15 minutes. If you didn't request it, you can ignore this email.</p></div>`;
+    html = MAILCODE(title, body, code);
   } else if (t.internal) {
     html = MAIL_INTERNAL(title, body, href || "");
   } else {
-    html = MAIL(title, body, t.btn, href || "", !!t.noExpiry);
+    html = MAIL(title, body, fillTpl(t.btn || "", vars), href || "", !!t.noExpiry, fillTpl(t.badge || "", vars));
   }
   const plainBody = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   const text = (t.isCode ? `${title}: ${code}` : `${title}. ${plainBody}`) + (href ? " " + href : "");
@@ -6928,7 +6968,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.24-shared";
+const BUILD = "v16.25-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11531,6 +11571,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           console.log("lead sms fail: " + e.message);
         }
       }
+      const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email || "") ? `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent("Re: your message to " + (l.business || S.brand))}` : "";
       const emailed = owner ? await sendTplEmail(env, DB, owner, "enquiry_notify", {
         brand: S.brand,
         name: E(l.name || "Someone"),
@@ -11538,7 +11579,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         email: E(l.email || "-"),
         phone: E(l.phone || "-"),
         details: E(l.details || "(no message)")
-      }) : false;
+      }, replyTo) : false;
       if (emailed) return R2(NOTICE(d, "Enquiry sent", `Your message has been sent to ${l.business || "the business"}. They'll be in touch directly.`, "Back to the directory", "/"));
       if (noted) try {
         await notifyAdmins(env, DB, "enquiry", "admin_enquiry", {
