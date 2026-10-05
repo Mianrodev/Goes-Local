@@ -39,7 +39,7 @@ npm run browse-check -- orlando       # real headless-Chromium click-through + s
 - Orlando Variables: ADMIN_LOGIN_KEY (plain text — visible in the dashboard, unlike Miami's Secret), CITY_BRAND, CITY_COUNTY, CITY_DOMAIN, CITY_FROM_EMAIL, CITY_FROM_NAME, CITY_GA_IDS, CITY_NAME, CITY_STATE, CITY_TAGLINE. Secrets: GHL_API_TOKEN, GHL_LOCATION_ID.
   Missing vs Miami: GOOGLE_PLACES_API_KEY (no Google ratings refresh), GHL_PRIVATE_TOKEN_AGENT (agent logins), ADMIN_NOTIFY_EMAIL, PAYMENT_WEBHOOK_KEY, CITY_VALID_ZIPS. (STATUS_WEBHOOK_KEY added 29 Sep; the Orlando GHL workflow "Auto Listing Verification" posts to /webhooks/ghlstatus. Tested end to end with CFL Counseling.)
 - Miami Variables: ADMIN_NOTIFY_EMAIL, CITY_GA_IDS (one ID only), GOOGLE_PLACES_API_KEY, PAYMENT_WEBHOOK_KEY, STATUS_WEBHOOK_KEY. Secrets: ADMIN_LOGIN_KEY, GHL_API_TOKEN, GHL_LOCATION_ID, GHL_PRIVATE_TOKEN_AGENT, GHL_PRIVATE_TOKEN_SALES. Miami sets no CITY_* except GA — it runs on the code defaults.
-- The account also holds the zone `tampagoeslocal.com` (not yet attached to a Worker).
+- Tampa (live 2 Oct 2026, worker `goes-local-tampa-api`): Variables CITY_NAME, CITY_BRAND, CITY_COUNTY, CITY_STATE, CITY_DOMAIN, CITY_FROM_EMAIL, CITY_FROM_NAME, CITY_TAGLINE, CITY_GA_IDS (G-PTHWYG1QQW, added 6 Oct); Secrets ADMIN_LOGIN_KEY, GHL_API_TOKEN, GHL_LOCATION_ID. Still missing: STATUS_WEBHOOK_KEY (claim-invite trigger from the GHL "Auto Listing Verification" workflow), PAYMENT_WEBHOOK_KEY (no Upgrade buttons until set).
 
 ## First-time setup status (2026-09-25)
 - [x] Live code pulled from both Workers — identical, committed and tagged `v15.79-shared`.
