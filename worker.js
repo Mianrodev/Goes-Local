@@ -4540,6 +4540,47 @@ const CSS = `\n@import url('https://fonts.googleapis.com/css2?family=Fraunces:op
 .ln2-claim{flex-wrap:wrap}.ln2-claim .btn{margin-left:0;width:100%;justify-content:center}
 .ln2-facts{grid-template-columns:1fr 1fr}.ln2-sim{grid-template-columns:1fr}.ln2-addr{flex-wrap:wrap}
 .split-biz.ln2 .contact-blk{order:0;margin-top:inherit}}
+.lpx-hero{position:relative;padding:54px 24px 70px;background:var(--navy) center/cover;color:#fff}
+.lpx-hero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(18,38,63,.97) 0%,rgba(18,38,63,.88) 48%,rgba(18,38,63,.55) 100%)}
+.lpx-in{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) 440px;grid-template-areas:'t c' 'b c';column-gap:48px;align-content:center;max-width:1180px;margin:0 auto}
+.lpx-top{grid-area:t;align-self:end}.lpx-bot{grid-area:b}.lpx-card{grid-area:c;align-self:center}
+.lpx-k{display:inline-flex;gap:8px;align-items:center;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px 14px;font-weight:700;font-size:12.5px}
+.lpx-k i{width:8px;height:8px;border-radius:50%;background:#3DDC84;box-shadow:0 0 0 4px rgba(61,220,132,.25)}
+.lpx-hero h1{color:#fff;font-size:54px;line-height:1.04;margin:18px 0 0}.lpx-hero h1 em{font-style:normal;color:#FF8A5B}
+.lpx-s{font-size:18px;color:rgba(255,255,255,.85);margin:16px 0 24px;max-width:520px}
+.lpx-li{list-style:none;padding:0;margin:0 0 26px;display:grid;gap:10px}.lpx-li li{display:flex;gap:10px;font-size:15.5px}.lpx-li b{color:#fff}.lpx-li span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--teal);flex-shrink:0;font-size:12px}
+.lpx-proof{display:flex;align-items:center;gap:12px;font-size:13.5px;color:rgba(255,255,255,.85)}.lpx-proof b{color:#fff}
+.lpx-av{display:flex}.lpx-av>span{width:36px;height:36px;border-radius:50%;border:2px solid var(--navy);overflow:hidden;background:#fff;margin-left:-10px;display:block}.lpx-av>span:first-child{margin:0}.lpx-av img,.lpx-av .fill{width:100%;height:100%;object-fit:cover;display:grid;place-items:center}
+.lpx-card{background:#fff;color:${T.ink};border-radius:24px;padding:26px;box-shadow:0 30px 70px rgba(0,0,0,.35)}
+.lpx-card h2{font-size:24px;margin:0}.lpx-sub{font-size:13.5px;color:var(--muted);margin:4px 0 14px}
+.lpx-pg{display:flex;gap:6px;margin-bottom:12px}.lpx-pg i{flex:1;height:5px;border-radius:9px;background:var(--sand)}.lpx-pg i.on{background:var(--coral)}
+.lpx-card .fld2{margin:0 0 10px}.lpx-card .fld2 label{font-size:12.5px}.lpx-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.lpx-card input,.lpx-card select,.lpx-card textarea{width:100%;box-sizing:border-box;min-width:0}
+.lpx-btn{display:block;width:100%;margin-top:8px;border:0;background:var(--coral);color:#fff;border-radius:999px;padding:15px;font-family:${T.sans};font-weight:800;font-size:16px;box-shadow:0 10px 24px rgba(228,87,46,.35);cursor:pointer}
+.lpx-back{display:block;margin:10px auto 0;border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer}
+.lpx-own{margin:6px 0 8px;font-size:14px;color:var(--navy)}
+.lpx-fine{display:flex;justify-content:center;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}
+.lpx-alt{text-align:center;margin-top:12px;font-size:13px;color:${T.body};border-top:1px solid var(--sand);padding-top:12px}.lpx-alt a{font-weight:700}
+.lpx-stats{display:grid;grid-template-columns:repeat(4,1fr);max-width:1180px;margin:-34px auto 56px;position:relative;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 14px 40px rgba(18,38,63,.1)}
+.lpx-stats div{padding:20px 24px;border-right:1px solid var(--sand)}.lpx-stats div:last-child{border:0}.lpx-stats b{display:block;font-family:${T.serif};font-size:30px;color:var(--navy);line-height:1.1}.lpx-stats span{font-size:13px;color:var(--muted)}
+.lpx-feat{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin:0 auto 70px;max-width:1100px}.lpx-feat.r .lpx-vis{order:-1}
+.lpx-kk{font-weight:800;font-size:12px;letter-spacing:.1em;color:var(--coral);text-transform:uppercase}.lpx-feat h2{font-size:36px;margin:8px 0 12px;line-height:1.1}.lpx-feat p{font-size:16.5px;color:${T.body};margin:0 0 14px}
+.lpx-feat ul{padding:0;margin:0;list-style:none}.lpx-feat li{padding:6px 0;font-size:15px}.lpx-feat li::before{content:"✓";color:var(--teal);font-weight:800;margin-right:10px}
+.lpx-vis{background:linear-gradient(135deg,#FDEBE4,var(--sand));border-radius:28px;padding:30px;position:relative;min-height:280px;display:grid;align-content:center;gap:12px}
+.lpx-ex{position:absolute;top:10px;right:14px;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lpx-row{display:flex;gap:14px;align-items:center;background:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 6px 18px rgba(18,38,63,.08);font-size:13px;color:${T.body}}
+.lpx-rph{width:54px;height:54px;border-radius:12px;background:var(--sand);flex-shrink:0;position:relative;display:block}.lpx-rph img,.lpx-rph .fill{width:100%;height:100%;object-fit:cover;border-radius:12px;display:grid;place-items:center}.lpx-rph em{position:absolute;left:-6px;top:-6px;background:var(--navy);color:#fff;font-weight:800;font-size:11px;font-style:normal;border-radius:999px;padding:2px 7px}
+.lpx-row b{display:block;font-family:${T.serif};font-size:16px;color:var(--navy)}.lpx-v{font-style:normal;color:var(--teal);font-weight:700;font-size:11.5px}
+.lpx-row.me{box-shadow:0 0 0 3px var(--coral),0 16px 34px rgba(228,87,46,.25);transform:scale(1.03)}.lpx-row.dim{opacity:.55}
+.lpx-msg{background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 10px 26px rgba(18,38,63,.1);font-size:14px;color:${T.body}}.lpx-msg .t{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}.lpx-msg b{color:var(--navy)}
+.lpx-h{text-align:center;max-width:700px;margin:0 auto 26px}.lpx-h h2{font-size:38px;margin:0 0 8px}.lpx-h p{color:${T.body};font-size:16.5px;margin:0}
+.lpx-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1100px;margin:0 auto 64px;counter-reset:s}.lpx-steps div{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px}
+.lpx-steps div::before{counter-increment:s;content:counter(s);display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--coral);color:#fff;font-weight:800;font-size:16px;margin-bottom:12px}.lpx-steps b{font-family:${T.serif};font-size:19px;color:var(--navy)}.lpx-steps p{margin:4px 0 0;color:${T.body};font-size:14.5px}
+.lpx-faq{max-width:820px;margin:0 auto 60px}.lpx-faq details{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 20px;margin-bottom:10px}.lpx-faq summary{font-weight:700;color:var(--navy);font-size:16px;cursor:pointer}.lpx-faq p{margin:8px 0 0;color:${T.body}}
+.lpx-end{padding:60px 24px;background:var(--navy);color:#fff;text-align:center}.lpx-end h2{color:#fff;font-size:40px;margin:0}.lpx-end p{color:rgba(255,255,255,.85);margin:10px 0 24px}.lpx-end a{display:inline-block;background:var(--coral);color:#fff;border-radius:999px;padding:16px 30px;font-weight:800}
+.lpx-sticky{display:none}
+@media(max-width:900px){.lpx-hero{padding:28px 16px 56px}.lpx-in{grid-template-columns:minmax(0,1fr);grid-template-areas:'t' 'c' 'b';row-gap:22px}.lpx-hero h1{font-size:34px}.lpx-s{font-size:16px}.lpx-card{padding:20px}.lpx-k{font-size:11px}
+.lpx-feat{grid-template-columns:minmax(0,1fr);gap:24px;margin-bottom:50px}.lpx-feat.r .lpx-vis{order:0}.lpx-feat h2,.lpx-h h2{font-size:28px}.lpx-stats{grid-template-columns:1fr 1fr;margin:-30px 0 40px}.lpx-stats div:nth-child(2){border-right:0}.lpx-steps{grid-template-columns:minmax(0,1fr)}.lpx-end{padding:40px 16px 90px}.lpx-end h2{font-size:28px}
+.lpx-sticky{display:block;position:fixed;left:12px;right:12px;bottom:12px;z-index:90;background:var(--coral);color:#fff;text-align:center;border-radius:999px;padding:15px;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:opacity .2s}.lpx-sticky.off{opacity:0;pointer-events:none}}
 .bpl{display:grid;grid-template-columns:minmax(0,760px) 320px;gap:32px;justify-content:center;align-items:start;margin:22px 0 30px}
 .bpl-side{position:sticky;top:20px;display:grid;gap:16px}
 .bp-box{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--sh)}
@@ -5621,13 +5662,95 @@ const ALLHOODS = (d, counts) => PAGE(d, {
   body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / Neighbourhoods</nav>\n<div style="padding:14px 0 26px"><div class="kicker">Neighbourhoods</div><h1>Browse by neighbourhood</h1>\n<p style="color:${T.body};margin-top:8px">${HOODS_LIVE().length ? `${HOODS_LIVE().length} ${E(S.city)} neighbourhoods with their own flavour of local business.` : `Neighbourhoods for ${E(S.city)} are being added — check back soon.`}</p></div>\n<div class="hoods" style="margin-bottom:40px">${HOODS_LIVE().map(h => HOODCARD(h, (counts || {})[h.slug])).join("")}</div></div>`
 });
 
-const ADD = d => PAGE(d, {
-  title: SEOTXT("add", `Add your business to the directory | ${S.brand}`, `Add your ${S.city} business. Free forever, reviewed by our local team.`).title,
-  desc: SEOTXT("add", `Add your business to the directory | ${S.brand}`, `Add your ${S.city} business. Free forever, reviewed by our local team.`).desc,
+// List Your Business = ad landing page (Eric approved the mockup, 5 Oct 2026): the form is in the first
+// screen, split into 2 steps (same fields, same /api/lead post), then product pictures, steps and FAQs.
+// x: { img (city hero photo), proof (a few claimed businesses with their own photo) }.
+const ADD = (d, x) => {
+  x = x || {};
+  const proof = (x.proof || []).slice(0, 5);
+  const seo = SEOTXT("add", `List your ${S.city} business free | ${S.brand}`, `Get found by ${S.city} customers. Add your business to ${S.brand} free — verified by a local team and live in 1–2 days.`);
+  const hoodN = HOODS_LIVE().length;
+  const lpRow = (name, sub, b, cls, rank, ver) => `<div class="lpx-row ${cls || ""}"><span class="lpx-rph">${b ? PHOTO(b) : ""}${rank ? `<em>#${rank}</em>` : ""}</span><span>${ver ? `<i class="lpx-v">✓ VERIFIED</i>` : ""}<b>${name}</b>${sub}</span></div>`;
+  const exHood = E(x.hoodName || (HOODS_LIVE()[0] ? HOODS_LIVE()[0].name : S.city));
+  return PAGE(d, {
+  title: seo.title,
+  desc: seo.desc,
   can: S.dom + "/add",
   ld: SEOLD("add"),
-  body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / For Businesses</nav>\n<div style="padding:14px 0 26px;max-width:620px"><div class="kicker">For business owners</div>\n<h1>Add your business to the directory</h1>\n<p style="color:${T.body};margin-top:12px">Tell us about your ${E(S.city)} business. Submissions are reviewed by our local team before your page is published.</p></div>\n<div class="steps">\n<div class="step"><b>${ICO.gift}</b><h3>Free forever</h3><p>No monthly fee to keep your listing live.</p></div>\n<div class="step"><b>${ICO.check}</b><h3>Verified badge</h3><p>Reviewed by our team in 1–2 business days.</p></div>\n<div class="step"><b>${ICO.star}</b><h3>Featured slots</h3><p>Eligible for weekly featured placement.</p></div></div>\n<div class="blk" style="max-width:860px;margin-bottom:44px"><h2>Business details</h2>\n<form method="POST" action="/api/lead" id="addBizForm"><input type="hidden" name="type" value="add">\n<input type="hidden" name="utm_source" id="lfSrc"><input type="hidden" name="utm_medium" id="lfMed">\n<input type="hidden" name="utm_campaign" id="lfCam"><input type="hidden" name="landing_page" id="lfLand">\n<input type="hidden" name="referrer_domain" id="lfRef">\n<script>(function(){try{\nvar m=document.cookie.match(/(?:^|; )gl_attr=([^;]*)/);\nif(!m)return;var a=JSON.parse(decodeURIComponent(m[1]));\nvar set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||""};\nset("lfSrc",a.source);set("lfMed",a.medium);set("lfCam",a.campaign);set("lfLand",a.landing);set("lfRef",a.source)\n}catch(e){}})();<\/script>\n<h3 style="font-size:15px;margin:0 0 4px">Business information</h3>\n<div class="fgrid">\n<div class="fld2"><label for="bn">Business name *</label><input id="bn" name="business" required></div>\n<div class="fld2"><label for="bc">Category</label><select id="bc" name="category">\n<option value="">Not sure — put me in "Other"</option>${MAINS.map(c => `<option>${E(c)}</option>`).join("")}<option>Other</option></select></div>\n<div class="fld2"><label for="bh2">Neighbourhood</label><select id="bh2" name="hood">\n<option value="">Select neighbourhood</option>${HOODS_LIVE().map(h => `<option>${E(h.name)}</option>`).join("")}<option>Other</option></select></div>\n<div class="fld2"><label for="byrs">Years in business</label><input id="byrs" name="yrs" placeholder="e.g. 2015 or 8"></div>\n<div class="fld2 full"><label for="ba">Street address *</label><input id="ba" name="address" required></div>\n<div class="fld2"><label for="bz">ZIP code *</label><input id="bz" name="zip" required></div>\n<div class="fld2"><label for="bp">Business phone *</label><input id="bp" name="phone" type="tel" required></div>\n<div class="fld2"><label for="be">Business email *</label><input id="be" name="email" type="email" required placeholder="hello@yourbusiness.com"></div>\n<div class="fld2 full"><label for="bw">Website (optional)</label><input id="bw" name="website" placeholder="yourbusiness.com"></div>\n<div class="fld2 full"><label for="bs">Services offered</label><textarea id="bs" name="services" placeholder="Emergency leak repair, drain cleaning, water heater install…"></textarea></div>\n<div class="fld2 full"><label for="bd">Short description</label><textarea id="bd" name="details"></textarea></div>\n</div>\n<h3 style="font-size:15px;margin:20px 0 4px">Owner information</h3>\n<p style="font-size:12.5px;color:${T.muted};margin:0 0 12px">Who we contact about this listing — doesn\'t have to be the same as the business phone/email above.</p>\n<div class="fgrid">\n<div class="fld2"><label for="cn">Owner name *</label><input id="cn" name="owner_name" required></div>\n<div class="fld2"><label for="oe">Owner email *</label><input id="oe" name="owner_email" type="email" required></div>\n<div class="fld2"><label for="op">Owner phone *</label><input id="op" name="owner_phone" type="tel" required></div>\n</div>\n<h3 style="font-size:15px;margin:20px 0 4px">A little more</h3>\n<div class="fgrid">\n<div class="fld2 full"><label for="bref">How did you hear about us? (optional)</label><select id="bref" name="referral">\n<option value="">Prefer not to say</option>\n<option>Google Search</option>\n<option>Social Media</option>\n<option>Friend or Family</option>\n<option>Another Local Business</option>\n<option>Flyer or Signage</option>\n<option>Other</option>\n</select></div>\n</div>\n<button class="btn btn-p btn-lg" style="margin-top:6px">Submit business</button>\n<p style="font-size:12px;color:${T.muted};margin:12px 0 0">Free forever. No card required.</p>\n</form></div></div>`
-});
+  body: `<section class="lpx-hero"${x.img ? ` style="background-image:url('${E(x.img)}')"` : ""}><div class="lpx-in">
+<div class="lpx-top"><span class="lpx-k"><i></i> <span id="lpxVisits">Thousands of</span> people visited ${E(S.brand)} today</span>
+<h1>${E(S.city)} customers are looking. <em>Make sure they find you.</em></h1></div>
+<div class="lpx-bot"><p class="lpx-s">List your business on ${E(S.city)}'s own local directory — free, verified by a real local team, and live in 1–2 days.</p>
+<ul class="lpx-li"><li><span>✓</span><div><b>Free forever</b> — no credit card, no contract</div></li><li><span>✓</span><div><b>Your own Google-friendly page</b> in your neighbourhood</div></li><li><span>✓</span><div><b>Customer enquiries</b> straight to your inbox</div></li></ul>
+<div class="lpx-proof">${proof.length ? `<span class="lpx-av">${proof.map(b => `<span>${PHOTO(b)}</span>`).join("")}</span>` : ""}<span>Join <b>${NUM(d.count || 0)}</b> ${E(S.city)} businesses</span></div></div>
+<div class="lpx-card" id="start"><h2>Add your business — free</h2><div class="lpx-sub" id="lpxStepTxt">Step 1 of 2 · takes about 3 minutes</div><div class="lpx-pg"><i class="on"></i><i id="lpxPg2"></i></div>
+<form method="POST" action="/api/lead" id="addBizForm"><input type="hidden" name="type" value="add">\n<input type="hidden" name="utm_source" id="lfSrc"><input type="hidden" name="utm_medium" id="lfMed">\n<input type="hidden" name="utm_campaign" id="lfCam"><input type="hidden" name="landing_page" id="lfLand">\n<input type="hidden" name="referrer_domain" id="lfRef">\n<script>(function(){try{\nvar m=document.cookie.match(/(?:^|; )gl_attr=([^;]*)/);\nif(!m)return;var a=JSON.parse(decodeURIComponent(m[1]));\nvar set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||""};\nset("lfSrc",a.source);set("lfMed",a.medium);set("lfCam",a.campaign);set("lfLand",a.landing);set("lfRef",a.source)\n}catch(e){}})();<\/script>
+<div id="lpxS1">
+<div class="fld2"><label for="bn">Business name *</label><input id="bn" name="business" required placeholder="e.g. Blue Palm Plumbing"></div>
+<div class="fld2"><label for="bc">What do you do?</label><select id="bc" name="category">
+<option value="">Not sure — put me in "Other"</option>${MAINS.map(c => `<option>${E(c)}</option>`).join("")}<option>Other</option></select></div>
+<div class="lpx-2"><div class="fld2"><label for="bp">Business phone *</label><input id="bp" name="phone" type="tel" required></div>
+<div class="fld2"><label for="bz">ZIP code *</label><input id="bz" name="zip" required inputmode="numeric"></div></div>
+<div class="fld2"><label for="be">Business email *</label><input id="be" name="email" type="email" required placeholder="hello@yourbusiness.com"></div>
+<button type="button" class="lpx-btn" id="lpxNext">Continue →</button>
+</div>
+<div id="lpxS2">
+<div class="fld2"><label for="ba">Street address *</label><input id="ba" name="address" required></div>
+<div class="lpx-2"><div class="fld2"><label for="bh2">Neighbourhood</label><select id="bh2" name="hood">
+<option value="">Select neighbourhood</option>${HOODS_LIVE().map(h => `<option>${E(h.name)}</option>`).join("")}<option>Other</option></select></div>
+<div class="fld2"><label for="byrs">Years in business</label><input id="byrs" name="yrs" placeholder="e.g. 2015 or 8"></div></div>
+<div class="fld2"><label for="bw">Website (optional)</label><input id="bw" name="website" placeholder="yourbusiness.com"></div>
+<div class="fld2"><label for="bs">Services offered</label><textarea id="bs" name="services" rows="2" placeholder="Emergency leak repair, drain cleaning, water heater install…"></textarea></div>
+<div class="fld2"><label for="bd">Short description</label><textarea id="bd" name="details" rows="2"></textarea></div>
+<p class="lpx-own"><b>Who should we contact about this listing?</b></p>
+<div class="fld2"><label for="cn">Your name *</label><input id="cn" name="owner_name" required></div>
+<div class="lpx-2"><div class="fld2"><label for="oe">Your email *</label><input id="oe" name="owner_email" type="email" required></div>
+<div class="fld2"><label for="op">Your phone *</label><input id="op" name="owner_phone" type="tel" required></div></div>
+<div class="fld2"><label for="bref">How did you hear about us? (optional)</label><select id="bref" name="referral">
+<option value="">Prefer not to say</option><option>Google Search</option><option>Social Media</option><option>Friend or Family</option><option>Another Local Business</option><option>Flyer or Signage</option><option>Other</option></select></div>
+<button class="lpx-btn">Submit my business</button>
+<button type="button" class="lpx-back" id="lpxBack">← Back</button>
+</div>
+</form>
+<div class="lpx-fine"><span>🔒 Never sold or shared</span><span>✓ No card needed</span></div>
+<div class="lpx-alt">Already listed? <a href="/claim">Find &amp; claim your business →</a></div></div>
+</div></section>
+<div class="wrap">
+<div class="lpx-stats"><div><b id="lpxVisits2">—</b><span>visitors today</span></div><div><b>${NUM(d.count || 0)}</b><span>businesses listed</span></div><div><b>${hoodN}</b><span>${E(S.city)} neighbourhoods</span></div><div><b>1–2 days</b><span>to go live</span></div></div>
+<div class="lpx-feat"><div><div class="lpx-kk">Get found</div><h2>Show up when locals search for what you do</h2><p>Every business gets its own page in its category and neighbourhood — built to show up on Google for searches like "plumber in ${exHood}".</p><ul><li>Listed in your category and neighbourhood guides</li><li>Eligible for "${E(S.city)}'s Best" top-10 lists</li><li>Verified badge that builds trust</li></ul></div>
+<div class="lpx-vis"><span class="lpx-ex">Example</span>${lpRow("Your Business", `★ 4.9 (128) · Plumber · ${exHood}`, proof[0], "me", 1, 1)}${lpRow("Another Plumbing Co.", `★ 4.6 (54) · Plumber · ${exHood}`, null, "dim", 2)}${lpRow("City Drain Pros", `★ 4.4 (31) · Plumber · ${exHood}`, null, "dim", 3)}</div></div>
+<div class="lpx-feat r"><div><div class="lpx-kk">Get customers</div><h2>Customers message you directly</h2><p>Enquiries from your page land straight in your inbox. No middleman, no fee per lead.</p><ul><li>Call, directions and website buttons on your page</li><li>Hours with a live "Open now" badge</li><li>Add photos, services and offers from your phone</li></ul></div>
+<div class="lpx-vis"><span class="lpx-ex">Example</span><div class="lpx-msg"><div class="t"><span>📩 New enquiry · Your Business</span><span>2 min ago</span></div><b>Maria G.</b> — "Hi! Do you have availability this Saturday morning? Looking for a quote."</div><div class="lpx-msg" style="margin-left:40px"><div class="t"><span>📞 Call from your page</span><span>Today</span></div><b>A customer</b> tapped "Call"</div><div class="lpx-msg"><div class="t"><span>👀 Your page this week</span></div><b style="font-size:22px">248 views</b> · 19 direction requests</div></div></div>
+<div class="lpx-h"><h2>Live in 3 simple steps</h2><p>No website needed. No tech skills needed.</p></div>
+<div class="lpx-steps"><div><b>Tell us about your business</b><p>Fill in the short form above — about 3 minutes.</p></div><div><b>Our local team verifies it</b><p>We check your details within 1–2 business days.</p></div><div><b>Customers start finding you</b><p>Your page goes live with a Verified badge.</p></div></div>
+<div class="lpx-h"><h2>Questions owners ask</h2></div>
+<div class="lpx-faq"><details open><summary>Is it really free?</summary><p>Yes. A basic listing is free forever — no credit card, no contract. <a href="/pricing">Paid plans</a> are optional extras.</p></details><details><summary>My business might already be listed.</summary><p>Search for it on the <a href="/claim">Claim page</a> — claiming is free and lets you edit everything.</p></details><details><summary>Do I need a website?</summary><p>No. Your page works as your web presence, with hours, photos and a contact form.</p></details><details><summary>How long until I'm live?</summary><p>Usually 1–2 business days after our team verifies your details.</p></details></div>
+</div>
+<section class="lpx-end"><h2>Ready to be found in ${E(S.city)}?</h2><p>Free forever. Takes 3 minutes.</p><a href="#start">Add my business free ↑</a></section>
+<a class="lpx-sticky" id="lpxSticky" href="#start">Add my business — free</a>
+<script>(function(){
+var f=document.getElementById("addBizForm"),s1=document.getElementById("lpxS1"),s2=document.getElementById("lpxS2");
+if(!f||!s1||!s2)return;f.classList.add("lpx-js");
+function req(box,on){box.querySelectorAll("[data-req]").forEach(function(e){e.required=on})}
+s2.querySelectorAll("[required]").forEach(function(e){e.setAttribute("data-req","1")});req(s2,false);
+function step(n){s1.style.display=n===1?"":"none";s2.style.display=n===2?"":"none";req(s2,n===2);
+document.getElementById("lpxStepTxt").textContent=n===1?"Step 1 of 2 · takes about 3 minutes":"Step 2 of 2 · almost done";
+document.getElementById("lpxPg2").className=n===2?"on":"";}
+step(1);
+document.getElementById("lpxNext").addEventListener("click",function(){
+var bad=[].slice.call(s1.querySelectorAll("input,select")).filter(function(e){return !e.checkValidity()});
+if(bad.length){bad[0].reportValidity();return}
+var oe=document.getElementById("oe"),op=document.getElementById("op");
+if(oe&&!oe.value)oe.value=document.getElementById("be").value;if(op&&!op.value)op.value=document.getElementById("bp").value;
+step(2);var a=document.getElementById("ba");if(a)a.focus();
+if(window.gtag)try{gtag("event","add_business_step2")}catch(e){}});
+document.getElementById("lpxBack").addEventListener("click",function(){step(1)});
+function vis(){var v=document.getElementById("glVisitCount");if(v&&/[0-9]/.test(v.textContent)){["lpxVisits","lpxVisits2"].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=v.textContent})}else setTimeout(vis,300)}vis();
+var st=document.getElementById("lpxSticky"),card=document.getElementById("start");
+if(st&&card&&"IntersectionObserver" in window)new IntersectionObserver(function(es){st.classList.toggle("off",es[0].isIntersecting)}).observe(card);
+})();<\/script>`
+  });
+};
 
 const CLAIMFIND = (d, q, hits) => PAGE(d, {
   title: `Claim your listing | ${S.brand}`,
@@ -6759,7 +6882,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.18-shared";
+const BUILD = "v16.21-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11488,7 +11611,18 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const rows = DB ? ((await DB.prepare("SELECT * FROM businesses WHERE claimed=1 ORDER BY plus DESC, premium DESC, rat DESC, rev DESC LIMIT ?1 OFFSET ?2").bind(perPage, (page - 1) * perPage).all()).results || []).map(ROWOF) : [];
       return R(CLAIMEDPAGE(d, rows, page, totalPages));
     }
-    if (p[0] === "add") return R(ADD(d));
+    if (p[0] === "add") {
+      // City photo (busiest neighbourhood) + a few claimed businesses with their own photo, for the landing page.
+      let img = "", proof = [], topHood = "";
+      if (DB) try {
+        await catImgOverrides(DB);
+        const top = Object.entries(await hoodCounts(DB)).sort((m, n) => n[1] - m[1]).map(([h]) => h);
+        img = top.map(h => CIC.d["hood-" + h]).find(Boolean) || "";
+        topHood = top.length ? hoodName(top[0]) : "";
+        proof = ((await DB.prepare("SELECT * FROM businesses WHERE claimed=1 AND logo LIKE 'http%' ORDER BY rev DESC LIMIT 12").all()).results || []).map(ROWOF).filter(b => bizImg(b) !== DEFAULT_LISTING_IMG).slice(0, 5);
+      } catch {}
+      return R(ADD(d, { img: img, proof: proof, hoodName: topHood }));
+    }
     if (p[0] === "blog" && !p[1]) {
       const activeCat = u.searchParams.get("cat") || "";
       const posts = DB ? (activeCat ? await DB.prepare("SELECT id,slug,title,excerpt,cover_image,blog_cat,author,created_at FROM posts WHERE published=1 AND archived=0 AND blog_cat=?1 ORDER BY created_at DESC LIMIT 60").bind(activeCat).all().catch(() => ({
