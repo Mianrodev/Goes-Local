@@ -1305,6 +1305,42 @@ const getDB = e => {
 
 const DDL = [ `CREATE TABLE IF NOT EXISTS businesses(\n id INTEGER PRIMARY KEY AUTOINCREMENT,\n ghl_id TEXT UNIQUE, city TEXT, cat TEXT, cs TEXT, sub TEXT, slug TEXT,\n name TEXT, addr TEXT, area TEXT, state TEXT, zip TEXT,\n ph TEXT, pr TEXT, email TEXT, web TEXT, descr TEXT, hrs TEXT, svc TEXT,\n logo TEXT, map TEXT, ic TEXT, rat REAL, rev INTEGER, yrs INTEGER,\n premium INTEGER DEFAULT 0, claimed INTEGER DEFAULT 0,\n hood TEXT DEFAULT '', owner_email TEXT, code TEXT DEFAULT '', labels TEXT DEFAULT '',\n lat REAL, lng REAL, photos TEXT DEFAULT '', miss_count INTEGER DEFAULT 0, updated_at INTEGER)`, `CREATE UNIQUE INDEX IF NOT EXISTS ix_slug ON businesses(cs,slug)`, `CREATE INDEX IF NOT EXISTS ix_cs ON businesses(cs)`, `CREATE INDEX IF NOT EXISTS ix_sub ON businesses(cs,sub)`, `CREATE INDEX IF NOT EXISTS ix_prem ON businesses(cs,premium DESC,rat DESC)`, `CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT)`, `CREATE TABLE IF NOT EXISTS claims(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT, business TEXT,\n name TEXT, email TEXT, phone TEXT, role TEXT, verify TEXT, notes TEXT,\n status TEXT DEFAULT 'pending', token TEXT, created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_claim_status ON claims(status,created_at DESC)`, `CREATE TABLE IF NOT EXISTS posts(\n id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE, title TEXT, excerpt TEXT, body TEXT,\n author TEXT, published INTEGER DEFAULT 1, created_at INTEGER, updated_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_posts_pub ON posts(published,created_at DESC)`, `CREATE TABLE IF NOT EXISTS reviews(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL,\n reviewer_email TEXT NOT NULL, reviewer_name TEXT DEFAULT '',\n rating INTEGER NOT NULL, body TEXT DEFAULT '', status TEXT DEFAULT 'pending',\n created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_reviews_biz ON reviews(ghl_id,status)`, `CREATE TABLE IF NOT EXISTS follows(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL,\n follower_email TEXT NOT NULL, created_at INTEGER,\n UNIQUE(ghl_id,follower_email))`, `CREATE INDEX IF NOT EXISTS ix_follows_email ON follows(follower_email)`, `CREATE TABLE IF NOT EXISTS photos(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL,\n uploader_email TEXT NOT NULL, url TEXT NOT NULL, status TEXT DEFAULT 'pending',\n created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_photos_biz ON photos(ghl_id,status)`, `CREATE TABLE IF NOT EXISTS comments(\n id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER NOT NULL,\n commenter_email TEXT NOT NULL, commenter_name TEXT DEFAULT '',\n body TEXT NOT NULL, status TEXT DEFAULT 'pending',\n created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_comments_post ON comments(post_id,status)`, `CREATE TABLE IF NOT EXISTS import_batches(\n id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT DEFAULT '', total INTEGER DEFAULT 0,\n created_at INTEGER)`, `CREATE TABLE IF NOT EXISTS import_rows(\n id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL,\n name TEXT DEFAULT '', category TEXT DEFAULT '', address TEXT DEFAULT '', city TEXT DEFAULT '',\n state TEXT DEFAULT '', zip TEXT DEFAULT '', phone TEXT DEFAULT '', website TEXT DEFAULT '',\n email TEXT DEFAULT '', rating REAL, reviews INTEGER,\n dup_of TEXT DEFAULT '', status TEXT DEFAULT 'pending', ghl_id TEXT DEFAULT '', err TEXT DEFAULT '',\n created_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_import_rows_batch ON import_rows(batch_id,status)`, `CREATE TABLE IF NOT EXISTS cancellations(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL, business TEXT DEFAULT '',\n email TEXT DEFAULT '', plan TEXT DEFAULT '', reason TEXT DEFAULT '', notes TEXT DEFAULT '',\n status TEXT DEFAULT 'pending', created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_cancel_status ON cancellations(status,created_at DESC)`, `CREATE TABLE IF NOT EXISTS deletion_requests(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL, business TEXT DEFAULT '',\n email TEXT DEFAULT '', reason TEXT DEFAULT '',\n status TEXT DEFAULT 'pending', created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_delreq_status ON deletion_requests(status,created_at DESC)`, `CREATE TABLE IF NOT EXISTS slug_redirects(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL, cs TEXT NOT NULL, old_slug TEXT NOT NULL,\n created_at INTEGER, UNIQUE(cs,old_slug))`, `CREATE TABLE IF NOT EXISTS ad_requests(\n id INTEGER PRIMARY KEY AUTOINCREMENT, ghl_id TEXT NOT NULL, business TEXT DEFAULT '',\n email TEXT DEFAULT '', cat_slug TEXT DEFAULT '', sub TEXT DEFAULT '', notes TEXT DEFAULT '',\n status TEXT DEFAULT 'pending', created_at INTEGER, decided_at INTEGER)`, `CREATE INDEX IF NOT EXISTS ix_adreq_status ON ad_requests(status,created_at DESC)` ];
 
+// Map pins: looks up latitude/longitude for listings that have none, using the free US Census
+// batch geocoder (one request per batch, no API key, no cost). Runs weekly from the cron and on
+// demand at /admin/geocode. Addresses Census can't match are stamped and retried after 90 days,
+// so the same misses aren't re-sent every week.
+async function geocodeBatch(DB, n) {
+  const cutoff = Date.now() - 90 * 864e5;
+  const rows = (await DB.prepare("SELECT ghl_id,addr,zip,state FROM businesses WHERE lat IS NULL AND addr<>'' AND (geo_tried_at IS NULL OR geo_tried_at<?1) LIMIT ?2").bind(cutoff, n).all()).results || [];
+  if (!rows.length) return { tried: 0, matched: 0, left: 0 };
+  const q = v => '"' + String(v || "").replace(/"/g, "'") + '"';
+  const csv = rows.map(r => {
+    const parts = String(r.addr).split(",").map(x => x.trim()).filter(Boolean);
+    const zip = r.zip || (String(r.addr).match(/\b(\d{5})\b(?!.*\d{5})/) || [])[1] || "";
+    return [ r.ghl_id, parts[0] || "", parts.length >= 3 ? parts[parts.length - 2] : S.city, S.st || r.state || "", zip ].map(q).join(",");
+  }).join("\n");
+  const fd = new FormData();
+  fd.append("addressFile", new Blob([ csv ], { type: "text/csv" }), "a.csv");
+  fd.append("benchmark", "Public_AR_Current");
+  const res = await fetch("https://geocoding.geo.census.gov/geocoder/locations/addressbatch", { method: "POST", body: fd });
+  if (!res.ok) throw new Error("Census geocoder HTTP " + res.status);
+  const now = Date.now(), hit = {};
+  for (const line of (await res.text()).split("\n")) {
+    const c = line.match(/"([^"]*)"/g);
+    if (!c) continue;
+    const v = c.map(x => x.slice(1, -1));
+    if (v[2] === "Match" && v[5]) {
+      const [lng, lat] = v[5].split(",").map(Number);
+      if (lat && lng) hit[v[0]] = [ lat, lng ];
+    }
+  }
+  const st = rows.map(r => hit[r.ghl_id] ? DB.prepare("UPDATE businesses SET lat=?1,lng=?2,geo_tried_at=?3 WHERE ghl_id=?4").bind(hit[r.ghl_id][0], hit[r.ghl_id][1], now, r.ghl_id)
+    : DB.prepare("UPDATE businesses SET geo_tried_at=?1 WHERE ghl_id=?2").bind(now, r.ghl_id));
+  for (let i = 0; i < st.length; i += 100) await DB.batch(st.slice(i, i + 100));
+  const left = await DB.prepare("SELECT COUNT(*) n FROM businesses WHERE lat IS NULL AND addr<>'' AND (geo_tried_at IS NULL OR geo_tried_at<?1)").bind(cutoff).first();
+  return { tried: rows.length, matched: Object.keys(hit).length, left: left ? left.n : 0 };
+}
+
 async function migrate(DB, env) {
   for (const q of DDL) await DB.prepare(q).run();
   try {
@@ -1327,6 +1363,9 @@ async function migrate(DB, env) {
   } catch {}
   try {
     await DB.prepare("ALTER TABLE businesses ADD COLUMN lng REAL").run();
+  } catch {}
+  try {
+    await DB.prepare("ALTER TABLE businesses ADD COLUMN geo_tried_at INTEGER").run();
   } catch {}
   try {
     await DB.prepare("ALTER TABLE businesses ADD COLUMN photos TEXT DEFAULT ''").run();
@@ -6889,7 +6928,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.23-shared";
+const BUILD = "v16.24-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -6933,6 +6972,17 @@ const _export = {
         hourly = !hr || Date.now() - +hr.v >= 55 * 60 * 1e3;
         if (hourly) await DB.prepare("INSERT INTO meta(k,v) VALUES('cron_hourly_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(Date.now())).run();
       } catch {}
+      // Weekly: map pins for listings added since the last run (free Census geocoder, one request).
+      try {
+        const gw = await DB.prepare("SELECT v FROM meta WHERE k='cron_geo_at'").first();
+        if (!gw || Date.now() - +gw.v >= 7 * 864e5) {
+          await DB.prepare("INSERT INTO meta(k,v) VALUES('cron_geo_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(Date.now())).run();
+          const g = await geocodeBatch(DB, 1500);
+          console.log(`cron: map pins — tried ${g.tried}, matched ${g.matched}, ${g.left} still without`);
+        }
+      } catch (e) {
+        console.log("cron geocode failed: " + e.message);
+      }
       if (hourly) try {
         const gp = await gpSyncBatch(env, DB, 60);
         if (gp.done) console.log(`cron: refreshed Google reviews for ${gp.done} listings, ${gp.left} left`);
@@ -7116,6 +7166,16 @@ const _export = {
         await migrate(DB, env);
         const t = (await DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()).results || [];
         return TXT("Migration OK.\nTables: " + t.map(x => x.name).join(", "));
+      }
+      if (p[1] === "geocode") {
+        if (role !== "admin") return TXT("Map pins need full admin access — ask an admin.");
+        await migrate(DB, env);
+        try {
+          const g = await geocodeBatch(DB, Math.min(2500, Math.max(1, parseInt(u.searchParams.get("n")) || 1000)));
+          return TXT(`Map pins: tried ${g.tried}, found ${g.matched}. ${g.left} listings still to try` + (g.left ? " — open this page again to do the next batch." : ". All done."));
+        } catch (e) {
+          return TXT("MAP PINS FAILED: " + e.message);
+        }
       }
       if (p[1] === "logos") {
         if (role !== "admin") return TXT("Logos needs full admin access — ask an admin.");
