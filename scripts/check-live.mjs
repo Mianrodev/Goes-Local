@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Compares wrangler.toml with what is actually configured on each live Worker, so a
 // deploy can never silently drop a binding, cron, domain or setting.
-// Usage: node scripts/check-live.mjs [orlando|miami|tampa ...]   (default: every env in wrangler.toml)
+// Usage: node scripts/check-live.mjs [orlando|miami|tampa|ny|il|ga ...]   (default: every env in wrangler.toml)
 // Needs CLOUDFLARE_API_TOKEN. Exits 1 on any mismatch.
 import { readFileSync } from "node:fs";
 import { parse } from "smol-toml";

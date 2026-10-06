@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // After a deploy: sign in to the city's admin, run /admin/migrate, then read /debug and
 // confirm the live VERSION matches worker.js and D1/KV are bound.
-// Usage: node scripts/migrate-verify.mjs <orlando|miami|tampa> <expected-version> [--no-migrate]
+// Usage: node scripts/migrate-verify.mjs <orlando|miami|tampa|ny|il|ga> <expected-version> [--no-migrate]
 // Needs ADMIN_LOGIN_KEY (same key on every city).
 import { readFileSync } from "node:fs";
 import { parse } from "smol-toml";

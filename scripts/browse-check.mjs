@@ -2,7 +2,7 @@
 // Opens a city's real site in headless Chromium: homepage, categories, search, one
 // listing page, pricing, blog, and the admin login. Reports status codes, page
 // headings, JS errors and 5xx responses, and saves screenshots.
-// Usage: node scripts/browse-check.mjs <orlando|miami|tampa> [out-dir]
+// Usage: node scripts/browse-check.mjs <orlando|miami|tampa|ny|il|ga> [out-dir]
 // Needs ADMIN_LOGIN_KEY. Uses the global playwright install and /opt/pw-browsers/chromium.
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";

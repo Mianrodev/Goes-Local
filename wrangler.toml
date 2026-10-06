@@ -1,7 +1,8 @@
 # One file (worker.js) deployed once per city. City differences live in the
 # dashboard Variables (CITY_*, GHL tokens, keys) and each city's own D1 — never here.
 #
-# Orlando and Miami values were copied from the live Workers on 2026-09-25; Tampa was added 2026-10-01.
+# Orlando and Miami values were copied from the live Workers on 2026-09-25; Tampa was added 2026-10-01;
+# the NY, IL and GA home-services sites on 2026-10-06.
 # `npm run check-live` compares this file with what is live; the deploy script
 # refuses to run while anything here disagrees.
 
@@ -81,3 +82,77 @@ database_id = "dacebb72-57c8-418e-ae18-8fa9697ea4ed"
 [[env.tampa.kv_namespaces]]
 binding = "SESSIONS"
 id = "2c08d7ffc02b40ffbb4faed2aac0411d"   # GOES_LOCAL_TAMPA_SESSIONS
+
+# Statewide home-services sites (free listings only), added 2026-10-06. D1 lives in eastern North America.
+
+[env.ny]
+name = "homeservices-ny-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "homeservicesinny.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }
+
+[env.ny.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.ny.d1_databases]]
+binding = "homeservices-ny-db"
+database_name = "homeservices-ny-db"
+database_id = "ffde2da8-2327-46d8-b3ab-33f7957d148d"
+
+[[env.ny.kv_namespaces]]
+binding = "SESSIONS"
+id = "af31fe153aa342c1b5aa265d66df0855"   # HOMESERVICES_NY_SESSIONS
+
+[env.il]
+name = "homeservices-il-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "homeservicesinil.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }
+
+[env.il.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.il.d1_databases]]
+binding = "homeservices-il-db"
+database_name = "homeservices-il-db"
+database_id = "8eb07958-1950-4a53-8620-7ef23d9fa4ae"
+
+[[env.il.kv_namespaces]]
+binding = "SESSIONS"
+id = "f9bb9bf3bb8b42e486a529635a2b9bf4"   # HOMESERVICES_IL_SESSIONS
+
+[env.ga]
+name = "homeservices-ga-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "homeservicesinga.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }
+
+[env.ga.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.ga.d1_databases]]
+binding = "homeservices-ga-db"
+database_name = "homeservices-ga-db"
+database_id = "ba641c97-b72b-45d3-bd81-6d56c6b70d1b"
+
+[[env.ga.kv_namespaces]]
+binding = "SESSIONS"
+id = "b1a10018b8924c40966b346a7b4945ab"   # HOMESERVICES_GA_SESSIONS
