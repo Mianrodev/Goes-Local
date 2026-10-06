@@ -234,6 +234,8 @@ Listings with the same name + phone + address show once on the site: the kept co
 
 ## Lead-source tag (since v16.05)
 - **`seoinbound`:** added in the CRM to every website lead that found us through a search engine or AI assistant. That covers "List your business" and "Claim a listing".
+- **Who tags what (Eric, 6 Oct 2026):** the website is the only thing that adds `seoinbound`; GHL workflows add only `emailreplied`. The site never adds `seoinbound` to a contact with `emailreplied`, never for clicks from webmail or mail apps (`WEBMAIL_SRC`: mail.google.com, the Gmail Android app, Outlook, Yahoo Mail…), and never for paid ads. Each sync pass removes `seoinbound` from any contact that also has `emailreplied`.
+- **Older leads:** the 17 contacts tagged by the 29 Sep backfill with no recorded source keep their tag, by Eric's decision. `/admin/seotags?audit=1` lists every tagged contact by evidence; `&fix=1` only removes the emailreplied and webmail groups.
 - **Where it goes:** on a claim, both the person claiming and the business contact get the tag. On a pending listing, it's added again when the listing is published.
 - **Never removed.** Email is tracked in GHL by `emailreplied`, so the site adds no email tag. `emailinbound` from v16.04 was dropped.
 - **`/admin/seotags`** adds the tag to past leads. It's safe to re-run.
