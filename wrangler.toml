@@ -15,7 +15,7 @@ name = "goes-local-orlando-api"
 compatibility_date = "2026-09-10"
 workers_dev = true
 preview_urls = false
-routes = [{ pattern = "orlandogoeslocal.com", custom_domain = true }]
+routes = [{ pattern = "orlandogoeslocal.com", custom_domain = true }, { pattern = "www.orlandogoeslocal.com/*", zone_name = "orlandogoeslocal.com" }]
 triggers = { crons = ["*/5 * * * *"] }
 placement = { mode = "smart" }   # D1 lives in APAC (Singapore); run the Worker next to it
 
@@ -63,7 +63,7 @@ name = "goes-local-tampa-api"
 compatibility_date = "2026-09-10"
 workers_dev = true
 preview_urls = false
-routes = [{ pattern = "tampagoeslocal.com", custom_domain = true }]
+routes = [{ pattern = "tampagoeslocal.com", custom_domain = true }, { pattern = "www.tampagoeslocal.com", custom_domain = true }]
 triggers = { crons = ["*/5 * * * *"] }
 placement = { mode = "smart" }   # D1 lives in APAC (Singapore); run the Worker next to it
 

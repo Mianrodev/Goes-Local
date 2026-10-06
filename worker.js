@@ -7054,7 +7054,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.30-shared";
+const BUILD = "v16.31-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -12729,6 +12729,8 @@ export default {
   async fetch(req, env, ctx) {
     applyCityConfig(env);
     const u = new URL(req.url);
+    // www.<city>goeslocal.com → the main address, keeping the page and query (one canonical site for Google).
+    if (/^www\./i.test(u.hostname)) return Response.redirect(`https://${u.hostname.slice(4)}${u.pathname}${u.search}`, 301);
     const cookieHas = new RegExp(`(?:^|; )${APP_COOKIE}=1(?:;|$)`).test(req.headers.get("Cookie") || "");
     const cameFromApp = u.searchParams.get("app") === "1";
     const isApp = isAppRequest(req, u);
