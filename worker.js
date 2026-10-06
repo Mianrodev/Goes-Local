@@ -2151,6 +2151,14 @@ async function syncStep(env, DB, maxPages) {
       contactsThisCall += page.contacts.length;
       nextUrl = page.nextUrl;
       pagesFetched++;
+      // A contact can't be both an email lead and an SEO lead: drop "seoinbound" wherever GHL's workflow has
+      // added "emailreplied" (up to 25 per page, so a big backlog clears over a few passes).
+      let seoFix = 0;
+      for (const c of page.contacts) {
+        if (seoFix >= 25) break;
+        const tl = (c.tags || []).map(t => String(t).trim().toLowerCase());
+        if (tl.includes("seoinbound") && tl.includes("emailreplied") && await ghlRemoveTag(env, c.id, [ "seoinbound" ])) seoFix++;
+      }
       let pageList = page.contacts.filter(c => (c.tags || []).some(t => String(t).toLowerCase() === S.tag) && !isPerson(c)).map(c => norm(c, m));
       if (dupHidden.size) {
         const unhide = [];
@@ -4531,13 +4539,28 @@ async function notifyAdmins(env, DB, kind, tplKey, vars, href) {
 // Lead-source tag for the CRM (SG/Eric, 29 Sep): "seoinbound" for leads that found us through a search engine or
 // AI assistant. Email is tracked in GHL itself ("emailreplied"), so email clicks — including webmail referrers such
 // as mail.google.com, which would otherwise match "google" — get no tag here. Nothing ever removes the tag.
+// Webmail apps (Gmail on the web = mail.google.com, Yahoo Mail, Outlook…) send their own address as the
+// referrer when someone clicks a link in our campaign emails — that is an email click, not a search.
+const WEBMAIL_SRC = /(^|[.-])(mail|webmail|email|inbox)[.-]|outlook|hotmail|live\.com|proton|icloud|zoho|aol\.com|lc-[a-z]+goeslocal|msgsndr|mailchimp|mailgun|sendgrid/;
+
 function leadChannelTag(src, med) {
   src = String(src || "").toLowerCase();
   med = String(med || "").toLowerCase();
-  if (/e-?mail|newsletter/.test(med) || /^e-?mail|newsletter/.test(src)) return "";
+  if (/e-?mail|newsletter/.test(med) || /^e-?mail|newsletter/.test(src) || WEBMAIL_SRC.test(src)) return "";
   if (/cpc|ppc|paid/.test(med)) return "";
   if (med === "organic" || /google|bing|yahoo|duckduckgo|ecosia|brave|yandex|baidu|chatgpt|openai|perplexity|gemini|copilot|claude\.ai/.test(src)) return "seoinbound";
   return "";
+}
+
+// Adds "seoinbound" unless the contact already has GHL's "emailreplied" tag (Eric, 6 Oct: email leads
+// are tagged only by the GHL workflow and must never also count as SEO).
+async function addSeoInbound(env, cid) {
+  if (!cid) return false;
+  try {
+    const c = await ghlGetContact(env, cid);
+    if (c && (c.tags || []).some(t => String(t).trim().toLowerCase() === "emailreplied")) return false;
+  } catch {}
+  return ghlAddTag(env, cid, [ "seoinbound" ]);
 }
 
 function claimTier(biz, email) {
@@ -6968,7 +6991,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.25-shared";
+const BUILD = "v16.26-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -7270,6 +7293,40 @@ const _export = {
           }
           const show = (g, label) => `${label}: ${groups[g].length}\n` + groups[g].map(r => `  ${r.has ? "[seoinbound] " : ""}${r.name} — ${r.why}`).join("\n");
           return TXT(`${applyTo.length ? `Added seoinbound to ${added} contact(s) in: ${applyTo.join(" + ")}.\n\n` : "Preview only — nothing changed.\n\n"}${show("sure", "SURE (a tag says search/AI)")}\n\n${show("likely", "LIKELY (came through the website, no sign of email/call/social)")}\n\n${show("not", "NOT SEO (email reply, sales call or social)")}`);
+        }
+        if (u.searchParams.has("audit")) {
+          // Every contact tagged "seoinbound", sorted by what the evidence says. ?audit=1 is read-only;
+          // ?audit=1&fix=1 removes the tag from the two "remove" groups (never touches the others).
+          const SEARCH_SRC = /^source-.*(google|bing|yahoo|duckduckgo|ecosia|brave|chatgpt|openai|perplexity|gemini|copilot|claude)|^heard-about-us: *(google|online search|search|chatgpt|ai)/i;
+          const groups = { reply: [], webmail: [], keep: [], check: [] };
+          let url = `${API}/contacts/?locationId=${env.GHL_LOCATION_ID}&limit=100`, pages = 0, seen = 0;
+          while (url && pages < 400) {
+            const pg = await contactsPage(env, url);
+            pages++;
+            for (const c of pg.contacts) {
+              seen++;
+              const tags = (c.tags || []).map(t => String(t).trim());
+              const tl = tags.map(t => t.toLowerCase());
+              if (!tl.includes("seoinbound")) continue;
+              const name = c.companyName || [ c.firstName, c.lastName ].filter(Boolean).join(" ") || c.email || c.id;
+              const srcTags = tags.filter(t => /^source-|^heard-about-us/i.test(t));
+              const hint = [ ...srcTags, tl.includes("emailcampaign") ? "was in an email campaign" : "", tl.includes("claimed") ? "claimed" : "" ].filter(Boolean).join(", ") || "no source recorded";
+              const row = { id: c.id, name, hint };
+              const webSrc = srcTags.filter(t => /^source-/i.test(t)).some(t => WEBMAIL_SRC.test(t.toLowerCase().replace(/^source-/, "").replace(/-/g, ".")));
+              if (tl.includes("emailreplied")) groups.reply.push(row);
+              else if (srcTags.some(t => SEARCH_SRC.test(t))) groups.keep.push(row);
+              else if (webSrc) groups.webmail.push(row);
+              else groups.check.push(row);
+            }
+            url = pg.nextUrl;
+          }
+          let removed = 0;
+          if (u.searchParams.get("fix") === "1") for (const r of groups.reply.concat(groups.webmail)) if (await ghlRemoveTag(env, r.id, [ "seoinbound" ])) {
+            r.done = true;
+            removed++;
+          }
+          const show = (g, label) => `${label}: ${groups[g].length}\n` + groups[g].map(r => `  ${r.done ? "[removed] " : ""}${r.name} — ${r.hint}`).join("\n");
+          return TXT(`${S.brand}: ${seen} contacts read, ${groups.reply.length + groups.webmail.length + groups.keep.length + groups.check.length} tagged seoinbound.\n${u.searchParams.get("fix") === "1" ? `Removed seoinbound from ${removed}.` : "Read-only — add &fix=1 to remove the tag from the two REMOVE groups."}\n\n${show("reply", "REMOVE — has emailreplied (email lead)")}\n\n${show("webmail", "REMOVE — clicked through from an email app, not a search")}\n\n${show("keep", "KEEP — recorded source is a search engine or AI")}\n\n${show("check", "NO PROOF EITHER WAY — tagged by the earlier backfill; no recorded source")}`);
         }
         if (u.searchParams.has("list")) {
           // Read-only: walks every GHL contact and counts the tags (and contact "source" values) that look like
@@ -9070,7 +9127,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             }
             if (cid && row && row.referral) await ghlAddTag(env, cid, [ `heard-about-us: ${row.referral}` ]);
             const seoTag = row ? leadChannelTag(row.utm_source || row.referrer_domain, row.utm_medium) : "";
-            if (cid && seoTag) await ghlAddTag(env, cid, [ seoTag ]);
+            if (cid && seoTag) await addSeoInbound(env, cid);
             if (cid) {
               try {
                 await insertOne(env, DB, cid, pubC);
@@ -11499,7 +11556,8 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         const channelTag = leadChannelTag(utmSource || referrerDomain, utmMedium);
         if (cid && (utmSource || referrerDomain)) {
           try {
-            await ghlAddTag(env, cid, [ `source-${SL(utmSource || referrerDomain)}`, channelTag ].filter(Boolean));
+            await ghlAddTag(env, cid, [ `source-${SL(utmSource || referrerDomain)}` ]);
+            if (channelTag) await addSeoInbound(env, cid);
           } catch (e) {
             console.log("attribution tag fail: " + e.message);
           }
@@ -11657,9 +11715,10 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         }
       });
       const seoTag = leadChannelTag(utmSource, utmMedium);
-      if (cid) await ghlAddTag(env, cid, [ "claim-request", utmSource ? `source-${SL(utmSource)}` : "", seoTag ].filter(Boolean));
+      if (cid) await ghlAddTag(env, cid, [ "claim-request", utmSource ? `source-${SL(utmSource)}` : "" ].filter(Boolean));
+      if (seoTag && cid) await addSeoInbound(env, cid);
       if (seoTag && id !== cid) try {
-        await ghlAddTag(env, id, [ seoTag ]);
+        await addSeoInbound(env, id);
       } catch (e) {
         console.log("claim: seoinbound on business contact failed: " + e.message);
       }
