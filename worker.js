@@ -4541,7 +4541,7 @@ async function notifyAdmins(env, DB, kind, tplKey, vars, href) {
 // as mail.google.com, which would otherwise match "google" — get no tag here. Nothing ever removes the tag.
 // Webmail apps (Gmail on the web = mail.google.com, Yahoo Mail, Outlook…) send their own address as the
 // referrer when someone clicks a link in our campaign emails — that is an email click, not a search.
-const WEBMAIL_SRC = /(^|[.-])(mail|webmail|email|inbox)[.-]|outlook|hotmail|live\.com|proton|icloud|zoho|aol\.com|lc-[a-z]+goeslocal|msgsndr|mailchimp|mailgun|sendgrid/;
+const WEBMAIL_SRC = /(^|[.-])(mail|webmail|email|inbox)[.-]|outlook|hotmail|live\.com|proton|icloud|zoho|aol\.com|lc-[a-z]+goeslocal|msgsndr|mailchimp|mailgun|sendgrid|google\.?android\.?gm|com\.?google\.?android\.?gm|yahoo\.?mobile\.?client|com\.?microsoft\.?office\.?outlook/;
 
 function leadChannelTag(src, med) {
   src = String(src || "").toLowerCase();
@@ -6991,7 +6991,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.26-shared";
+const BUILD = "v16.27-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -7312,9 +7312,10 @@ const _export = {
               const srcTags = tags.filter(t => /^source-|^heard-about-us/i.test(t));
               const hint = [ ...srcTags, tl.includes("emailcampaign") ? "was in an email campaign" : "", tl.includes("claimed") ? "claimed" : "" ].filter(Boolean).join(", ") || "no source recorded";
               const row = { id: c.id, name, hint };
-              const webSrc = srcTags.filter(t => /^source-/i.test(t)).some(t => WEBMAIL_SRC.test(t.toLowerCase().replace(/^source-/, "").replace(/-/g, ".")));
+              const isMailTag = t => /^source-/i.test(t) && WEBMAIL_SRC.test(t.toLowerCase().replace(/^source-/, ""));
+              const webSrc = srcTags.some(isMailTag);
               if (tl.includes("emailreplied")) groups.reply.push(row);
-              else if (srcTags.some(t => SEARCH_SRC.test(t))) groups.keep.push(row);
+              else if (srcTags.some(t => SEARCH_SRC.test(t) && !isMailTag(t))) groups.keep.push(row);
               else if (webSrc) groups.webmail.push(row);
               else groups.check.push(row);
             }
