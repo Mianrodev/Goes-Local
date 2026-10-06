@@ -47,3 +47,8 @@ npm run browse-check -- orlando       # real headless-Chromium click-through + s
 - [x] `wrangler.toml` filled from the live Workers (compat dates, binding names, cron, custom domains, workers.dev on, logs on); `check-live` passes for both.
 - [x] Orlando: no-change v15.79 deploy on 2026-09-25 15:34Z — settings identical before/after, migrate + /debug OK, browser click-through OK, full sync completed 15:45Z.
 - [x] Miami: no-change v15.79 deploy on 2026-09-25 15:47Z — same checks passed; new sync pass started 15:50Z.
+
+## Home-services sites (2026-10-06)
+- `ny`, `il`, `ga` deployed on v16.19-shared, Variables set (see `changelog/v16.19.md`), `ADMIN_LOGIN_KEY` secret set, migrated, `seed/home-services-categories.sql` loaded, `scripts/security-rules.mjs` applied to all three zones. Reachable at `homeservices-{ny,il,ga}-api.dev1-024.workers.dev`.
+- **Custom domains not attached yet:** each zone has an old proxied A record on the apex (the site behind it returned 522) and the token can't edit DNS. Once Eric deletes those records, re-run `npx wrangler deploy --env <ny|il|ga>` (or PUT /workers/domains) to attach, then `npm run check-live -- ny il ga`. Plain-http requests were also being 302'd to `www.` by a rule the token can't read; check it after the domains attach.
+- Still to add once GHL exists: `GHL_LOCATION_ID`, `GHL_API_TOKEN` (Secret), `CITY_FROM_EMAIL`, `CITY_FROM_NAME`, optionally `CITY_GA_IDS`, `ADMIN_NOTIFY_EMAIL`, `GOOGLE_PLACES_API_KEY`, `STATUS_WEBHOOK_KEY`.
