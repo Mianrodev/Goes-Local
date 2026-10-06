@@ -191,7 +191,11 @@ Release routine:
 
 History: v15.76 CRM Business Name on existing contacts → v15.77 GA IDs to `CITY_GA_IDS` → v15.78 schema box limit removed → v15.79 SEO nav tab + per-page JSON-LD.
 
-## 8. Launching the next city (Tampa)
+## 8. Launching the next city
+
+**Tampa went live 2 Oct 2026 (v16.18)** following these steps: Worker `goes-local-tampa-api`, D1 `tampa-directory-db`, KV `GOES_LOCAL_TAMPA_SESSIONS`, starter content `seed/tampa.sql`, 25 neighbourhoods, bot rules applied. The custom domain only attaches once the zone's old A/CNAME record for the apex is deleted (error 100117). Until then, check the city with `BASE=https://<worker>.workers.dev node scripts/migrate-verify.mjs <city> <ver>`. Still open for Tampa: logo upload, GA ID, neighbourhood photos, geocoding (maps stay blank until lat/lng is filled), STATUS_WEBHOOK_KEY / PAYMENT_WEBHOOK_KEY.
+
+Steps for the next city:
 
 1. GHL: clone a sub-account from the Miami snapshot; verify the sending domain.
 2. Buy domain, add to Cloudflare.
@@ -230,12 +234,14 @@ Listings with the same name + phone + address show once on the site: the kept co
 
 ## Lead-source tag (since v16.05)
 - **`seoinbound`:** added in the CRM to every website lead that found us through a search engine or AI assistant. That covers "List your business" and "Claim a listing".
+- **Who tags what (Eric, 6 Oct 2026):** the website is the only thing that adds `seoinbound`; GHL workflows add only `emailreplied`. The site never adds `seoinbound` to a contact with `emailreplied`, never for clicks from webmail or mail apps (`WEBMAIL_SRC`: mail.google.com, the Gmail Android app, Outlook, Yahoo Mail…), and never for paid ads. Each sync pass removes `seoinbound` from any contact that also has `emailreplied`.
+- **Older leads:** the 17 contacts tagged by the 29 Sep backfill with no recorded source keep their tag, by Eric's decision. `/admin/seotags?audit=1` lists every tagged contact by evidence; `&fix=1` only removes the emailreplied and webmail groups.
 - **Where it goes:** on a claim, both the person claiming and the business contact get the tag. On a pending listing, it's added again when the listing is published.
 - **Never removed.** Email is tracked in GHL by `emailreplied`, so the site adds no email tag. `emailinbound` from v16.04 was dropped.
 - **`/admin/seotags`** adds the tag to past leads. It's safe to re-run.
 - **Where the rules live:** `leadChannelTag()` in worker.js.
 
 ## Statewide trade sites (since v16.18)
-The same code can run a statewide directory for one trade (first planned: Florida plumbers), on its own Worker, D1, KV and GHL sub-account, set up like a new city (§8). Extra Variables, all optional: `CITY_AREA_WORD=City` (pages at `/city/{slug}`, `/cities`), `CITY_AREAS_FROM=city` (listings are grouped by their own town; towns are added automatically during sync), `CITY_VALID_ZIPS=32,33,34` (zip starts allowed), `CITY_HEADLINE`, `CITY_NOUN=Plumbers`, `CITY_SEARCH_HINT`. Suggested core values: `CITY_NAME=Florida`, `CITY_STATE=FL`, `CITY_COUNTY=Florida`. Load `seed/home-services-categories.sql` into its D1 after the first migrate. See `changelog/v16.18.md`.
+The same code can run a statewide directory for one trade (first planned: Florida plumbers), on its own Worker, D1, KV and GHL sub-account, set up like a new city (§8). Extra Variables, all optional: `CITY_AREA_WORD=City` (pages at `/city/{slug}`, `/cities`), `CITY_AREAS_FROM=city` (listings are grouped by their own town; towns are added automatically during sync), `CITY_VALID_ZIPS=32,33,34` (zip starts allowed), `CITY_HEADLINE`, `CITY_NOUN=Plumbers`, `CITY_SEARCH_HINT`. Suggested core values: `CITY_NAME=Florida`, `CITY_STATE=FL`, `CITY_COUNTY=Florida`. Load `seed/home-services-categories.sql` into its D1 after the first migrate. See `changelog/v16.32.md`.
 
-**Live (6 Oct 2026):** homeservicesinny.com, homeservicesinil.com, homeservicesinga.com: envs `ny`, `il`, `ga`, free listings only (`CITY_FREE_ONLY=1`, see `changelog/v16.19.md`). Deploy them with `scripts/deploy.sh ny il ga` after Orlando and Miami.
+**Live (6 Oct 2026):** homeservicesinny.com, homeservicesinil.com, homeservicesinga.com: envs `ny`, `il`, `ga`, free listings only (`CITY_FREE_ONLY=1`, see `changelog/v16.32.md`). Deploy them with `scripts/deploy.sh ny il ga` after Orlando and Miami.

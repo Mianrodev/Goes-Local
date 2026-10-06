@@ -39,7 +39,7 @@ npm run browse-check -- orlando       # real headless-Chromium click-through + s
 - Orlando Variables: ADMIN_LOGIN_KEY (plain text — visible in the dashboard, unlike Miami's Secret), CITY_BRAND, CITY_COUNTY, CITY_DOMAIN, CITY_FROM_EMAIL, CITY_FROM_NAME, CITY_GA_IDS, CITY_NAME, CITY_STATE, CITY_TAGLINE. Secrets: GHL_API_TOKEN, GHL_LOCATION_ID.
   Missing vs Miami: GOOGLE_PLACES_API_KEY (no Google ratings refresh), GHL_PRIVATE_TOKEN_AGENT (agent logins), ADMIN_NOTIFY_EMAIL, PAYMENT_WEBHOOK_KEY, CITY_VALID_ZIPS. (STATUS_WEBHOOK_KEY added 29 Sep; the Orlando GHL workflow "Auto Listing Verification" posts to /webhooks/ghlstatus. Tested end to end with CFL Counseling.)
 - Miami Variables: ADMIN_NOTIFY_EMAIL, CITY_GA_IDS (one ID only), GOOGLE_PLACES_API_KEY, PAYMENT_WEBHOOK_KEY, STATUS_WEBHOOK_KEY. Secrets: ADMIN_LOGIN_KEY, GHL_API_TOKEN, GHL_LOCATION_ID, GHL_PRIVATE_TOKEN_AGENT, GHL_PRIVATE_TOKEN_SALES. Miami sets no CITY_* except GA — it runs on the code defaults.
-- The account also holds the zone `tampagoeslocal.com` (not yet attached to a Worker).
+- Tampa (live 2 Oct 2026, worker `goes-local-tampa-api`): Variables CITY_NAME, CITY_BRAND, CITY_COUNTY, CITY_STATE, CITY_DOMAIN, CITY_FROM_EMAIL, CITY_FROM_NAME, CITY_TAGLINE, CITY_GA_IDS (G-PTHWYG1QQW, added 6 Oct); Secrets ADMIN_LOGIN_KEY, GHL_API_TOKEN, GHL_LOCATION_ID. STATUS_WEBHOOK_KEY added 6 Oct (Eric). GOOGLE_PLACES_API_KEY copied from Miami to Tampa and Orlando on 7 Oct (Google rating/review refresh for claimed listings). Still missing: PAYMENT_WEBHOOK_KEY and per-city Stripe payment links (Eric is setting up Stripe in each GHL account).
 
 ## First-time setup status (2026-09-25)
 - [x] Live code pulled from both Workers — identical, committed and tagged `v15.79-shared`.
@@ -49,6 +49,6 @@ npm run browse-check -- orlando       # real headless-Chromium click-through + s
 - [x] Miami: no-change v15.79 deploy on 2026-09-25 15:47Z — same checks passed; new sync pass started 15:50Z.
 
 ## Home-services sites (2026-10-06)
-- `ny`, `il`, `ga` deployed on v16.19-shared, Variables set (see `changelog/v16.19.md`), `ADMIN_LOGIN_KEY` secret set, migrated, `seed/home-services-categories.sql` loaded, `scripts/security-rules.mjs` applied to all three zones. Reachable at `homeservices-{ny,il,ga}-api.dev1-024.workers.dev`.
+- `ny`, `il`, `ga` first deployed 6 Oct on this branch's v16.19 (renumbered v16.32 after merging main), Variables set (see `changelog/v16.32.md`), `ADMIN_LOGIN_KEY` secret set, migrated, `seed/home-services-categories.sql` loaded, `scripts/security-rules.mjs` applied to all three zones. Reachable at `homeservices-{ny,il,ga}-api.dev1-024.workers.dev`.
 - **Custom domains not attached yet:** each zone has an old proxied A record on the apex (the site behind it returned 522) and the token can't edit DNS. Once Eric deletes those records, re-run `npx wrangler deploy --env <ny|il|ga>` (or PUT /workers/domains) to attach, then `npm run check-live -- ny il ga`. Plain-http requests were also being 302'd to `www.` by a rule the token can't read; check it after the domains attach.
 - Still to add once GHL exists: `GHL_LOCATION_ID`, `GHL_API_TOKEN` (Secret), `CITY_FROM_EMAIL`, `CITY_FROM_NAME`, optionally `CITY_GA_IDS`, `ADMIN_NOTIFY_EMAIL`, `GOOGLE_PLACES_API_KEY`, `STATUS_WEBHOOK_KEY`.
