@@ -4010,13 +4010,9 @@ const ghlPayReady = env => !!env.PAYMENT_WEBHOOK_KEY;
 
 const ghlPayAnnualReady = env => !!env.PAYMENT_WEBHOOK_KEY;
 
-const FEATURED_PAY_URL = "https://link.fastpaydirect.com/payment-link/6a7dcb1dc8cc9a2ce7267c8e";
-
-const FEATURED_PAY_URL_ANNUAL = "https://link.fastpaydirect.com/payment-link/6a7f898b73c7ff66b05e8471";
-
-const PREMIUM_PAY_URL = "https://link.fastpaydirect.com/payment-link/6a8cad9ef9c8c807930b9ce9";
-
-const PREMIUM_PAY_URL_ANNUAL = "https://link.fastpaydirect.com/payment-link/6a8cadd9f9c8c807930b9cec";
+// Each city's own GHL/Stripe payment links (dashboard Variables), so money lands in that city's account.
+// A plan's button only shows when its link is set and the city has PAYMENT_WEBHOOK_KEY.
+const PAYURL = (env, k) => /^https:\/\//.test(String(env[k] || "")) ? String(env[k]).trim() : "";
 
 async function sendChallenge(env, channel, target, payload) {
   if (!AUTH.CHANNELS[channel]) {
@@ -7054,7 +7050,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.31-shared";
+const BUILD = "v16.32-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -10934,10 +10930,10 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       }
       const pre = url => url ? `${url}${url.includes("?") ? "&" : "?"}email=${encodeURIComponent(s.email)}&biz=${encodeURIComponent(id)}` : "";
       const pay = {
-        fm: ghlPayReady(env) ? pre(FEATURED_PAY_URL) : "",
-        fy: ghlPayAnnualReady(env) ? pre(FEATURED_PAY_URL_ANNUAL) : "",
-        pm: ghlPayReady(env) ? pre(PREMIUM_PAY_URL) : "",
-        py: ghlPayReady(env) ? pre(PREMIUM_PAY_URL_ANNUAL) : ""
+        fm: ghlPayReady(env) ? pre(PAYURL(env, "CITY_PAY_PLUS_MONTH")) : "",
+        fy: ghlPayAnnualReady(env) ? pre(PAYURL(env, "CITY_PAY_PLUS_YEAR")) : "",
+        pm: ghlPayReady(env) ? pre(PAYURL(env, "CITY_PAY_PRO_MONTH")) : "",
+        py: ghlPayReady(env) ? pre(PAYURL(env, "CITY_PAY_PRO_YEAR")) : ""
       };
       return R2(UPGRADE(d, b, pay, u.searchParams.get("err") || ""));
     }
