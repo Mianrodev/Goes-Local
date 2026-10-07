@@ -7111,7 +7111,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.34-shared";
+const BUILD = "v16.35-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11410,7 +11410,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     }
     if (u.pathname === "/photo-credits") {
       const rows = Object.entries(IMG_CREDITS).sort((a, b) => a[0].localeCompare(b[0]));
-      const label = k => k.startsWith("hood-") ? hoodName(k.slice(5)) : k.startsWith("type-") ? TC(k.slice(5).replace(/-/g, " ")) : (d.cats.find(c => c.slug === k) || {}).name || k;
+      const label = k => k.startsWith("hood-") ? hoodName(k.slice(5)) : k.startsWith("type-") ? TC(k.slice(5).replace(/-/g, " ")) : (d.cats.find(c => c.slug === k) || {}).name || TC(k.replace(/[-_]/g, " "));
       return R(PAGE(d, {
         title: `Photo credits | ${S.brand}`,
         desc: `Credits for the photographs used on ${S.brand}.`,
