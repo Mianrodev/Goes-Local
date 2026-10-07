@@ -456,11 +456,16 @@ const hoodName = slug => {
   return h ? h.name : slug;
 };
 
-const HOODS_LIVE = () => HOOD_CACHE.list.map(h => ({
-  slug: h.slug,
-  name: h.name,
-  blurb: h.blurb || ""
-}));
+// Statewide sites list their busiest towns first (hundreds of towns; A–Z would lead with tiny ones).
+const HOODS_LIVE = () => {
+  const l = HOOD_CACHE.list.map(h => ({
+    slug: h.slug,
+    name: h.name,
+    blurb: h.blurb || ""
+  }));
+  const n = AREA.byCity && HC_CACHE.d;
+  return n ? l.sort((a, b) => (n[b.slug] || 0) - (n[a.slug] || 0)) : l;
+};
 
 function seededShuffle(arr, seed) {
   const a = arr.slice();
@@ -7113,7 +7118,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.37-shared";
+const BUILD = "v16.38-shared";
 
 const APP_COOKIE = "gl_app";
 
