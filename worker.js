@@ -2250,6 +2250,8 @@ async function syncStep(env, DB, maxPages) {
           const towns = new Map;
           for (const miss of misses) if (miss.area && (!S.validZips || S.validZips.has(miss.zip))) {
             const name = TOWNCASE(miss.area), slug = SL(name);
+            // Only real town names: letters, no digits, not an address fragment like "Suite 200".
+            if (!/^[a-z][a-z .'\-]*$/i.test(name) || /^(suite|ste|apt|unit|po box|p o box)\b/i.test(name)) continue;
             if (slug && !towns.has(slug)) towns.set(slug, name);
           }
           if (towns.size) try {
@@ -7111,7 +7113,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.35-shared";
+const BUILD = "v16.36-shared";
 
 const APP_COOKIE = "gl_app";
 
