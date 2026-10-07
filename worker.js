@@ -5259,7 +5259,8 @@ function HOME(d, feat, hoodCounts, openNow, homeEvents, homePosts, heroTagRows, 
   homeNews = homeNews || [];
   heroTagRows = heroTagRows || [];
   heroBigRows = heroBigRows || [];
-  const totalSubcats = (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
+  // Statewide sites count real categories (Plumbing, Electricians…), not every Google business type under them.
+  const totalSubcats = AREA.byCity ? (d.cats || []).filter(c => c.name !== "Other").length : (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
   const PLACEHOLDER_TAG = [ {
     title: "List your business free",
     subtitle: `Join ${NUM(d.count)} ${S.city} businesses`,
@@ -5819,7 +5820,7 @@ ${b.pr || b.map ? `<div class="mcta">${b.pr ? `<a class="btn btn-p" href="tel:${
 }
 
 const ALLCATS = (d, faqs) => {
-  const totalSubs = (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
+  const totalSubs = AREA.byCity ? (d.cats || []).filter(c => c.name !== "Other").length : (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
   const shuffled = (() => {
     const rest = (d.cats || []).filter(c => c.name !== "Other");
     const other = (d.cats || []).filter(c => c.name === "Other");
@@ -7118,7 +7119,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.38-shared";
+const BUILD = "v16.39-shared";
 
 const APP_COOKIE = "gl_app";
 
