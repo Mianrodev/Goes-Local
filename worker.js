@@ -6647,7 +6647,22 @@ const ADMINPENDING = (rows, key, role) => `<!DOCTYPE html><html><head><meta char
 
 const ADMINCOMMENTS = (pending, approved, role) => `<!DOCTYPE html><html><head><meta charset="utf-8">\n<title>Comments — Admin | ${S.brand}</title><style>${CSS}</style></head><body>\n${ADMINNAV("/admin/comments", role)}\n<div class="wrap" style="padding:36px 24px 60px;max-width:900px">\n<h1 style="margin-bottom:6px">Blog comments</h1>\n<p style="color:${T.muted};margin-bottom:24px">${pending.length} waiting for review.</p>\n${pending.length ? `<div class="rows" style="margin-bottom:36px">${pending.map(c => `<div class="row" style="grid-template-columns:1fr 200px">\n<div class="rc"><h3 style="font-size:15px">${E(c.post_title)}</h3>\n<p style="font-size:12.5px;color:${T.muted};margin:2px 0 8px">${E(c.commenter_name || c.commenter_email)}</p>\n<p style="font-size:13px;color:${T.body}">${E(c.body)}</p>\n<p style="font-size:11px;color:${T.faint};margin-top:6px">Submitted ${new Date(c.created_at).toLocaleString()}</p></div>\n<div class="acts">\n<form method="POST" action="/admin/comments"><input type="hidden" name="commentId" value="${c.id}">\n<input type="hidden" name="act" value="approve"><button class="btn btn-p btn-sm btn-w">Approve</button></form>\n<form method="POST" action="/admin/comments" style="margin-top:6px"><input type="hidden" name="commentId" value="${c.id}">\n<input type="hidden" name="act" value="reject"><button class="btn btn-o btn-sm btn-w">Reject</button></form>\n</div></div>`).join("")}</div>` : `<div class="empty" style="margin-bottom:36px">Nothing waiting.</div>`}\n\n<h2 style="margin-bottom:6px">Live comments</h2>\n<p style="color:${T.muted};margin-bottom:14px">Reply to any comment below — your reply shows publicly, right under theirs.</p>\n${approved.length ? `<div class="rows">${approved.map(c => `<div class="row" style="grid-template-columns:1fr">\n<div class="rc"><h3 style="font-size:14px">${E(c.post_title)}</h3>\n<p style="font-size:12.5px;color:${T.muted};margin:2px 0 6px">${E(c.commenter_name || c.commenter_email)} · ${new Date(c.created_at).toLocaleDateString()}</p>\n<p style="font-size:13px;color:${T.body};margin-bottom:10px">${E(c.body)}</p>\n${c.admin_reply ? `<div style="background:${T.sand};border-radius:${T.r};padding:10px 12px;margin-bottom:8px">\n<b style="font-size:12px;color:${T.navy}">Your reply</b>\n<p style="font-size:13px;color:${T.body};margin-top:2px">${E(c.admin_reply)}</p></div>` : ""}\n<form method="POST" action="/admin/comments/reply">\n<input type="hidden" name="commentId" value="${c.id}">\n<div class="fld2"><textarea name="reply" placeholder="Write a reply…" maxlength="1000">${E(c.admin_reply || "")}</textarea></div>\n<button class="btn btn-o btn-sm">${c.admin_reply ? "Update reply" : "Post reply"}</button>\n${c.admin_reply ? `<button class="btn btn-o btn-sm" name="clear" value="1" style="margin-left:8px">Remove reply</button>` : ""}\n</form>\n</div></div>`).join("")}</div>` : `<div class="empty">No live comments yet.</div>`}\n</div></body></html>`;
 
-const R = (b, s = 200) => new Response(b, {
+// Filter/sort/claim links: Google sees only the plain page; the real address is swapped in when a person clicks.
+const HIDE_Q = /[?&](hood|rating|claim|sort|sub)=/;
+const GOJS = `(function(){function go(e){var a=e.target&&e.target.closest&&e.target.closest("a[data-go]");if(a)a.setAttribute("href",a.getAttribute("data-go"))}["pointerdown","focusin","click"].forEach(function(t){document.addEventListener(t,go,true)})})();`;
+const HIDELINKS = h => {
+  if (typeof h !== "string") return h;
+  let n = 0;
+  h = h.replace(/<a\b[^>]*>/g, t => t.replace(/\shref="(\/[^"]*)"/, (m, u) => {
+    const raw = u.replace(/&amp;/g, "&");
+    if (/^\/claim\/start\?/.test(raw)) return n++, ` href="/claim" data-go="${u}"`;
+    if (HIDE_Q.test(raw)) return n++, ` href="${u.split("?")[0]}" data-go="${u}"`;
+    return m;
+  }));
+  return n ? h.replace(/<\/body>(?![\s\S]*<\/body>)/, `<script>${GOJS}</script></body>`) : h;
+};
+
+const R = (b, s = 200) => new Response(HIDELINKS(b), {
   status: s,
   headers: {
     "content-type": "text/html;charset=UTF-8",
@@ -7050,7 +7065,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.32-shared";
+const BUILD = "v16.33-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11839,6 +11854,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
     if (p[0] === "pricing") return R(PRICING(d));
     if (p[0] === "privacy") return R(PRIVACY(d));
     if (p[0] === "terms") return R(TERMS(d));
+    if (p[0] === "neighbourhoods" && p[1]) return Response.redirect(AUTH.SITE_URL + "/neighbourhoods", 301);
     if (p[0] === "neighbourhoods") return R(ALLHOODS(d, await hoodCounts(DB)));
     if (p[0] === "claimed" && !p[1]) {
       const page = Math.max(1, parseInt(u.searchParams.get("page"), 10) || 1);
