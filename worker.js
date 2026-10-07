@@ -7113,7 +7113,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.36-shared";
+const BUILD = "v16.37-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -12090,7 +12090,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         return "/search" + (t ? "?" + t : "");
       };
       return R(RESULTS(d, {
-        title: q ? `${q} in ${S.city}, ${S.st}` : `All listings in ${S.city}`,
+        title: q ? `${q} in ${PLACE()}` : `All listings in ${S.city}`,
         metaTitle: `${q || "All listings"} in ${S.city} — ${total} results | ${S.brand}`,
         metaDesc: `Search results for ${q} in ${S.city}.`,
         crumb: `<a href="/">Home</a> / Search`,
@@ -12445,7 +12445,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         } catch {}
         return R(RESULTS(d, {
           title: `${fSub || c.name} in ${PLACE()}`,
-          metaTitle: `${fSub || c.name} in ${S.city}, ${S.st} — ${total} listings | ${S.brand}`,
+          metaTitle: `${fSub || c.name} in ${PLACE()} — ${total} listings | ${S.brand}`,
           metaDesc: `Compare ${total} ${(fSub || c.name).toLowerCase()} businesses in ${S.city}. Ratings, hours and phone numbers.`,
           crumb: `<a href="/">Home</a> / <a href="/categories">Categories</a> / <a href="${catBase}">${E(c.name)}</a>${fSub ? " / " + E(fSub) : ""}`,
           catName: c.name,
