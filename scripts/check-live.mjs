@@ -38,7 +38,9 @@ for (const name of envs) {
   want("observability.logs.enabled", !!(o.logs && o.logs.enabled), !!(fo.logs && fo.logs.enabled));
   want("observability.logs.invocation_logs", !!(o.logs && o.logs.invocation_logs), !!(fo.logs && fo.logs.invocation_logs));
   want("observability.traces.enabled", !!(o.traces && o.traces.enabled), !!(fo.traces && fo.traces.enabled));
-  want("placement.mode", (s.placement && s.placement.mode) || "off", (e.placement && e.placement.mode) || "off");
+  // Placement is either smart mode or a pinned cloud region (Tampa: aws:ap-southeast-1, next to its D1).
+  const plc = x => (x && (x.mode || x.region)) || "off";
+  want("placement", plc(s.placement), plc(e.placement));
   if (s.logpush) problems.push("logpush is on live but not described in wrangler.toml");
   if ((s.tail_consumers || []).length) problems.push("tail consumers are set live but not described in wrangler.toml");
 
