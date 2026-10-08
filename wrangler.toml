@@ -156,3 +156,77 @@ database_id = "ba641c97-b72b-45d3-bd81-6d56c6b70d1b"
 [[env.ga.kv_namespaces]]
 binding = "SESSIONS"
 id = "b1a10018b8924c40966b346a7b4945ab"   # HOMESERVICES_GA_SESSIONS
+
+# Second wave of statewide home-services sites, added 2026-10-08.
+
+[env.nc]
+name = "homeservices-nc-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "homeservicesinnc.com", custom_domain = true }, { pattern = "www.homeservicesinnc.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }
+
+[env.nc.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.nc.d1_databases]]
+binding = "homeservices-nc-db"
+database_name = "homeservices-nc-db"
+database_id = "6f7518cf-a5e7-4d72-ac88-effff1f2e7f5"
+
+[[env.nc.kv_namespaces]]
+binding = "SESSIONS"
+id = "b556d5cebae64ac6bd8d5f313a52a6db"   # HOMESERVICES_NC_SESSIONS
+
+[env.ma]
+name = "homeservices-ma-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "homeservicesinma.com", custom_domain = true }, { pattern = "www.homeservicesinma.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }
+
+[env.ma.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.ma.d1_databases]]
+binding = "homeservices-ma-db"
+database_name = "homeservices-ma-db"
+database_id = "61cf10ae-7552-4ff5-96ef-07c8694ef453"
+
+[[env.ma.kv_namespaces]]
+binding = "SESSIONS"
+id = "709430b3baae4eabbcb948bbbb7f5e0c"   # HOMESERVICES_MA_SESSIONS
+
+[env.pa]
+name = "homeservices-pa-api"
+compatibility_date = "2026-09-10"
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "homeservicesinpa.com", custom_domain = true }, { pattern = "www.homeservicesinpa.com", custom_domain = true }]
+triggers = { crons = ["*/5 * * * *"] }
+placement = { mode = "smart" }
+
+[env.pa.observability]
+enabled = true
+head_sampling_rate = 1
+logs = { enabled = true, head_sampling_rate = 1, persist = true, invocation_logs = true }
+traces = { enabled = false, persist = true, head_sampling_rate = 1 }
+
+[[env.pa.d1_databases]]
+binding = "homeservices-pa-db"
+database_name = "homeservices-pa-db"
+database_id = "0ea2d134-ea56-4ac5-b35f-529d1b14c816"
+
+[[env.pa.kv_namespaces]]
+binding = "SESSIONS"
+id = "7696c4d3c9fa4881a5c113abb1ae7f8a"   # HOMESERVICES_PA_SESSIONS

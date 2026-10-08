@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Release routine: check -> deploy + migrate + verify orlando, then miami, then tampa.
-# Usage: scripts/deploy.sh [orlando|miami|tampa|ny|il|ga ...]   (default: orlando miami tampa, in that order)
+# Usage: scripts/deploy.sh [orlando|miami|tampa|ny|il|ga|nc|ma|pa ...]   (default: orlando miami tampa, in that order)
 # Needs CLOUDFLARE_API_TOKEN and ADMIN_LOGIN_KEY in the environment. Stops at the first failure.
 # ALLOW_CONFIG_CHANGE=1 deploys even when wrangler.toml deliberately differs from live settings.
 set -euo pipefail
