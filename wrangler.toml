@@ -66,7 +66,7 @@ workers_dev = true
 preview_urls = false
 routes = [{ pattern = "tampagoeslocal.com", custom_domain = true }, { pattern = "www.tampagoeslocal.com", custom_domain = true }]
 triggers = { crons = ["*/5 * * * *"] }
-placement = { mode = "smart" }   # D1 lives in APAC (Singapore); run the Worker next to it
+placement = { region = "aws:ap-southeast-1" }   # D1 lives in APAC (Singapore). Smart placement never moved Tampa (ran in New Jersey, ~225ms per query), so pin it.
 
 [env.tampa.observability]
 enabled = true
