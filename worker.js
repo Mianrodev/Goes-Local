@@ -2282,6 +2282,18 @@ async function syncStep(env, DB, maxPages) {
     } catch (e) {
       console.log("bad-logo scan failed: " + e.message);
     }
+    // Claimed in GHL but no owner email: use the email already on the contact (Eric, 9 Oct), in GHL and here.
+    try {
+      const noOwner = (await DB.prepare("SELECT ghl_id,email FROM businesses WHERE claimed=1 AND (owner_email IS NULL OR owner_email='') AND email LIKE '%_@_%._%' LIMIT 25").all()).results || [];
+      for (const r of noOwner) {
+        const em = NRM(r.email);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) continue;
+        if (await ghlSetOwnerEmail(env, r.ghl_id, em)) await DB.prepare("UPDATE businesses SET owner_email=?1 WHERE ghl_id=?2").bind(em, r.ghl_id).run();
+      }
+      if (noOwner.length) console.log("owner email filled from contact email: " + noOwner.length);
+    } catch (e) {
+      console.log("owner email fill failed: " + e.message);
+    }
     try {
       const ftsRow = await DB.prepare("SELECT v FROM meta WHERE k='fts_at'").first().catch(() => null);
       const ftsAt = ftsRow ? +ftsRow.v : 0;
