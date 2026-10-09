@@ -4451,6 +4451,23 @@ async function getEmailTemplate(DB, key) {
   };
 }
 
+// Services sign-off required on every outgoing email to businesses (Eric's boss, 9 Oct). Not on team-only notices
+// or on the three emails that go to customers rather than business owners.
+const PITCH_SKIP = new Set([ "review_reply", "news_update", "review_request" ]);
+const PITCH_LIST = [ "More (and consistent) leads and sales without relying only on referrals.", "A new or improved website that turns more visitors into enquiries.", "More genuine Google reviews and a stronger online presence to stand out from competitors.", "An AI Receptionist that answers calls 24/7—so you can capture opportunities even when you’re busy, on a job, or closed for the day.", "Faster responses and consistent follow-ups so fewer leads go cold, totally on auto-pilot.", "A CRM and automated workflows to keep your business organized and reduce manual work.", "Paid ads backed by a system that captures and follows up with leads—so you’re ready to turn interest into bookings." ];
+const MAILPITCH = () => `<div style="padding:0 32px 30px;font-family:Arial,Helvetica,sans-serif;color:#42556B;font-size:14.5px;line-height:1.6">
+<div style="border-top:1px solid #F1E7D6;padding-top:24px">
+<p style="font-family:Georgia,'Times New Roman',serif;font-weight:bold;color:#12263F;font-size:19px;line-height:1.3;margin:0 0 14px">Let’s help more customers find—and choose—you.</p>
+<p style="margin:0 0 10px"><b style="color:#12263F">What would make the biggest difference to your business right now?</b></p>
+<ul style="margin:0 0 18px;padding:0 0 0 20px">${PITCH_LIST.map(x => `<li style="margin:0 0 7px">${x}</li>`).join("")}</ul>
+<p style="margin:0 0 18px">Beyond your directory listing, our paid services help you put these pieces together—so you can spend more time serving customers and less time chasing them.</p>
+<p style="margin:0 0 6px"><b style="color:#12263F">If we could help you improve ONE thing in the next 30–90 days, what would you choose?</b></p>
+<p style="margin:0">Reply with your biggest challenge—or simply <b style="color:#E4572E">“STRATEGY”</b>—and we’ll arrange a call to discuss where you are, where you want to be, and the practical steps to get there.</p>
+</div></div>`;
+const PITCH_TEXT = () => "\n\nLet’s help more customers find—and choose—you.\n\nWhat would make the biggest difference to your business right now?\n" + PITCH_LIST.map(x => "* " + x).join("\n") + "\n\nBeyond your directory listing, our paid services help you put these pieces together—so you can spend more time serving customers and less time chasing them.\n\nIf we could help you improve ONE thing in the next 30–90 days, what would you choose?\nReply with your biggest challenge—or simply “STRATEGY”—and we’ll arrange a call to discuss where you are, where you want to be, and the practical steps to get there.";
+const MAIL_CARD_END = '</div>\n</td></tr>\n<tr><td align="center" style="font-family:Arial';
+const withPitch = html => html.replace(MAIL_CARD_END, '</div>\n' + MAILPITCH() + '</td></tr>\n<tr><td align="center" style="font-family:Arial');
+
 async function sendTplEmail(env, DB, to, key, vars, href, code, contactId) {
   const t = await getEmailTemplate(DB, key);
   if (!t) {
@@ -4471,8 +4488,10 @@ async function sendTplEmail(env, DB, to, key, vars, href, code, contactId) {
   } else {
     html = MAIL(title, body, fillTpl(t.btn || "", vars), href || "", !!t.noExpiry, fillTpl(t.badge || "", vars));
   }
+  const pitch = !t.internal && !PITCH_SKIP.has(key);
+  if (pitch) html = withPitch(html);
   const plainBody = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  const text = (t.isCode ? `${title}: ${code}` : `${title}. ${plainBody}`) + (href ? " " + href : "");
+  const text = (t.isCode ? `${title}: ${code}` : `${title}. ${plainBody}`) + (href ? " " + href : "") + (pitch ? PITCH_TEXT() : "");
   return sendEmail(env, to, subject, html, text, contactId);
 }
 
@@ -5197,7 +5216,7 @@ const WHYBAND = () => `<section class="whyb"><div class="wrap"><div class="whyb-
 <div class="whyb-it"><i>⭐</i><b>Real reviews</b><p>Google ratings on every page, so you see what neighbours really think.</p></div>
 <div class="whyb-it"><i>📞</i><b>Straight to the business</b><p>Call or message the business itself. No middlemen, no lead fees.</p></div>
 <div class="whyb-it"><i>💸</i><b>Free, always</b><p>Free to search. Free for every local business to list.</p></div></div></div></section>`;
-const BRAGBAR = () => `<div id="glBragBar" style="background:linear-gradient(90deg,${T.navy},#123c4a,${T.navy});color:#fff;text-align:center;font-size:12.5px;font-weight:600;padding:9px 10px;letter-spacing:.2px">🏆 <b style="color:#ffc857"><span class="bb-l">${E(BRAG())}</span><span class="bb-s">#1 in ${E(S.city)}</span></b><span class="bb-x"> &nbsp;·&nbsp; 100% local &nbsp;·&nbsp; Free to list</span> &nbsp;·&nbsp; Today's visitors: <b id="glVisitCount">—</b></div>\n<script>(function(){\nfunction seed(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0}return h}\nfunction rnd(x){x+=0x6D2B79F5;var t=Math.imul(x^x>>>15,x|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}\nfunction compute(){\n  var now=new Date();\n  var day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);\n  var ds=seed(day);\n  var start=3000+Math.floor(rnd(ds)*700);\n  var end=4300+Math.floor(rnd(ds+1)*700);\n  var parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(now);\n  var hh=0,mm=0;parts.forEach(function(p){if(p.type==="hour")hh=parseInt(p.value,10)%24;if(p.type==="minute")mm=parseInt(p.value,10)});\n  var minutes=hh*60+mm;\n  var frac=minutes/1440;\n  var base=start+(end-start)*frac;\n  var bucket=Math.floor(minutes/5);\n  var jitter=(rnd(ds+1000+bucket)-0.5)*24;\n  return Math.max(0,Math.round(base+jitter));\n}\nfunction paint(){var el=document.getElementById("glVisitCount");if(el)el.textContent=compute().toLocaleString("en-US")}\npaint();\nsetInterval(paint,30000);\n})();<\/script>`;
+const BRAGBAR = () => `<div id="glBragBar" style="background:linear-gradient(90deg,${T.navy},#123c4a,${T.navy});color:#fff;text-align:center;font-size:12.5px;font-weight:600;padding:9px 10px;letter-spacing:.2px">🏆 <b style="color:#ffc857"><span class="bb-l">${E(BRAG())}</span><span class="bb-s">#1 in ${E(S.city)}</span></b><span class="bb-x"> &nbsp;·&nbsp; 100% local &nbsp;·&nbsp; Free to list</span> &nbsp;·&nbsp; Today's visitors: <b id="glVisitCount">—</b></div>\n<script>(function(){\nfunction seed(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0}return h}\nfunction rnd(x){x+=0x6D2B79F5;var t=Math.imul(x^x>>>15,x|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}\nfunction compute(){\n  var now=new Date();\n  var day=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);\n  var ds=seed(day+"|"+location.hostname.replace(/^www\\./,""));\n  var K=${S.visits || 4600}/4600;\n  var start=Math.round(K*(3000+Math.floor(rnd(ds)*700)));\n  var end=Math.round(K*(4300+Math.floor(rnd(ds+1)*700)));\n  var parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(now);\n  var hh=0,mm=0;parts.forEach(function(p){if(p.type==="hour")hh=parseInt(p.value,10)%24;if(p.type==="minute")mm=parseInt(p.value,10)});\n  var minutes=hh*60+mm;\n  var frac=minutes/1440;\n  var base=start+(end-start)*frac;\n  var bucket=Math.floor(minutes/5);\n  var jitter=(rnd(ds+1000+bucket)-0.5)*24;\n  return Math.max(0,Math.round(base+jitter));\n}\nfunction paint(){var el=document.getElementById("glVisitCount");if(el)el.textContent=compute().toLocaleString("en-US")}\npaint();\nsetInterval(paint,30000);\n})();<\/script>`;
 // Per-page SEO overrides from Admin → SEO → "Any other page" (site_seo rows keyed "path:/some/page"):
 // replace the page's Google title/description and add the team's own structured data.
 const SEO_PATH = u => {
@@ -7098,7 +7117,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.38-shared";
+const BUILD = "v16.39-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -12674,6 +12693,8 @@ function applyCityConfig(env) {
   if (env.CITY_COUNTY) S.county = env.CITY_COUNTY;
   if (env.CITY_BRAND) S.brand = env.CITY_BRAND;
   if (env.CITY_TAGLINE) S.tagline = env.CITY_TAGLINE;
+  // Optional: roughly how many visitors the top-bar counter reaches by end of day (default 4,600).
+  S.visits = Math.max(200, Math.min(200000, parseInt(env.CITY_VISITS, 10) || 4600));
   if (env.CITY_DOMAIN) S.dom = env.CITY_DOMAIN;
   if (env.CITY_GA_IDS) S.gaIds = env.CITY_GA_IDS.split(",").map(s => s.trim()).filter(Boolean);
   if (env.CITY_DOMAIN) AUTH.SITE_URL = env.CITY_DOMAIN;
