@@ -3712,6 +3712,7 @@ async function bvSend(env, DB, st, ch) {
     brand: S.brand,
     what: "business verification"
   }, "", st.code).then(r => r !== false, () => false);
+  if (!ok) st.sentAt = 0;
   return ok;
 }
 
@@ -3726,7 +3727,10 @@ async function bvStart(env, DB, st) {
   }
   if (!ok) return null;
   await bvPut(env, ref, st);
-  if (st.rowId) await DB.prepare("UPDATE claims SET bv_tries=0, notes=CASE WHEN coalesce(notes,'') LIKE '%[code-sent]%' THEN notes ELSE trim(coalesce(notes,'') || ?1) END WHERE id=?2").bind("\n[code-sent]", st.rowId).run().catch(() => {});
+  if (st.rowId) {
+    await DB.prepare("UPDATE claims SET notes=CASE WHEN coalesce(notes,'') LIKE '%[code-sent]%' THEN notes ELSE trim(coalesce(notes,'') || ?1) END WHERE id=?2").bind("\n[code-sent]", st.rowId).run().catch(() => {});
+    await DB.prepare("UPDATE claims SET bv_tries=0 WHERE id=?1").bind(st.rowId).run().catch(() => {});
+  }
   return ref;
 }
 
@@ -3834,6 +3838,8 @@ async function bvHourly(env, DB) {
   };
   const due = (await DB.prepare("SELECT * FROM claims WHERE status='transfer-pending' AND decided_at<?1 ORDER BY decided_at LIMIT 20").bind(Date.now() - 72 * 3600 * 1e3).all()).results || [];
   for (const r of due) try {
+    const mine = await DB.prepare("UPDATE claims SET status='verifying-transfer' WHERE id=?1 AND status='transfer-pending'").bind(r.id).run();
+    if (!mine.meta || !mine.meta.changes) continue;
     await approveClaim(env, DB, r.id, r.ghl_id, NRM(r.email), "ownership moved: no objection from the previous owner in 72 hours");
     out.moved++;
   } catch (e) {
@@ -3842,12 +3848,13 @@ async function bvHourly(env, DB) {
   // A verification that died half-way (timeout mid-publish) goes back to its queue after 15 minutes.
   try {
     await DB.prepare("UPDATE claims SET status=substr(status,11) WHERE status IN ('verifying-pending','verifying-pending-listing') AND decided_at<?1").bind(Date.now() - 15 * 60 * 1e3).run();
+    await DB.prepare("UPDATE claims SET status='transfer-pending' WHERE status='verifying-transfer' AND decided_at<?1").bind(Date.now() - 74 * 3600 * 1e3).run();
   } catch (e) {
     console.log("verifying reset failed: " + e.message);
   }
   // Still not verified a day after the reminder: hand it to the team once (per item, no daily digest).
   try {
-    const late = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[reminded]%' AND notes NOT LIKE '%[to-team%' AND created_at<?1 LIMIT 10").bind(Date.now() - 26 * 3600 * 1e3).all()).results || [];
+    const late = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[to-team%' AND created_at<?1 LIMIT 10").bind(Date.now() - 26 * 3600 * 1e3).all()).results || [];
     for (const r of late) await bvToTeam(env, DB, {
       kind: r.status === "pending" ? "claim" : "add",
       rowId: r.id,
@@ -12334,7 +12341,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             business: row.business || "your business",
             email: NRM(row.email),
             name: row.name || "",
-            smsCid: row.ghl_id && row.phone ? row.ghl_id : "",
+            smsCid: row.ghl_id && /^1?\d{10}$/.test(String(row.phone || "").replace(/\D/g, "")) ? row.ghl_id : "",
             smsShown: MASKPH(row.phone),
             emailTo: live ? "" : NRM(row.email),
             emailShown: live ? "" : MASKEM(row.email),
