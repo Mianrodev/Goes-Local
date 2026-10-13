@@ -3730,6 +3730,7 @@ async function bvStart(env, DB, st) {
   if (st.rowId) {
     await DB.prepare("UPDATE claims SET notes=CASE WHEN coalesce(notes,'') LIKE '%[code-sent]%' THEN notes ELSE trim(coalesce(notes,'') || ?1) END WHERE id=?2").bind("\n[code-sent]", st.rowId).run().catch(() => {});
     await DB.prepare("UPDATE claims SET bv_tries=0 WHERE id=?1").bind(st.rowId).run().catch(() => {});
+    await DB.prepare("UPDATE claims SET decided_at=?1 WHERE id=?2 AND status IN ('pending','pending-listing')").bind(Date.now(), st.rowId).run().catch(() => {});
   }
   return ref;
 }
@@ -3854,7 +3855,7 @@ async function bvHourly(env, DB) {
   }
   // Still not verified a day after the reminder: hand it to the team once (per item, no daily digest).
   try {
-    const late = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[to-team%' AND created_at<?1 LIMIT 10").bind(Date.now() - 26 * 3600 * 1e3).all()).results || [];
+    const late = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[to-team%' AND coalesce(decided_at,created_at)<?1 LIMIT 10").bind(Date.now() - 26 * 3600 * 1e3).all()).results || [];
     for (const r of late) await bvToTeam(env, DB, {
       kind: r.status === "pending" ? "claim" : "add",
       rowId: r.id,
@@ -3876,7 +3877,7 @@ async function bvHourly(env, DB) {
   const KV = KVOF(env);
   if (!KV) return out;
   const now = Date.now();
-  const rows = (await DB.prepare("SELECT id,business,email,ghl_id FROM claims WHERE status IN ('pending','pending-listing') AND created_at BETWEEN ?1 AND ?2 AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[reminded]%' AND notes NOT LIKE '%[to-team%' AND coalesce(email,'')<>'' ORDER BY created_at LIMIT 15").bind(now - 7 * 864e5, now - 2 * 3600 * 1e3).all()).results || [];
+  const rows = (await DB.prepare("SELECT id,business,email,ghl_id FROM claims WHERE status IN ('pending','pending-listing') AND coalesce(decided_at,created_at) BETWEEN ?1 AND ?2 AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[reminded]%' AND notes NOT LIKE '%[to-team%' AND coalesce(email,'')<>'' ORDER BY created_at LIMIT 15").bind(now - 7 * 864e5, now - 2 * 3600 * 1e3).all()).results || [];
   for (const r of rows) try {
     const t = RID(24);
     await KV.put("bvr:" + t, String(r.id), {
@@ -3889,6 +3890,57 @@ async function bvHourly(env, DB) {
     out.reminded++;
   } catch (e) {
     console.log("reminder " + r.id + " failed: " + e.message);
+  }
+  return out;
+}
+
+// One-off (Eric, 13 Oct): everyone who was waiting for a call before codes existed gets one "finish in 30
+// seconds" email whose button starts a fresh code (/verify-business/restart). One email per person per listing;
+// skipped: already theirs, nothing to send a code to, or looks like a test.
+async function bvBacklog(env, DB) {
+  const rows = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND coalesce(email,'')<>'' ORDER BY id DESC").all()).results || [];
+  const seen = new Set, out = [];
+  for (const r of rows) {
+    const em = NRM(r.email), key = r.status + "|" + em + "|" + (r.ghl_id || NRM(r.business || ""));
+    const item = {
+      row: r,
+      send: false,
+      why: ""
+    };
+    out.push(item);
+    if (seen.has(key)) {
+      item.why = "duplicate of a newer request";
+      continue;
+    }
+    seen.add(key);
+    if (/\[(invited|code-sent)\]/.test(r.notes || "")) {
+      item.why = "already invited or already sent a code";
+      continue;
+    }
+    if (/\btest\b/i.test((r.business || "") + " " + em)) {
+      item.why = "looks like a test";
+      continue;
+    }
+    const br = r.ghl_id ? await DB.prepare("SELECT * FROM businesses WHERE ghl_id=?1").bind(r.ghl_id).first().catch(() => null) : null;
+    const b = br ? ROWOF(br) : null;
+    if (b && b.claimed && NRM(b.owner_email || "") === em) {
+      item.why = "already theirs";
+      continue;
+    }
+    if (r.status === "pending") {
+      if (!b) {
+        item.why = "listing no longer on the site";
+        continue;
+      }
+      if (!bvClaimState(b, r.ghl_id, em, r.name || "", claimTier(b, em).tier, r.id, {})) {
+        item.why = "no phone or email on the listing to send a code to";
+        continue;
+      }
+    } else if (b && !(r.ghl_id && /^1?\d{10}$/.test(String(r.phone || "").replace(/\D/g, "")))) {
+      item.why = "existing listing, no US phone to text";
+      continue;
+    }
+    item.send = true;
   }
   return out;
 }
@@ -4832,6 +4884,16 @@ const EMAIL_TEMPLATES = {
     title: "We need to check one thing",
     body: "<p>The current owner of <b>{{business}}</b> asked to keep the listing, so we haven't moved it yet. Your account manager will be in touch to sort it out with you both.</p>",
     btn: ""
+  },
+  verify_backlog: {
+    label: "Invite to finish verifying (people who were waiting before instant verification)",
+    description: "Sent once from Admin → Verify invites to claims and new listings that were waiting for a call before codes existed.",
+    vars: [ "business", "brand", "link" ],
+    subject: "Finish {{business}} in 30 seconds — no call needed",
+    title: "Good news: no more waiting",
+    body: "<p>You asked to claim or list <b>{{business}}</b> on {{brand}}. We've made it instant: tap below, we'll text or email a 6-digit code to the business, and you're done — no waiting for a call.</p>",
+    btn: "Finish in 30 seconds",
+    noExpiry: true
   },
   verify_reminder: {
     label: "Reminder to finish verifying",
@@ -7745,7 +7807,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.46-shared";
+const BUILD = "v16.47-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -9782,6 +9844,28 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             "cache-control": "no-store"
           }
         });
+      }
+      if (p[1] === "verify-invites") {
+        if (role !== "admin") return TXT("Verify invites need full admin access — ask an admin.");
+        const list = await bvBacklog(env, DB);
+        const todo = list.filter(x => x.send);
+        if (req.method !== "POST") return TXT(`VERIFY INVITES — dry run (nothing sent)\nWill email: ${todo.length}\nSkipped: ${list.length - todo.length}\n\n` + list.map(x => `${x.send ? "SEND" : "skip"}  #${x.row.id}  ${x.row.status}  ${x.row.business || "-"}  <${x.row.email}>${x.why ? "  — " + x.why : ""}`).join("\n") + `\n\nTo send, POST to this page (sends up to 40 per request; repeat until "Will email: 0").`);
+        const KV = KVOF(env);
+        if (!KV) return TXT("KV not available.");
+        let sent = 0;
+        for (const x of todo.slice(0, 40)) {
+          const t = RID(24);
+          await KV.put("bvr:" + t, String(x.row.id), {
+            expirationTtl: 14 * 86400
+          });
+          await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[invited]", x.row.id).run();
+          const ok = await sendTplEmail(env, DB, NRM(x.row.email), "verify_backlog", {
+            business: E(x.row.business || "your business"),
+            brand: S.brand
+          }, AUTH.SITE_URL + "/verify-business/restart?t=" + t, undefined, x.row.ghl_id || undefined).catch(() => false);
+          if (ok !== false) sent++;
+        }
+        return TXT(`Sent ${sent} of ${Math.min(40, todo.length)} this batch. ${Math.max(0, todo.length - 40)} still to send — POST again.`);
       }
       if (p[1] === "status") {
         if (role !== "admin") return TXT("Status needs full admin access — ask an admin.");

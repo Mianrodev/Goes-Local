@@ -1,5 +1,5 @@
 // QA suite for business verification (local wrangler dev on :8791, BV_TEST_ECHO=1, local D1/KV).
-// How to run: start `npx wrangler dev --env tampa --local --test-scheduled --port 8791 --env-file <vars with ADMIN_LOGIN_KEY=localtestkey123, BV_TEST_ECHO=1> --persist-to <dir>` logging to <dir>/../dev.log, run /admin/migrate, then `node scripts/qa/verification.cjs` from that scratch dir (SP = this file's folder holds dev.log and wstate).
+// How to run: start `npx wrangler dev --env tampa --local --test-scheduled --port 8791 --env-file <vars with ADMIN_LOGIN_KEY=localtestkey123, BV_TEST_ECHO=1> --persist-to <dir>/wstate` logging to <dir>/dev.log, run /admin/migrate, then run this file from <dir>.
 const { execSync } = require("child_process");
 const fs = require("fs");
 const SP = __dirname, BASE = "http://localhost:8791", REPO = "/home/user/Goes-Local";
@@ -202,5 +202,37 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   ok(tries <= 5, "T16 parallel guesses capped at 5", tries);
   r = await post("/verify-business", { ref, code: c16 });
   ok(!/You're verified/.test(txt(r.html)) && !/account/.test(r.loc), "T16 right code refused after the cap");
+
+  // T17 backlog invites: dry run lists, POST marks [invited], restart sends a code, no instant team hand-off
+  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,role,verify,notes,status,created_at) VALUES
+    ('QA7','QA Seven Movers','Old','old1@example.com','','Owner','','','pending',${Date.now() - 20 * 864e5}),
+    ('QA7','QA Seven Movers','Old','old1@example.com','','Owner','','','pending',${Date.now() - 21 * 864e5}),
+    ('QA2','QA Two Roofing','Old','old2@gmail.com','','Owner','','','pending',${Date.now() - 20 * 864e5}),
+    ('QA4','Test Bakery','T','t@example.com','','Owner','','','pending',${Date.now() - 20 * 864e5})`);
+  const login2 = await F(BASE + "/admin/login", { method: "POST", redirect: "manual", body: new URLSearchParams({ as: "admin", key: "localtestkey123" }) });
+  const ck2 = (login2.headers.get("set-cookie") || "").split(";")[0];
+  let dr = await (await F(BASE + "/admin/verify-invites", { headers: { cookie: ck2 } })).text();
+  ok(/SEND\s+#\d+\s+pending\s+QA Seven Movers\s+<old1@example.com>/.test(dr), "T17 dry run will email old1 once", dr.slice(0, 300));
+  ok(/duplicate of a newer request/.test(dr) && /no phone or email on the listing/.test(dr) && /looks like a test/.test(dr), "T17 dry run skips duplicate, no-channel and test rows");
+  const before = sql("SELECT count(*) n FROM claims WHERE notes LIKE '%[invited]%'")[0].n;
+  ok(before === 0, "T17 dry run sent nothing");
+  const sendRes = await (await F(BASE + "/admin/verify-invites", { method: "POST", headers: { cookie: ck2 } })).text();
+  ok(/Sent \d+ of/.test(sendRes), "T17 POST sends a batch", sendRes);
+  const inv = sql("SELECT id FROM claims WHERE email='old1@example.com' AND notes LIKE '%[invited]%'");
+  ok(inv.length === 1, "T17 exactly one old1 row marked invited", inv.length);
+  dr = await (await F(BASE + "/admin/verify-invites", { headers: { cookie: ck2 } })).text();
+  ok(!/SEND\s+#\d+\s+pending\s+QA Seven Movers/.test(dr), "T17 second dry run won't email old1 again");
+  const bvr = kvList("bvr:");
+  let restarted = false;
+  for (const k of bvr) {
+    const pg2 = await post("/verify-business/restart?t=" + k.slice(4), {}, "10.17.0.1");
+    if (/verify-business\?ref=/.test(pg2.loc)) { restarted = true; break; }
+  }
+  ok(restarted, "T17 invite button sends a fresh code");
+  sql("DELETE FROM meta WHERE k='cron_hourly_at'");
+  await get("/cdn-cgi/handler/scheduled?cron=*/5+*+*+*+*");
+  await sleep(45000);
+  const n17 = sql("SELECT notes FROM claims WHERE id=" + inv[0].id)[0].notes;
+  ok(!/to-team/.test(n17) && !/reminded/.test(n17), "T17 no instant reminder/team hand-off after a fresh code", n17);
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });
