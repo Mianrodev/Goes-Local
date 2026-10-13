@@ -28,6 +28,9 @@ fi
 for city in "${cities[@]}"; do
   echo; echo "=== deploying $city ==="
   npx wrangler deploy --env "$city" --message "$version $(git rev-parse --short HEAD)"
+  # Give the new version ~20s to reach every Cloudflare location, or /admin/migrate can be served by the old code
+  # (13 Oct: Orlando and Miami missed the claims.bv_tries column that way).
+  sleep 20
   node scripts/migrate-verify.mjs "$city" "$version"
   echo "✓ $city is live on $version — now click through the change in a browser."
 done
