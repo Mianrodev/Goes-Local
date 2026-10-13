@@ -122,8 +122,8 @@ const HOOD_SEED = [ {
 const POPULAR = [ "Plumber", "Croquetas", "AC repair", "Dentist", "Tow truck", "Barber", "Dog groomer", "Notary" ];
 
 const TRUST = () => [ {
-  t: "Verified & Approved",
-  s: `Every featured business is reviewed by our ${S.city} team before it goes live.`
+  t: "Owner-verified",
+  s: "Every claimed business is verified by its owner with a code sent to the business phone or email."
 }, {
   t: "Free to claim",
   s: "Owners claim their page, add photos, hours and services at no cost."
@@ -4593,37 +4593,37 @@ const EMAIL_TEMPLATES = {
     label: "Listing published — owner already has an account",
     description: "Sent when a submitted business goes live and the email is already tied to an owner account.",
     vars: [ "brand", "link" ],
-    subject: "Your listing is live",
-    title: "You're all set!",
-    body: "<p>Your business is now live on {{brand}}, and it's already linked to your account — no separate claim needed. Click below to sign in and manage your hours, services and description.</p>",
-    btn: "Sign in and manage your listing"
+    subject: "You're live on {{brand}}",
+    title: "You're live!",
+    body: "<p>Your business is now live on {{brand}}, and it's already linked to your account — no separate claim needed. Sign in to add your hours, services and photos.</p>",
+    btn: "Manage my listing"
   },
   listing_live_new: {
     label: "Listing published — new owner",
     description: "Sent when a submitted business goes live and there's no existing account yet.",
     vars: [ "brand" ],
-    subject: "Your listing is live",
-    title: "Your listing is live",
-    body: "<p>Your business is now on {{brand}}. Sign in with this email to manage your hours, services and description.</p>",
-    btn: "Sign in"
+    subject: "You're live on {{brand}}",
+    title: "You're verified — your page is live",
+    body: "<p>Your business is now live on {{brand}}. Sign in with this email to add your hours, services and photos so customers pick you.</p>",
+    btn: "Manage my listing"
   },
   claim_approved: {
     label: "Claim approved",
     description: "Sent when an admin approves a claim request.",
     vars: [ "link" ],
-    subject: "Your claim was approved",
-    title: "You're in!",
-    body: "<p>Your claim was approved. Click below to sign in and manage your listing.</p>",
-    btn: "Sign in"
+    subject: "You're verified — the listing is yours",
+    title: "You're verified — it's yours!",
+    body: "<p>Your claim is approved, so the listing is now yours. Sign in any time to update your hours, services and photos and reply to customers.</p>",
+    btn: "Manage my listing"
   },
   claim_invite: {
     label: "Invite a verified business to claim its listing",
     description: "Sent manually by staff to a business whose listing has been verified, inviting them to claim it.",
     vars: [ "business", "brand", "email" ],
-    subject: "{{business}} is verified — manage your free listing",
+    subject: "{{business}} is listed on {{brand}} — claim it in 30 seconds",
     badge: "✓ VERIFIED ON {{brand}}",
     title: "{{business}} is live — take control of your page",
-    body: "<p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> on {{brand}} has been verified. Create your account to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
+    body: "<p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> on {{brand}} is live. Create your free account in 30 seconds to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
     btn: "Manage my listing →",
     noExpiry: true
   },
@@ -4633,7 +4633,7 @@ const EMAIL_TEMPLATES = {
     vars: [ "business", "link" ],
     subject: "Confirm your email",
     title: "Confirm your email to continue",
-    body: "<p>You asked to claim <b>{{business}}</b>. Confirm this is your address and our team will review the claim.</p>",
+    body: "<p>You asked to claim <b>{{business}}</b>. Confirm this is your address and our team will check your claim — usually within 1–2 business days.</p>",
     btn: "Confirm my email"
   },
   claim_dispute_notify: {
@@ -4651,7 +4651,7 @@ const EMAIL_TEMPLATES = {
     vars: [ "business" ],
     subject: "We've got your listing",
     title: "Thanks — we've got your listing",
-    body: "<p>We received your submission for <b>{{business}}</b>. Our local team reviews new listings within one to two business days, and we'll email you as soon as your page is live.</p>",
+    body: "<p>We received your submission for <b>{{business}}</b>. We couldn't verify it with a code, so our local team will check it and email you as soon as your page is live — usually within 1–2 business days.</p>",
     btn: ""
   },
   enquiry_notify: {
@@ -6303,7 +6303,7 @@ const ADD = (d, x) => {
   body: `<section class="lpx-hero"${x.img ? ` style="background-image:url('${E(x.img)}')"` : ""}><div class="lpx-in">
 <div class="lpx-top"><span class="lpx-k"><i></i> 🏆 ${E(BRAG())}</span>
 <h1>${AREA.byCity ? `Customers across ${E(S.city)} are looking.` : `${E(S.city)} customers are looking.`} <em>Make sure they find you.</em></h1></div>
-<div class="lpx-bot"><p class="lpx-s">List your business on ${E(S.city)}'s #1 ${E(BRAGDIR())} — free, verified by a real local team, and live in 1–2 days.</p>
+<div class="lpx-bot"><p class="lpx-s">List your business on ${E(S.city)}'s #1 ${E(BRAGDIR())} — free, verified in 30 seconds with a code, and live straight away.</p>
 <ul class="lpx-li"><li><span>✓</span><div><b>Free forever</b> — no credit card, no contract</div></li><li><span>✓</span><div><b>Your own Google-friendly page</b> in your ${E(AREA.lo)}</div></li><li><span>✓</span><div><b>Customer enquiries</b> straight to your inbox</div></li></ul>
 <div class="lpx-proof">${proof.length ? `<span class="lpx-av">${proof.map(b => `<span>${PHOTO(b)}</span>`).join("")}</span>` : ""}<span>Join <b>${NUM(d.count || 0)}</b> ${E(S.city)} businesses</span></div></div>
 <div class="lpx-card" id="start"><h2>Add your business — free</h2><div class="lpx-sub" id="lpxStepTxt">Step 1 of 2 · takes about 3 minutes</div><div class="lpx-pg"><i class="on"></i><i id="lpxPg2"></i></div>
@@ -6339,7 +6339,7 @@ const ADD = (d, x) => {
 <div class="lpx-alt">Already listed? <a href="/claim">Find &amp; claim your business →</a></div></div>
 </div></section>
 <div class="wrap">
-<div class="lpx-stats"><div><b>#1</b><span>${E(BRAGDIR())} in ${E(S.city)}</span></div><div><b>${NUM(d.count || 0)}</b><span>businesses listed</span></div><div><b>${hoodN}</b><span>${E(S.city)} ${E(AREA.los)}</span></div><div><b>1–2 days</b><span>to go live</span></div></div>
+<div class="lpx-stats"><div><b>#1</b><span>${E(BRAGDIR())} in ${E(S.city)}</span></div><div><b>${NUM(d.count || 0)}</b><span>businesses listed</span></div><div><b>${hoodN}</b><span>${E(S.city)} ${E(AREA.los)}</span></div><div><b>30 sec</b><span>to go live</span></div></div>
 <div class="lpx-feat"><div><div class="lpx-kk">Get found</div><h2>Show up when locals search for what you do</h2><p>Every business gets its own page in its category and ${E(AREA.lo)} — built to show up on Google for searches like "plumber in ${exHood}".</p><ul><li>Listed in your category and ${E(AREA.lo)} guides</li><li>Eligible for "${E(S.city)}'s Best" top-10 lists</li><li>Verified badge that builds trust</li></ul></div>
 <div class="lpx-vis"><span class="lpx-ex">Example</span>${lpRow("Your Business", `★ 4.9 (128) · Plumber · ${exHood}`, proof[0], "me", 1, 1)}${lpRow("Another Plumbing Co.", `★ 4.6 (54) · Plumber · ${exHood}`, null, "dim", 2)}${lpRow("City Drain Pros", `★ 4.4 (31) · Plumber · ${exHood}`, null, "dim", 3)}</div></div>
 <div class="lpx-feat r"><div><div class="lpx-kk">Get customers</div><h2>Customers message you directly</h2><p>Enquiries from your page land straight in your inbox. No middleman, no fee per lead.</p><ul><li>Call, directions and website buttons on your page</li><li>Hours with a live "Open now" badge</li><li>Add photos, services and offers from your phone</li></ul></div>
@@ -6379,7 +6379,7 @@ const CLAIMFIND = (d, q, hits) => PAGE(d, {
   title: `Claim your listing | ${S.brand}`,
   desc: `Find and claim your ${S.city} business listing.`,
   can: S.dom + "/claim",
-  body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / Claim a listing</nav>\n<div style="padding:14px 0 26px;max-width:620px"><div class="kicker">🏆 ${E(S.city)}'s #1 ${E(BRAGDIR())} · For business owners</div>\n<h1>Claim your listing</h1>\n<p style="color:${T.body};margin-top:12px">Find your business, verify you own it, then manage your own page.</p></div>\n<div class="steps">\n<div class="step"><b>1</b><h3>Find your listing</h3><p>Search your business name below.</p></div>\n<div class="step"><b>2</b><h3>Verify by email</h3><p>Business-domain emails verify instantly. Others get a quick manual review.</p></div>\n<div class="step"><b>3</b><h3>Take control</h3><p>Edit hours, services and photos. Receive enquiries directly.</p></div></div>\n<div class="blk" style="max-width:620px"><h2>Find your business</h2>\n<form method="GET" action="/claim">\n<div class="fld2"><label for="cq">Business name</label><input id="cq" name="q" value="${E(q || "")}" required placeholder="${AREA.byCity ? "e.g. Main Street Plumbing" : "e.g. Blue Palm Plumbing"}"></div>\n<button class="btn btn-p">Search listings</button></form></div>\n${q ? hits.length ? `<div class="grid g2" style="margin:22px 0 44px">${hits.map(b => `<article class="card">\n<div class="card-img">${PHOTO(b)}${b.claimed ? `<span class="pin l">${BDG("bdg-shut", "Already claimed")}</span>` : ""}</div>\n<div class="card-b"><div class="tagrow">${BDG("bdg-cat", b.cat)}</div>\n<h3><a href="/${E(b.cs)}/${E(b.slug)}">${E(b.name)}</a></h3>\n${b.addr ? `<div class="meta"><span class="ic">${ICO.pin}</span><span>${E(CLAMP(b.addr, 60))}</span></div>` : ""}\n<div class="card-acts"><a class="btn btn-p" href="/claim/start?id=${encodeURIComponent(b.id)}">This is my business</a></div>\n</div></article>`).join("")}</div>` : `<div class="empty" style="margin:22px 0 44px"><b>No listings matched “${E(q)}”.</b>\n<p style="margin:8px 0 0">It may not be listed yet — <a href="/add">add it free</a>.</p></div>` : `<div style="height:44px"></div>`}\n</div>`
+  body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / Claim a listing</nav>\n<div style="padding:14px 0 26px;max-width:620px"><div class="kicker">🏆 ${E(S.city)}'s #1 ${E(BRAGDIR())} · For business owners</div>\n<h1>Claim your listing</h1>\n<p style="color:${T.body};margin-top:12px">Find your business, verify you own it, then manage your own page.</p></div>\n<div class="steps">\n<div class="step"><b>1</b><h3>Find your listing</h3><p>Search your business name below.</p></div>\n<div class="step"><b>2</b><h3>Verify with a code</h3><p>We text or email a 6-digit code to the business. Enter it and it's yours instantly.</p></div>\n<div class="step"><b>3</b><h3>Take control</h3><p>Edit hours, services and photos. Receive enquiries directly.</p></div></div>\n<div class="blk" style="max-width:620px"><h2>Find your business</h2>\n<form method="GET" action="/claim">\n<div class="fld2"><label for="cq">Business name</label><input id="cq" name="q" value="${E(q || "")}" required placeholder="${AREA.byCity ? "e.g. Main Street Plumbing" : "e.g. Blue Palm Plumbing"}"></div>\n<button class="btn btn-p">Search listings</button></form></div>\n${q ? hits.length ? `<div class="grid g2" style="margin:22px 0 44px">${hits.map(b => `<article class="card">\n<div class="card-img">${PHOTO(b)}${b.claimed ? `<span class="pin l">${BDG("bdg-shut", "Already claimed")}</span>` : ""}</div>\n<div class="card-b"><div class="tagrow">${BDG("bdg-cat", b.cat)}</div>\n<h3><a href="/${E(b.cs)}/${E(b.slug)}">${E(b.name)}</a></h3>\n${b.addr ? `<div class="meta"><span class="ic">${ICO.pin}</span><span>${E(CLAMP(b.addr, 60))}</span></div>` : ""}\n<div class="card-acts"><a class="btn btn-p" href="/claim/start?id=${encodeURIComponent(b.id)}">This is my business</a></div>\n</div></article>`).join("")}</div>` : `<div class="empty" style="margin:22px 0 44px"><b>No listings matched “${E(q)}”.</b>\n<p style="margin:8px 0 0">It may not be listed yet — <a href="/add">add it free</a>.</p></div>` : `<div style="height:44px"></div>`}\n</div>`
 });
 
 const CLAIMSTART = (d, b, err) => PAGE(d, {
