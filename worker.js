@@ -3648,6 +3648,306 @@ async function sendSMS(env, contactId, message) {
   }
 }
 
+// Business verification by code (Eric, 13 Oct: replaces the sales calls that confirmed claims and new listings).
+// A claim gets a code texted to the phone on the listing or emailed to the listing's email; a new listing gets one
+// at the phone or email the owner typed. The right code approves the claim / publishes the listing straight away.
+// No phone or email, too many wrong codes, a claim on an already-claimed listing, or "send it to your team"
+// falls back to the claims / pending-listings queue, as before.
+const BV_TTL = 30 * 60, BV_CODE_MS = 15 * 60 * 1e3, BV_MAX_TRIES = 5, BV_MAX_SENDS = 5;
+const MASKPH = ph => {
+  const dg = String(ph || "").replace(/\D/g, "");
+  return dg.length >= 4 ? "ending " + dg.slice(-4) : "";
+};
+const MASKEM = em => {
+  const [a, dom] = String(em || "").split("@");
+  return a && dom ? a[0] + "•••@" + dom : "";
+};
+
+async function bvGet(env, ref) {
+  const KV = KVOF(env);
+  if (!KV || !/^[A-Za-z0-9]{10,64}$/.test(String(ref || ""))) return null;
+  try {
+    return JSON.parse(await KV.get("bv:" + ref) || "null");
+  } catch {
+    return null;
+  }
+}
+
+async function bvPut(env, ref, st) {
+  const KV = KVOF(env);
+  if (KV) await KV.put("bv:" + ref, JSON.stringify(st), {
+    expirationTtl: BV_TTL
+  });
+}
+
+// Sends a fresh code by "sms" (to contact st.smsCid, whose phone is the business phone) or "email" (to st.emailTo).
+async function bvSend(env, DB, st, ch) {
+  if (ch === "sms" ? !st.smsCid : !st.emailTo) return false;
+  st.code = String(Math.floor(1e5 + Math.random() * 9e5));
+  st.codeAt = Date.now();
+  st.ch = ch;
+  st.sends = (st.sends || 0) + 1;
+  // Local testing only (.dev.vars, never set on a live site): print the code instead of texting/emailing it.
+  if (env.BV_TEST_ECHO === "1") {
+    console.log("BV TEST CODE " + st.code);
+    return true;
+  }
+  const ok = ch === "sms" ? await sendSMS(env, st.smsCid, `${S.brand}: your business verification code is ${st.code}. It expires in 15 minutes. Reply STOP to opt out.`) : await sendTplEmail(env, DB, st.emailTo, "otp_signin", {
+    brand: S.brand,
+    what: "business verification"
+  }, "", st.code).then(r => r !== false, () => false);
+  return ok;
+}
+
+async function bvStart(env, DB, st) {
+  const ref = RID(24);
+  let ch = st.prefer === "email" && st.emailTo ? "email" : st.smsCid ? "sms" : "email";
+  let ok = await bvSend(env, DB, st, ch);
+  if (!ok) {
+    const other = ch === "sms" ? "email" : "sms";
+    if (other === "sms" ? st.smsCid : st.emailTo) ok = await bvSend(env, DB, st, other);
+  }
+  if (!ok) return null;
+  await bvPut(env, ref, st);
+  return ref;
+}
+
+// Hands an unverified claim / listing to the team: the usual admin email, and the row stays in its queue.
+async function bvToTeam(env, DB, st, why) {
+  if (st.toTeam) return;
+  st.toTeam = why;
+  try {
+    if (st.kind === "claim") await notifyAdmins(env, DB, "new_claim", "admin_new_claim", {
+      ...st.adminVars || {},
+      reason: ((st.adminVars || {}).reason || "") + E(" — not verified by code: " + why)
+    }, AUTH.SITE_URL + "/admin/claims"); else await notifyAdmins(env, DB, "new_listing", "admin_new_listing", st.adminVars || {}, AUTH.SITE_URL + "/admin/pending");
+  } catch (e) {
+    console.log("bvToTeam notify failed: " + e.message);
+  }
+  if (st.kind === "add" && st.email) try {
+    await sendTplEmail(env, DB, st.email, "listing_received", {
+      business: E(st.business || "your business")
+    }, "", undefined, st.ownerCid);
+  } catch {}
+}
+
+// Approves a claim: owner email + "claimed" tags in GHL, listing refreshed, approval email with a sign-in link.
+// Used by Admin → Claims → Approve and by a correct verification code ("how" says which, for the claims row).
+async function approveClaim(env, DB, claimId, ghlId, email, how) {
+  if (ghlId && email) {
+    await ghlSetOwnerEmail(env, ghlId, email);
+    await ghlAddTag(env, ghlId, [ "claimed", "Recently Claimed" ]);
+    try {
+      await ghlRemoveTag(env, ghlId, [ "claim-request" ]);
+    } catch (e) {
+      console.log("claim-request tag removal failed: " + e.message);
+    }
+    if (DB) {
+      try {
+        await refreshOne(env, DB, ghlId, {
+          owner: email
+        });
+      } catch (e) {
+        console.log("post-approve refresh fail: " + e.message);
+      }
+      try {
+        await DB.prepare("UPDATE businesses SET claimed_at=?1 WHERE ghl_id=?2 AND claimed_at IS NULL").bind(Date.now(), ghlId).run();
+      } catch (e) {
+        console.log("post-approve claimed_at set failed: " + e.message);
+      }
+    }
+    const link = await issueLink(env, email, "login", {});
+    if (link) await sendTplEmail(env, DB, email, "claim_approved", {}, link, undefined, ghlId);
+  }
+  if (claimId && DB) try {
+    await DB.prepare("UPDATE claims SET status='approved', decided_at=?1, notes=trim(coalesce(notes,'') || ?3) WHERE id=?2").bind(Date.now(), claimId, how ? "\n[" + how + "]" : "").run();
+  } catch (e) {
+    console.log(e.message);
+  }
+}
+
+// Publishes a pending listing (claims row rowId): reuses or creates the business contact in GHL, adds it to the
+// site, links the owner (email) and emails them. Used by Admin → Pending listings → Publish and by a correct
+// verification code. Returns the business contact id ("" if it failed; the reason is saved on the row).
+async function publishListing(env, DB, rowId, cid, email) {
+  let row = null;
+  if (rowId) try {
+    row = await DB.prepare("SELECT * FROM claims WHERE id=?1").bind(rowId).first();
+  } catch (e) {
+    console.log(e.message);
+  }
+  let pubC = null;
+  if (cid) {
+    const ex = await ghlGetContact(env, cid);
+    if (!ex) {
+      console.log("publish: stored contact " + cid + " no longer exists in GHL — creating a fresh business contact");
+      cid = "";
+    } else if ((ex.tags || []).some(t => /^(consumer|owner-account)$/i.test(String(t).trim()))) {
+      console.log("publish: " + cid + " is a person — creating a separate business contact");
+      cid = "";
+    } else pubC = ex;
+  }
+  let perr = "";
+  if (!cid && row && row.phone) {
+    try {
+      const byPhone = await ghlFindContactByPhone(env, row.phone);
+      if (byPhone && byPhone.id && !(byPhone.tags || []).some(t => /^(consumer|owner-account)$/i.test(String(t).trim()))) {
+        cid = byPhone.id;
+        pubC = byPhone;
+        const category0 = String(row.role || "").trim() || "Other";
+        await ghlAddTag(env, cid, [ "business", category0 ]);
+      }
+    } catch (e) {
+      console.log("publish: phone dedup lookup failed: " + e.message);
+    }
+  }
+  if (!cid && row) {
+    const category = String(row.role || "").trim() || "Other";
+    let categoryFid = "";
+    try {
+      const fm = await fields(env);
+      categoryFid = fieldId(fm, "category", "business category", "primary category", "main category");
+    } catch {}
+    const mk = async body => {
+      const r = await fetch(`${API}/contacts/`, {
+        method: "POST",
+        headers: {
+          ...H(env),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+      const j = await r.json().catch(() => ({}));
+      return {
+        ok: r.ok,
+        id: j.contact && j.contact.id || "",
+        contact: j.contact || null,
+        err: r.ok ? "" : `GHL ${r.status}: ${JSON.stringify(j).slice(0, 200)}`
+      };
+    };
+    try {
+      let res = await mk({
+        locationId: env.GHL_LOCATION_ID,
+        companyName: row.business || "Unnamed",
+        firstName: row.business || "Unnamed",
+        phone: row.phone || undefined,
+        address1: row.verify || undefined,
+        tags: [ "business", category, "New" ],
+        ...categoryFid ? {
+          customFields: [ {
+            id: categoryFid,
+            value: category
+          } ]
+        } : {},
+        source: "Goes Local approved listing"
+      });
+      if (!res.ok) {
+        console.log("publish create attempt 1 failed: " + res.err);
+        res = await mk({
+          locationId: env.GHL_LOCATION_ID,
+          companyName: row.business || "Unnamed",
+          firstName: row.business || "Unnamed",
+          address1: row.verify || undefined,
+          tags: [ "business", category, "New" ],
+          ...categoryFid ? {
+            customFields: [ {
+              id: categoryFid,
+              value: category
+            } ]
+          } : {},
+          source: "Goes Local approved listing"
+        });
+      }
+      if (res.ok) {
+        cid = res.id;
+        pubC = res.contact;
+        if (cid && row.notes) try {
+          await fetch(`${API}/contacts/${cid}/notes`, {
+            method: "POST",
+            headers: {
+              ...H(env),
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              body: `Submitted details:\n\n${row.notes}`
+            })
+          });
+        } catch {}
+      } else perr = res.err || "GHL rejected the contact with no further detail.";
+    } catch (e) {
+      perr = e.message;
+      console.log("publish create fail: " + e.message);
+    }
+  } else if (cid) {
+    await ghlAddTag(env, cid, [ "business" ]);
+    if (row) try {
+      await ghlUpdateContact(env, cid, {
+        name: row.business || undefined,
+        address: row.verify || undefined
+      });
+    } catch (e) {
+      console.log("publish: business name update on existing contact failed: " + e.message);
+    }
+  }
+  if (cid && row && row.referral) await ghlAddTag(env, cid, [ `heard-about-us: ${row.referral}` ]);
+  const seoTag = row ? leadChannelTag(row.utm_source || row.referrer_domain, row.utm_medium) : "";
+  if (cid && seoTag) await addSeoInbound(env, cid);
+  if (cid) {
+    try {
+      await insertOne(env, DB, cid, pubC);
+    } catch (e) {
+      console.log("publish insertOne fail: " + e.message);
+    }
+    const em = NRM(email || "");
+    if (em) {
+      await ghlSetOwnerEmail(env, cid, em);
+      await ghlAddTag(env, cid, [ "claimed", "Recently Claimed" ]);
+    }
+    try {
+      await ghlRemoveTag(env, cid, [ "pending-listing" ]);
+    } catch (e) {
+      console.log("publish: pending-listing tag removal failed: " + e.message);
+    }
+    try {
+      await syncStep(env, DB, 5);
+      C = {
+        t: 0,
+        d: null
+      };
+        SHELL_DIRTY = true;
+    } catch (e) {
+      console.log("publish sync fail: " + e.message);
+    }
+    if (em) try {
+      await DB.prepare("UPDATE businesses SET claimed_at=?1 WHERE ghl_id=?2 AND claimed_at IS NULL").bind(Date.now(), cid).run();
+    } catch (e) {
+      console.log("publish claimed_at set failed: " + e.message);
+    }
+    if (em && DB) {
+      try {
+        await refreshOne(env, DB, cid, {
+          owner: em
+        });
+      } catch (e) {
+        console.log("publish post-claim refresh fail: " + e.message);
+      }
+    }
+    if (em) {
+      const link = await issueLink(env, em, "login", {});
+      if (link) await sendTplEmail(env, DB, em, "listing_live_existing", { brand: S.brand }, link, undefined, cid); else await sendTplEmail(env, DB, em, "listing_live_new", { brand: S.brand }, AUTH.SITE_URL + "/login", undefined, cid);
+    }
+  } else {
+    if (!perr) perr = "Could not obtain a business contact id.";
+    console.log("publish: " + perr);
+  }
+  if (rowId) try {
+    if (cid) await DB.prepare("UPDATE claims SET status='listed', decided_at=?1, perr=NULL WHERE id=?2").bind(Date.now(), rowId).run(); else await DB.prepare("UPDATE claims SET perr=?1 WHERE id=?2").bind(perr, rowId).run();
+  } catch (e) {
+    console.log(e.message);
+  }
+  return cid;
+}
+
 const NAMEOF = (name, email) => {
   const n = String(name || "").trim();
   if (n) {
@@ -4599,6 +4899,37 @@ const NOTIFY_TPL = {
   enquiry: "admin_enquiry"
 };
 const DEFAULT_NOTIFY_EMAIL = "dev1@mianrosystems.com";
+
+// Once a day (after 8am New York time): one email to the team listing the claims and new listings still waiting
+// for a person — the ones that couldn't be verified by code. Nothing is sent when the queues are empty.
+async function needsHumanDigest(env, DB) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false
+  }).formatToParts(new Date);
+  const g = t => (parts.find(p => p.type === t) || {}).value;
+  const day = `${g("year")}-${g("month")}-${g("day")}`;
+  if (parseInt(g("hour"), 10) < 8) return 0;
+  const last = await DB.prepare("SELECT v FROM meta WHERE k='needs_human_day'").first().catch(() => null);
+  if (last && last.v === day) return 0;
+  await DB.prepare("INSERT OR REPLACE INTO meta(k,v) VALUES('needs_human_day',?1)").bind(day).run();
+  const cutoff = Date.now() - 30 * 60 * 1e3;
+  const rows = (await DB.prepare("SELECT id,business,name,email,phone,status,created_at FROM claims WHERE status IN ('pending','pending-listing') AND created_at<?1 ORDER BY created_at LIMIT 60").bind(cutoff).all()).results || [];
+  if (!rows.length) return 0;
+  const claims = rows.filter(r => r.status === "pending"), adds = rows.filter(r => r.status === "pending-listing");
+  const li = r => `<li><b>${E(r.business || "-")}</b> — ${E(r.name || "")} · ${E(r.email || "")}${r.phone ? " · " + E(r.phone) : ""} <span style="color:#7A8CA0">(${new Date(r.created_at).toLocaleDateString("en-US", { timeZone: "America/New_York" })})</span></li>`;
+  const body = `<p>These couldn't be verified automatically (no code entered, no phone/email on file, or a dispute), so they need a person.</p>
+${claims.length ? `<p style="margin-top:14px"><b>Claims (${claims.length})</b> — <a href="${AUTH.SITE_URL}/admin/claims">open Claims</a></p><ul>${claims.map(li).join("")}</ul>` : ""}
+${adds.length ? `<p style="margin-top:14px"><b>New listings (${adds.length})</b> — <a href="${AUTH.SITE_URL}/admin/pending">open Pending listings</a></p><ul>${adds.map(li).join("")}</ul>` : ""}`;
+  const title = `${rows.length} waiting for a person on ${S.brand}`;
+  const list = await getNotifyEmails(DB, env, "new_claim");
+  await Promise.all(list.map(to => sendEmail(env, to, title, MAIL_INTERNAL(title, body, ""), title).catch(() => {})));
+  return rows.length;
+}
 
 async function getNotifyEmails(DB, env, kind) {
   if (DB) try {
@@ -6014,9 +6345,9 @@ const ADD = (d, x) => {
 <div class="lpx-feat r"><div><div class="lpx-kk">Get customers</div><h2>Customers message you directly</h2><p>Enquiries from your page land straight in your inbox. No middleman, no fee per lead.</p><ul><li>Call, directions and website buttons on your page</li><li>Hours with a live "Open now" badge</li><li>Add photos, services and offers from your phone</li></ul></div>
 <div class="lpx-vis"><span class="lpx-ex">Example</span><div class="lpx-msg"><div class="t"><span>📩 New enquiry · Your Business</span><span>2 min ago</span></div><b>Maria G.</b> — "Hi! Do you have availability this Saturday morning? Looking for a quote."</div><div class="lpx-msg" style="margin-left:40px"><div class="t"><span>📞 Call from your page</span><span>Today</span></div><b>A customer</b> tapped "Call"</div><div class="lpx-msg"><div class="t"><span>👀 Your page this week</span></div><b style="font-size:22px">248 views</b> · 19 direction requests</div></div></div>
 <div class="lpx-h"><h2>Live in 3 simple steps</h2><p>No website needed. No tech skills needed.</p></div>
-<div class="lpx-steps"><div><b>Tell us about your business</b><p>Fill in the short form above — about 3 minutes.</p></div><div><b>Our local team verifies it</b><p>We check your details within 1–2 business days.</p></div><div><b>Customers start finding you</b><p>Your page goes live with a Verified badge.</p></div></div>
+<div class="lpx-steps"><div><b>Tell us about your business</b><p>Fill in the short form above — about 3 minutes.</p></div><div><b>Verify with a code</b><p>We text or email you a 6-digit code — it takes 30 seconds.</p></div><div><b>You're live straight away</b><p>Your page goes live with a Verified badge, and customers start finding you.</p></div></div>
 <div class="lpx-h"><h2>Questions owners ask</h2></div>
-<div class="lpx-faq"><details open><summary>Is it really free?</summary><p>Yes. ${S.freeOnly ? "Listing your business is free — no credit card, no contract, no paid plans." : `A basic listing is free forever — no credit card, no contract. <a href="/pricing">Paid plans</a> are optional extras.`}</p></details><details><summary>My business might already be listed.</summary><p>Search for it on the <a href="/claim">Claim page</a> — claiming is free and lets you edit everything.</p></details><details><summary>Do I need a website?</summary><p>No. Your page works as your web presence, with hours, photos and a contact form.</p></details><details><summary>How long until I'm live?</summary><p>Usually 1–2 business days after our team verifies your details.</p></details></div>
+<div class="lpx-faq"><details open><summary>Is it really free?</summary><p>Yes. ${S.freeOnly ? "Listing your business is free — no credit card, no contract, no paid plans." : `A basic listing is free forever — no credit card, no contract. <a href="/pricing">Paid plans</a> are optional extras.`}</p></details><details><summary>My business might already be listed.</summary><p>Search for it on the <a href="/claim">Claim page</a> — claiming is free and lets you edit everything.</p></details><details><summary>Do I need a website?</summary><p>No. Your page works as your web presence, with hours, photos and a contact form.</p></details><details><summary>How long until I'm live?</summary><p>Straight away — as soon as you enter the code we text or email you. If you can't get the code, our team checks your details instead, usually within 1–2 business days.</p></details></div>
 </div>
 <section class="lpx-end"><h2>Ready to be found in ${E(S.city)}?</h2><p>Free forever. Takes 3 minutes.</p><a href="#start">Add my business free ↑</a></section>
 <a class="lpx-sticky" id="lpxSticky" href="#start">Add my business — free</a>
@@ -6055,7 +6386,7 @@ const CLAIMSTART = (d, b, err) => PAGE(d, {
   title: `Claim ${b.name} | ${S.brand}`,
   desc: `Verify ownership of ${b.name}.`,
   can: S.dom + "/claim",
-  body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / <a href="/claim">Claim</a> / ${E(b.name)}</nav>\n<div style="padding:14px 0 26px"><h1>Claim ${E(b.name)}</h1>\n<p style="color:${T.muted};margin-top:8px">${E(b.addr || S.city)}</p></div>\n<div class="split"><div class="blk"><h2>How verification works</h2>\n<p>Once you submit this form, an account manager will call you to complete the verification process — that's the only way we verify a claim, so a real person confirms every request before access is granted.</p>\n${b.claimed ? `<div class="note note-warn"><b>This listing is already claimed.</b> Your request will still go through, and the current owner will be notified.</div>` : ""}\n</div>\n<aside><div class="blk"><h2>Claim this listing</h2>\n${err ? `<div class="note note-err">${E(err)}</div>` : ""}\n<form method="POST" action="/api/claim" id="claimForm"><input type="hidden" name="id" value="${E(b.id)}">\n<input type="hidden" name="utm_source" id="cfSrc"><input type="hidden" name="utm_medium" id="cfMed">\n<input type="hidden" name="utm_campaign" id="cfCam"><input type="hidden" name="landing_page" id="cfLand">\n<script>(function(){try{\nvar m=document.cookie.match(/(?:^|; )gl_attr=([^;]*)/);\nif(!m)return;var a=JSON.parse(decodeURIComponent(m[1]));\nvar set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||""};\nset("cfSrc",a.source);set("cfMed",a.medium);set("cfCam",a.campaign);set("cfLand",a.landing)\n}catch(e){}})();<\/script>\n<div class="fld2"><label for="n1">Your name *</label><input id="n1" name="name" required></div>\n<div class="fld2"><label for="r1">Your role *</label><select id="r1" name="role" required>\n<option>Owner</option><option>Manager</option><option>Other Employee</option></select></div>\n<div class="fld2"><label for="e1">Your email *</label><input id="e1" name="email" type="email" required placeholder="you@yourbusiness.com"></div>\n<p style="font-size:11.5px;color:${T.faint};margin:-6px 0 2px">You'll still sign in with this email, whatever your role — it's just who we're talking to.</p>\n<div class="fld2"><label for="p1">Your phone *</label><input id="p1" name="phone" type="tel" required placeholder="So we can call you"></div>\n<div id="ownerFields" hidden>\n<div class="note note-warn" style="margin-bottom:12px">Since you're not the owner, we need the owner's own contact details before this claim can be reviewed. <b>This is mandatory</b> — a claim submitted as Manager or Other Employee without it won't be approved.</div>\n<div class="fld2"><label for="on1">Owner's name *</label><input id="on1" name="owner_name" placeholder="The business owner's full name"></div>\n<div class="fld2"><label for="oe1">Owner's email *</label><input id="oe1" name="owner_email" type="email" placeholder="owner@yourbusiness.com"></div>\n<div class="fld2"><label for="op1">Owner's phone *</label><input id="op1" name="owner_phone" type="tel" placeholder="A number we can reach the owner on"></div>\n<div class="fld2" style="flex-direction:row;align-items:flex-start;gap:8px"><input id="disc1" name="disclaimer" type="checkbox" style="margin-top:3px;width:auto"><label for="disc1" style="font-size:12.5px;font-weight:400">I confirm the owner's details above are accurate and that the owner is aware I'm submitting this claim on their behalf. *</label></div>\n</div>\n<div class="fld2"><label for="d1">Anything we should know?</label><textarea id="d1" name="details"></textarea></div>\n<button class="btn btn-p btn-w">Submit claim request</button></form>\n<script>(function(){\nvar cf=document.getElementById("claimForm");if(cf)cf.addEventListener("submit",function(){var b=cf.querySelector("button.btn-p");if(b){b.disabled=true;b.textContent="Sending…"}});\nvar sel=document.getElementById("r1"),box=document.getElementById("ownerFields");\nif(!sel||!box)return;\nvar reqIds=["on1","oe1","op1","disc1"];\nfunction apply(){\n  var needsOwner=sel.value==="Manager"||sel.value==="Other Employee";\n  box.hidden=!needsOwner;\n  reqIds.forEach(function(id){var el=document.getElementById(id);if(el)el.required=needsOwner});\n}\nsel.addEventListener("change",apply);\napply();\n})();<\/script></div></aside>\n</div></div>`
+  body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / <a href="/claim">Claim</a> / ${E(b.name)}</nav>\n<div style="padding:14px 0 26px"><h1>Claim ${E(b.name)}</h1>\n<p style="color:${T.muted};margin-top:8px">${E(b.addr || S.city)}</p></div>\n<div class="split"><div class="blk"><h2>How verification works</h2>\n<p>Once you submit this form, we'll text a 6-digit code to the business phone on this listing (or email it to the business email we have on file). Enter it and the listing is yours straight away — no waiting for a call. Can't get the code? Our team will check your claim instead.</p>\n${b.claimed ? `<div class="note note-warn"><b>This listing is already claimed.</b> Your request will still go through, and the current owner will be notified.</div>` : ""}\n</div>\n<aside><div class="blk"><h2>Claim this listing</h2>\n${err ? `<div class="note note-err">${E(err)}</div>` : ""}\n<form method="POST" action="/api/claim" id="claimForm"><input type="hidden" name="id" value="${E(b.id)}">\n<input type="hidden" name="utm_source" id="cfSrc"><input type="hidden" name="utm_medium" id="cfMed">\n<input type="hidden" name="utm_campaign" id="cfCam"><input type="hidden" name="landing_page" id="cfLand">\n<script>(function(){try{\nvar m=document.cookie.match(/(?:^|; )gl_attr=([^;]*)/);\nif(!m)return;var a=JSON.parse(decodeURIComponent(m[1]));\nvar set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||""};\nset("cfSrc",a.source);set("cfMed",a.medium);set("cfCam",a.campaign);set("cfLand",a.landing)\n}catch(e){}})();<\/script>\n<div class="fld2"><label for="n1">Your name *</label><input id="n1" name="name" required></div>\n<div class="fld2"><label for="r1">Your role *</label><select id="r1" name="role" required>\n<option>Owner</option><option>Manager</option><option>Other Employee</option></select></div>\n<div class="fld2"><label for="e1">Your email *</label><input id="e1" name="email" type="email" required placeholder="you@yourbusiness.com"></div>\n<p style="font-size:11.5px;color:${T.faint};margin:-6px 0 2px">You'll still sign in with this email, whatever your role — it's just who we're talking to.</p>\n<div class="fld2"><label for="p1">Your phone *</label><input id="p1" name="phone" type="tel" required placeholder="In case we need to reach you"></div>\n<div id="ownerFields" hidden>\n<div class="note note-warn" style="margin-bottom:12px">Since you're not the owner, we need the owner's own contact details before this claim can be reviewed. <b>This is mandatory</b> — a claim submitted as Manager or Other Employee without it won't be approved.</div>\n<div class="fld2"><label for="on1">Owner's name *</label><input id="on1" name="owner_name" placeholder="The business owner's full name"></div>\n<div class="fld2"><label for="oe1">Owner's email *</label><input id="oe1" name="owner_email" type="email" placeholder="owner@yourbusiness.com"></div>\n<div class="fld2"><label for="op1">Owner's phone *</label><input id="op1" name="owner_phone" type="tel" placeholder="A number we can reach the owner on"></div>\n<div class="fld2" style="flex-direction:row;align-items:flex-start;gap:8px"><input id="disc1" name="disclaimer" type="checkbox" style="margin-top:3px;width:auto"><label for="disc1" style="font-size:12.5px;font-weight:400">I confirm the owner's details above are accurate and that the owner is aware I'm submitting this claim on their behalf. *</label></div>\n</div>\n<div class="fld2"><label for="d1">Anything we should know?</label><textarea id="d1" name="details"></textarea></div>\n<button class="btn btn-p btn-w">Submit claim request</button></form>\n<script>(function(){\nvar cf=document.getElementById("claimForm");if(cf)cf.addEventListener("submit",function(){var b=cf.querySelector("button.btn-p");if(b){b.disabled=true;b.textContent="Sending…"}});\nvar sel=document.getElementById("r1"),box=document.getElementById("ownerFields");\nif(!sel||!box)return;\nvar reqIds=["on1","oe1","op1","disc1"];\nfunction apply(){\n  var needsOwner=sel.value==="Manager"||sel.value==="Other Employee";\n  box.hidden=!needsOwner;\n  reqIds.forEach(function(id){var el=document.getElementById(id);if(el)el.required=needsOwner});\n}\nsel.addEventListener("change",apply);\napply();\n})();<\/script></div></aside>\n</div></div>`
 });
 
 const LOGIN = (d, opts) => {
@@ -6076,6 +6407,40 @@ const VERIFY = (d, ref, email, err, resent) => PAGE(d, {
   can: S.dom + "/verify",
   body: `<div class="wrap" style="max-width:420px;padding:60px 24px">\n<nav class="crumb"><a href="/signup">Sign up</a> / Confirm your email</nav>\n<h1 style="margin:14px 0 6px">Confirm your email</h1>\n<p style="color:${T.muted};margin-bottom:20px">We sent a 6-digit code to ${E(MASK(email))}. Enter it below to finish creating your account.</p>\n${resent ? `<div class="note note-ok">A fresh code is on its way.</div>` : ""}\n${err ? `<div class="note note-err">${E(err)}</div>` : ""}\n<form method="POST" action="/verify">\n<input type="hidden" name="ref" value="${E(ref)}">\n<div class="fld2"><label for="vc">Verification code</label>\n<input id="vc" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6"\nrequired autofocus style="letter-spacing:6px;font-size:20px;text-align:center"></div>\n<button class="btn btn-p btn-w">Confirm & create account</button>\n</form>\n<form method="POST" action="/verify/resend" style="margin-top:14px">\n<input type="hidden" name="ref" value="${E(ref)}">\n<button class="btn btn-o btn-w">Resend code</button>\n</form>\n<p style="font-size:11.5px;color:${T.faint};margin-top:14px">The code expires in 15 minutes. If you didn't try to sign up, you can just ignore the email — nothing is created until the code is confirmed.</p>\n</div>`
 });
+
+// Business verification code page (claim or new listing). st = the bv: state from KV.
+const BIZVERIFY = (d, ref, st, err, resent) => {
+  const where = st.ch === "sms" ? `the business phone ${E(st.smsShown)}` : E(st.emailShown);
+  const other = st.ch === "sms" ? st.emailTo && [ "email", `Email the code to ${E(st.emailShown)} instead` ] : st.smsCid && [ "sms", `Text the code to the business phone ${E(st.smsShown)} instead` ];
+  const what = st.kind === "claim" ? `claim ${E(st.business)}` : `put ${E(st.business)} live`;
+  return PAGE(d, {
+    title: `Verify your business | ${S.brand}`,
+    desc: "Enter the verification code we sent to your business.",
+    can: S.dom + "/verify-business",
+    body: `<div class="wrap" style="max-width:440px;padding:56px 24px">
+<div style="display:inline-block;background:#E4F1F1;color:#2E8B8B;font-weight:700;font-size:12px;border-radius:99px;padding:5px 12px;margin-bottom:12px">Step 2 of 2 · takes 30 seconds</div>
+<h1 style="margin:0 0 8px">Verify it's your business</h1>
+<p style="color:${T.muted};margin-bottom:20px">We sent a 6-digit code to ${where}. Enter it below to ${what} right now — no waiting for a call.</p>
+${resent ? `<div class="note note-ok">A fresh code is on its way.</div>` : ""}${err ? `<div class="note note-err">${E(err)}</div>` : ""}
+<form method="POST" action="/verify-business">
+<input type="hidden" name="ref" value="${E(ref)}">
+<div class="fld2"><label for="bvc">Verification code</label>
+<input id="bvc" name="code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" required autofocus style="letter-spacing:8px;font-size:22px;text-align:center"></div>
+<button class="btn btn-p btn-w btn-lg">Verify and continue</button>
+</form>
+<form method="POST" action="/verify-business/send" style="margin-top:12px">
+<input type="hidden" name="ref" value="${E(ref)}"><input type="hidden" name="ch" value="${E(st.ch)}">
+<button class="btn btn-o btn-w">Send the code again</button></form>
+${other ? `<form method="POST" action="/verify-business/send" style="margin-top:8px">
+<input type="hidden" name="ref" value="${E(ref)}"><input type="hidden" name="ch" value="${other[0]}">
+<button class="btn btn-o btn-w" style="white-space:normal;height:auto;line-height:1.35;padding-top:10px;padding-bottom:10px">${other[1]}</button></form>` : ""}
+<form method="POST" action="/verify-business/team" style="margin-top:18px;text-align:center">
+<input type="hidden" name="ref" value="${E(ref)}">
+<button style="background:none;border:0;color:${T.muted};text-decoration:underline;font-size:13px;cursor:pointer">Can't get the code? Send it to our team to check instead</button></form>
+<p style="font-size:11.5px;color:${T.faint};margin-top:14px">The code expires in 15 minutes.</p>
+</div>`
+  });
+};
 
 const CODEPAGE = (d, ref, shown, purpose, err, resent) => PAGE(d, {
   title: `Enter your code | ${S.brand}`,
@@ -7213,7 +7578,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.45-shared";
+const BUILD = "v16.46-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -7303,6 +7668,12 @@ const _export = {
         if (pe.sent) console.log(`cron: sent ${pe.sent} claim invite(s) once email showed up, ${pe.left} still waiting`);
       } catch (e) {
         console.log("cron pending-email-invite batch failed: " + e.message);
+      }
+      if (hourly) try {
+        const n = await needsHumanDigest(env, DB);
+        if (n) console.log(`cron: needs-a-human digest sent (${n} waiting)`);
+      } catch (e) {
+        console.log("cron needs-a-human digest failed: " + e.message);
       }
       try {
         const KV = KVOF(env);
@@ -9229,181 +9600,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           let cid = String(f.get("ghlId") || "");
           const rowId = String(f.get("claimId") || ""), act = String(f.get("act") || "");
           if (act === "approve") {
-            let row = null;
-            if (rowId) try {
-              row = await DB.prepare("SELECT * FROM claims WHERE id=?1").bind(rowId).first();
-            } catch (e) {
-              console.log(e.message);
-            }
-            let pubC = null;
-            if (cid) {
-              const ex = await ghlGetContact(env, cid);
-              if (!ex) {
-                console.log("publish: stored contact " + cid + " no longer exists in GHL — creating a fresh business contact");
-                cid = "";
-              } else if ((ex.tags || []).some(t => /^(consumer|owner-account)$/i.test(String(t).trim()))) {
-                console.log("publish: " + cid + " is a person — creating a separate business contact");
-                cid = "";
-              } else pubC = ex;
-            }
-            let perr = "";
-            if (!cid && row && row.phone) {
-              try {
-                const byPhone = await ghlFindContactByPhone(env, row.phone);
-                if (byPhone && byPhone.id && !(byPhone.tags || []).some(t => /^(consumer|owner-account)$/i.test(String(t).trim()))) {
-                  cid = byPhone.id;
-                  pubC = byPhone;
-                  const category0 = String(row.role || "").trim() || "Other";
-                  await ghlAddTag(env, cid, [ "business", category0 ]);
-                }
-              } catch (e) {
-                console.log("publish: phone dedup lookup failed: " + e.message);
-              }
-            }
-            if (!cid && row) {
-              const category = String(row.role || "").trim() || "Other";
-              let categoryFid = "";
-              try {
-                const fm = await fields(env);
-                categoryFid = fieldId(fm, "category", "business category", "primary category", "main category");
-              } catch {}
-              const mk = async body => {
-                const r = await fetch(`${API}/contacts/`, {
-                  method: "POST",
-                  headers: {
-                    ...H(env),
-                    "Content-Type": "application/json"
-                  },
-                  body: JSON.stringify(body)
-                });
-                const j = await r.json().catch(() => ({}));
-                return {
-                  ok: r.ok,
-                  id: j.contact && j.contact.id || "",
-                  contact: j.contact || null,
-                  err: r.ok ? "" : `GHL ${r.status}: ${JSON.stringify(j).slice(0, 200)}`
-                };
-              };
-              try {
-                let res = await mk({
-                  locationId: env.GHL_LOCATION_ID,
-                  companyName: row.business || "Unnamed",
-                  firstName: row.business || "Unnamed",
-                  phone: row.phone || undefined,
-                  address1: row.verify || undefined,
-                  tags: [ "business", category, "New" ],
-                  ...categoryFid ? {
-                    customFields: [ {
-                      id: categoryFid,
-                      value: category
-                    } ]
-                  } : {},
-                  source: "Goes Local approved listing"
-                });
-                if (!res.ok) {
-                  console.log("publish create attempt 1 failed: " + res.err);
-                  res = await mk({
-                    locationId: env.GHL_LOCATION_ID,
-                    companyName: row.business || "Unnamed",
-                    firstName: row.business || "Unnamed",
-                    address1: row.verify || undefined,
-                    tags: [ "business", category, "New" ],
-                    ...categoryFid ? {
-                      customFields: [ {
-                        id: categoryFid,
-                        value: category
-                      } ]
-                    } : {},
-                    source: "Goes Local approved listing"
-                  });
-                }
-                if (res.ok) {
-                  cid = res.id;
-                  pubC = res.contact;
-                  if (cid && row.notes) try {
-                    await fetch(`${API}/contacts/${cid}/notes`, {
-                      method: "POST",
-                      headers: {
-                        ...H(env),
-                        "Content-Type": "application/json"
-                      },
-                      body: JSON.stringify({
-                        body: `Submitted details:\n\n${row.notes}`
-                      })
-                    });
-                  } catch {}
-                } else perr = res.err || "GHL rejected the contact with no further detail.";
-              } catch (e) {
-                perr = e.message;
-                console.log("publish create fail: " + e.message);
-              }
-            } else if (cid) {
-              await ghlAddTag(env, cid, [ "business" ]);
-              if (row) try {
-                await ghlUpdateContact(env, cid, {
-                  name: row.business || undefined,
-                  address: row.verify || undefined
-                });
-              } catch (e) {
-                console.log("publish: business name update on existing contact failed: " + e.message);
-              }
-            }
-            if (cid && row && row.referral) await ghlAddTag(env, cid, [ `heard-about-us: ${row.referral}` ]);
-            const seoTag = row ? leadChannelTag(row.utm_source || row.referrer_domain, row.utm_medium) : "";
-            if (cid && seoTag) await addSeoInbound(env, cid);
-            if (cid) {
-              try {
-                await insertOne(env, DB, cid, pubC);
-              } catch (e) {
-                console.log("publish insertOne fail: " + e.message);
-              }
-              const em = NRM(f.get("email") || "");
-              if (em) {
-                await ghlSetOwnerEmail(env, cid, em);
-                await ghlAddTag(env, cid, [ "claimed", "Recently Claimed" ]);
-              }
-              try {
-                await ghlRemoveTag(env, cid, [ "pending-listing" ]);
-              } catch (e) {
-                console.log("publish: pending-listing tag removal failed: " + e.message);
-              }
-              try {
-                await syncStep(env, DB, 5);
-                C = {
-                  t: 0,
-                  d: null
-                };
-        SHELL_DIRTY = true;
-              } catch (e) {
-                console.log("publish sync fail: " + e.message);
-              }
-              if (em) try {
-                await DB.prepare("UPDATE businesses SET claimed_at=?1 WHERE ghl_id=?2 AND claimed_at IS NULL").bind(Date.now(), cid).run();
-              } catch (e) {
-                console.log("publish claimed_at set failed: " + e.message);
-              }
-              if (em && DB) {
-                try {
-                  await refreshOne(env, DB, cid, {
-                    owner: em
-                  });
-                } catch (e) {
-                  console.log("publish post-claim refresh fail: " + e.message);
-                }
-              }
-              if (em) {
-                const link = await issueLink(env, em, "login", {});
-                if (link) await sendTplEmail(env, DB, em, "listing_live_existing", { brand: S.brand }, link, undefined, cid); else await sendTplEmail(env, DB, em, "listing_live_new", { brand: S.brand }, AUTH.SITE_URL + "/login", undefined, cid);
-              }
-            } else {
-              if (!perr) perr = "Could not obtain a business contact id.";
-              console.log("publish: " + perr);
-            }
-            if (rowId) try {
-              if (cid) await DB.prepare("UPDATE claims SET status='listed', decided_at=?1, perr=NULL WHERE id=?2").bind(Date.now(), rowId).run(); else await DB.prepare("UPDATE claims SET perr=?1 WHERE id=?2").bind(perr, rowId).run();
-            } catch (e) {
-              console.log(e.message);
-            }
+            await publishListing(env, DB, rowId, cid, f.get("email"));
           } else if (rowId) try {
             await DB.prepare("UPDATE claims SET status='rejected', decided_at=?1 WHERE id=?2").bind(Date.now(), rowId).run();
           } catch (e) {
@@ -9754,37 +9951,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (u.pathname === "/admin/claims/approve" && req.method === "POST") {
         if (!await isStaff(env, req, u)) return Response.redirect(AUTH.SITE_URL + "/admin/login", 302);
         const f = await req.formData();
-        const claimId = String(f.get("claimId") || ""), ghlId = String(f.get("ghlId") || ""), email = NRM(f.get("email") || "");
-        if (ghlId && email) {
-          await ghlSetOwnerEmail(env, ghlId, email);
-          await ghlAddTag(env, ghlId, [ "claimed", "Recently Claimed" ]);
-          try {
-            await ghlRemoveTag(env, ghlId, [ "claim-request" ]);
-          } catch (e) {
-            console.log("claim-request tag removal failed: " + e.message);
-          }
-          if (DB) {
-            try {
-              await refreshOne(env, DB, ghlId, {
-                owner: email
-              });
-            } catch (e) {
-              console.log("post-approve refresh fail: " + e.message);
-            }
-            try {
-              await DB.prepare("UPDATE businesses SET claimed_at=?1 WHERE ghl_id=?2 AND claimed_at IS NULL").bind(Date.now(), ghlId).run();
-            } catch (e) {
-              console.log("post-approve claimed_at set failed: " + e.message);
-            }
-          }
-          const link = await issueLink(env, email, "login", {});
-          if (link) await sendTplEmail(env, DB, email, "claim_approved", {}, link, undefined, ghlId);
-        }
-        if (claimId && DB) try {
-          await DB.prepare("UPDATE claims SET status='approved', decided_at=?1 WHERE id=?2").bind(Date.now(), claimId).run();
-        } catch (e) {
-          console.log(e.message);
-        }
+        await approveClaim(env, DB, String(f.get("claimId") || ""), String(f.get("ghlId") || ""), NRM(f.get("email") || ""));
         return Response.redirect(AUTH.SITE_URL + "/admin/claims", 302);
       }
       if (u.pathname === "/admin/blog/delete" && req.method === "POST") {
@@ -11740,7 +11907,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         if (DB) try {
           repeatOf = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND created_at>?1 AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3)) ORDER BY id DESC LIMIT 1").bind(Date.now() - 864e5, cid || "", NRM(l.email)).first();
         } catch {}
-        if (!repeatOf) ctx.waitUntil(notifyAdmins(env, DB, "new_listing", "admin_new_listing", {
+        const addAdminVars = {
             business: E(l.business || "(not given)"),
             name: E(l.owner_name || "(not given)"),
             email: E(l.email || "(not given)"),
@@ -11758,7 +11925,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             details: E(l.details || "-"),
             referral: E(l.referral || "-"),
             traffic: E(`${utmSource || referrerDomain || "-"}${utmMedium ? " (" + utmMedium + ")" : ""}${utmCampaign ? " — campaign: " + utmCampaign : ""}`)
-          }, AUTH.SITE_URL + "/admin/pending").catch(e => console.log("admin notify (new listing) failed: " + e.message)));
+          };
         let saved = false;
         if (DB && repeatOf) try {
           await DB.prepare("UPDATE claims SET business=?1,name=?2,email=?3,phone=?4,role=?5,verify=?6,notes=?7,created_at=?8 WHERE id=?9").bind(l.business || "Unnamed", l.owner_name || l.name || "", NRM(l.email), l.phone || "", l.category || "", l.address || "", l.details || "", Date.now(), repeatOf.id).run();
@@ -11794,6 +11961,38 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             console.log("attribution tag fail: " + e.message);
           }
         }
+        // Instant route: a code to the phone or email they gave proves they're real and reachable; the right
+        // code puts the listing live with no review. An existing listing that's already claimed stays with the team.
+        let ownedElsewhere = false;
+        if (cid && DB) try {
+          ownedElsewhere = !!await DB.prepare("SELECT 1 FROM businesses WHERE ghl_id=?1 AND claimed=1 AND lower(coalesce(owner_email,''))<>?2").bind(cid, NRM(l.email)).first();
+        } catch {}
+        const addSms = !!(cid && l.phone), addEm = !!NRM(l.email);
+        // Caps on codes sent from this form (stops it being used to text strangers): per visitor and per phone, per hour.
+        const bvAllowed = (addSms || addEm) && await rateOk(env, "bvadd:" + (leadIp || "0"), 4) && (!addSms || await rateOk(env, "bvph:" + String(l.phone).replace(/\D/g, "").slice(-10), 3));
+        if (saved && !ownedElsewhere && bvAllowed) {
+          let rowId = null;
+          try {
+            const rr = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND ((?1<>'' AND ghl_id=?1) OR (?2<>'' AND email=?2)) ORDER BY id DESC LIMIT 1").bind(cid || "", NRM(l.email)).first();
+            rowId = rr && rr.id;
+          } catch {}
+          const ref = rowId ? await bvStart(env, DB, {
+            kind: "add",
+            rowId: rowId,
+            cid: cid,
+            ownerCid: cid,
+            business: l.business || "your business",
+            email: NRM(l.email),
+            name: l.owner_name || l.name || "",
+            smsCid: addSms ? cid : "",
+            smsShown: MASKPH(l.phone),
+            emailTo: addEm ? NRM(l.email) : "",
+            emailShown: addEm ? MASKEM(l.email) : "",
+            adminVars: addAdminVars
+          }) : null;
+          if (ref) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + ref, 302);
+        }
+        if (!repeatOf) ctx.waitUntil(notifyAdmins(env, DB, "new_listing", "admin_new_listing", addAdminVars, AUTH.SITE_URL + "/admin/pending").catch(e => console.log("admin notify (new listing) failed: " + e.message)));
         if (repeatOf) return R2(NOTICE(d, "Got it — your details are updated", "We already had your submission, so we've updated it with these details. There's no need to send it again — our local team will be in touch within one to two business days.", "Back to the directory", "/"));
         if (l.email) ctx.waitUntil(sendTplEmail(env, DB, l.email, "listing_received", { business: E(l.business || "your business") }, "", undefined, cid).catch(() => {}));
         return R2(NOTICE(d, "Thanks — we've got it", "Our local team reviews new submissions within one to two business days. We'll email you when your page is live.", "Back to the directory", "/"));
@@ -11904,6 +12103,83 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (!r) return R2(NOTICE(d, "Listing not found", "We couldn't find that listing.", "Search again", "/claim"), 404);
       return R2(CLAIMSTART(d, ROWOF(r), u.searchParams.get("err") || ""));
     }
+    if (u.pathname === "/verify-business" && req.method === "GET") {
+      const ref = u.searchParams.get("ref") || "", st = await bvGet(env, ref);
+      if (!st || st.done) return R2(NOTICE(d, "That code has expired", "Verification codes last 15 minutes. Your request is saved with our team, and we'll be in touch — or start again for a new code.", "Back to the directory", "/"));
+      return R2(BIZVERIFY(d, ref, st, "", u.searchParams.has("resent")));
+    }
+    if (u.pathname === "/verify-business/send" && req.method === "POST") {
+      const f = await req.formData(), ref = String(f.get("ref") || ""), st = await bvGet(env, ref);
+      if (!st || st.done) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + encodeURIComponent(ref), 302);
+      if ((st.sends || 0) >= BV_MAX_SENDS) return R2(BIZVERIFY(d, ref, st, "That's the most codes we can send for now. Use the last code you got, or send it to our team to check."));
+      const ok = await bvSend(env, DB, st, String(f.get("ch")) === "email" ? "email" : "sms");
+      await bvPut(env, ref, st);
+      if (!ok) return R2(BIZVERIFY(d, ref, st, "We couldn't send that one. Try the other option, or send it to our team to check."));
+      return Response.redirect(AUTH.SITE_URL + "/verify-business?resent=1&ref=" + encodeURIComponent(ref), 302);
+    }
+    if (u.pathname === "/verify-business/team" && req.method === "POST") {
+      const f = await req.formData(), ref = String(f.get("ref") || ""), st = await bvGet(env, ref);
+      if (st && !st.done) {
+        await bvToTeam(env, DB, st, "owner asked for a manual check");
+        st.done = true;
+        await bvPut(env, ref, st);
+      }
+      return R2(NOTICE(d, "Sent to our team", st && st.kind === "add" ? "Our local team will check your listing and email you as soon as it's live." : "Our local team will check your claim and email you as soon as it's approved.", "Back to the directory", "/"));
+    }
+    if (u.pathname === "/verify-business" && req.method === "POST") {
+      const f = await req.formData(), ref = String(f.get("ref") || ""), st = await bvGet(env, ref);
+      if (!st || st.done) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + encodeURIComponent(ref), 302);
+      const code = String(f.get("code") || "").replace(/\D/g, "");
+      const fresh = st.codeAt && Date.now() - st.codeAt < BV_CODE_MS;
+      if (!fresh || code !== st.code) {
+        st.tries = (st.tries || 0) + 1;
+        if (st.tries >= BV_MAX_TRIES) {
+          await bvToTeam(env, DB, st, "too many wrong codes");
+          st.done = true;
+          await bvPut(env, ref, st);
+          return R2(NOTICE(d, "Sent to our team", "That code didn't match a few times, so we've passed your request to our local team. They'll email you once it's checked.", "Back to the directory", "/"));
+        }
+        await bvPut(env, ref, st);
+        return R2(BIZVERIFY(d, ref, st, fresh ? "That code doesn't match. Check it and try again." : "That code has expired — tap \"Send the code again\" for a new one."));
+      }
+      st.done = true;
+      await bvPut(env, ref, st);
+      const how = "verified by " + (st.ch === "sms" ? "text code to " + st.smsShown : "email code to " + st.emailShown);
+      let liveId = "";
+      if (st.kind === "claim") {
+        await approveClaim(env, DB, st.rowId, st.bizId, st.email, how);
+        liveId = st.bizId;
+      } else {
+        liveId = await publishListing(env, DB, st.rowId, st.cid, st.email);
+        if (!liveId) {
+          await bvToTeam(env, DB, st, "verified, but publishing failed");
+          return R2(NOTICE(d, "Verified — one more step on our side", "Your business is verified, but we hit a problem putting the page live. Our team has been told and will email you shortly.", "Back to the directory", "/"));
+        }
+        if (st.rowId) try {
+          await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[" + how + "]", st.rowId).run();
+        } catch {}
+      }
+      ctx.waitUntil(notifyAdmins(env, DB, st.kind === "claim" ? "new_claim" : "new_listing", st.kind === "claim" ? "admin_new_claim" : "admin_new_listing", st.kind === "claim" ? {
+        ...st.adminVars || {},
+        reason: ((st.adminVars || {}).reason || "") + E(" — APPROVED AUTOMATICALLY (" + how + "). No action needed.")
+      } : {
+        ...st.adminVars || {},
+        business: E(st.business) + E(" — PUBLISHED AUTOMATICALLY (" + how + "). No action needed.")
+      }, AUTH.SITE_URL + (st.kind === "claim" ? "/admin/claims" : "/admin/pending")).catch(() => {}));
+      const cookie = st.email ? await startSession(env, st.email, await resolveDisplayName(env, st.email, st.name)) : null;
+      const hdrs = new Headers({
+        Location: cookie ? "/account?verified=1" : "/login",
+        "Cache-Control": "no-store"
+      });
+      if (cookie) {
+        hdrs.append("Set-Cookie", COOKIE(cookie, AUTH.SESSION_DAYS));
+        hdrs.append("Set-Cookie", `gl_who=1; Path=/; Secure; SameSite=Lax; Max-Age=${AUTH.SESSION_DAYS * 86400}`);
+      }
+      return new Response(null, {
+        status: 302,
+        headers: hdrs
+      });
+    }
     if (u.pathname === "/api/claim" && req.method === "POST") {
       const f = await req.formData();
       const id = String(f.get("id") || ""), email = NRM(f.get("email")), name = String(f.get("name") || "");
@@ -11964,6 +12240,48 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       } catch (e) {
         console.log("claim: cross-link failed: " + e.message);
       }
+      const adminVars = {
+        business: E(b.name),
+        bizCategory: E(b.cat || "-"),
+        bizAddress: E(b.addr || "-"),
+        bizPhone: E(b.ph || "-"),
+        name: E(name),
+        email: E(email),
+        phone: E(phone || "(not given)"),
+        role: E(role || "(not given)"),
+        notes: E(fullNotes || "(none)"),
+        ownerName: E(needsOwner ? ownerName : "-"),
+        ownerEmail: E(needsOwner ? ownerEmail : "-"),
+        ownerPhone: E(needsOwner ? ownerPhone : "-"),
+        alreadyText: already ? "Yes — this would be a re-claim/dispute" : "No",
+        tier: E(tier),
+        reason: E(reason)
+      };
+      // Instant route: a code to the phone or email already on the listing proves it's theirs (not for a listing
+      // someone already owns — those disputes stay with the team).
+      const smsOk = !!(b.ph && id), emOk = !!(b.email && !junkEmail(b.email));
+      if (!already && (smsOk || emOk)) {
+        let rowId = null;
+        try {
+          const rr = await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND lower(email)=?2 AND status='pending' ORDER BY id DESC LIMIT 1").bind(id, email).first();
+          rowId = rr && rr.id;
+        } catch {}
+        const ref = await bvStart(env, DB, {
+          kind: "claim",
+          rowId: rowId,
+          bizId: id,
+          business: b.name,
+          email: email,
+          name: name,
+          smsCid: smsOk ? id : "",
+          smsShown: MASKPH(b.ph),
+          emailTo: emOk ? NRM(b.email) : "",
+          emailShown: emOk ? MASKEM(b.email) : "",
+          prefer: tier === "B" ? "email" : "sms",
+          adminVars: adminVars
+        });
+        if (ref) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + ref, 302);
+      }
       const link = await issueLink(env, email, "claim-confirm", {
         bizId: id,
         contactId: cid,
@@ -11972,23 +12290,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (link) await sendTplEmail(env, DB, email, "claim_confirm", { business: E(b.name) }, link, undefined, cid);
       if (already && b.owner_email) await sendTplEmail(env, DB, b.owner_email, "claim_dispute_notify", { business: E(b.name) });
       try {
-        await notifyAdmins(env, DB, "new_claim", "admin_new_claim", {
-          business: E(b.name),
-          bizCategory: E(b.cat || "-"),
-          bizAddress: E(b.addr || "-"),
-          bizPhone: E(b.ph || "-"),
-          name: E(name),
-          email: E(email),
-          phone: E(phone || "(not given)"),
-          role: E(role || "(not given)"),
-          notes: E(fullNotes || "(none)"),
-          ownerName: E(needsOwner ? ownerName : "-"),
-          ownerEmail: E(needsOwner ? ownerEmail : "-"),
-          ownerPhone: E(needsOwner ? ownerPhone : "-"),
-          alreadyText: already ? "Yes — this would be a re-claim/dispute" : "No",
-          tier: E(tier),
-          reason: E(reason)
-        }, AUTH.SITE_URL + "/admin/claims");
+        await notifyAdmins(env, DB, "new_claim", "admin_new_claim", adminVars, AUTH.SITE_URL + "/admin/claims");
       } catch (e) {
         console.log("admin notify (new claim) failed: " + e.message);
       }
