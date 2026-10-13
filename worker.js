@@ -1426,6 +1426,9 @@ async function migrate(DB, env) {
     await DB.prepare("ALTER TABLE claims ADD COLUMN perr TEXT").run();
   } catch {}
   try {
+    await DB.prepare("ALTER TABLE claims ADD COLUMN bv_tries INTEGER DEFAULT 0").run();
+  } catch {}
+  try {
     await DB.prepare("ALTER TABLE claims ADD COLUMN referral TEXT DEFAULT ''").run();
   } catch {}
   try {
@@ -3683,6 +3686,19 @@ async function bvPut(env, ref, st) {
 // Sends a fresh code by "sms" (to contact st.smsCid, whose phone is the business phone) or "email" (to st.emailTo).
 async function bvSend(env, DB, st, ch) {
   if (ch === "sms" ? !st.smsCid : !st.emailTo) return false;
+  if (st.sentAt && Date.now() - st.sentAt < 60 * 1e3) return false;
+  if (ch === "sms") {
+    // Site-wide ceiling on verification texts per day, whatever the visitor does.
+    const KV = KVOF(env), dk = "bvsms:" + new Date().toISOString().slice(0, 10);
+    if (KV) {
+      const used = parseInt(await KV.get(dk) || "0", 10);
+      if (used >= 300) return false;
+      await KV.put(dk, String(used + 1), {
+        expirationTtl: 2 * 86400
+      });
+    }
+  }
+  st.sentAt = Date.now();
   st.code = String(Math.floor(1e5 + Math.random() * 9e5));
   st.codeAt = Date.now();
   st.ch = ch;
@@ -3705,10 +3721,12 @@ async function bvStart(env, DB, st) {
   let ok = await bvSend(env, DB, st, ch);
   if (!ok) {
     const other = ch === "sms" ? "email" : "sms";
+    st.sentAt = 0;
     if (other === "sms" ? st.smsCid : st.emailTo) ok = await bvSend(env, DB, st, other);
   }
   if (!ok) return null;
   await bvPut(env, ref, st);
+  if (st.rowId) await DB.prepare("UPDATE claims SET bv_tries=0, notes=CASE WHEN coalesce(notes,'') LIKE '%[code-sent]%' THEN notes ELSE trim(coalesce(notes,'') || ?1) END WHERE id=?2").bind("\n[code-sent]", st.rowId).run().catch(() => {});
   return ref;
 }
 
@@ -3716,6 +3734,7 @@ async function bvStart(env, DB, st) {
 async function bvToTeam(env, DB, st, why) {
   if (st.toTeam) return;
   st.toTeam = why;
+  if (st.rowId) await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[to-team: " + why + "]", st.rowId).run().catch(() => {});
   try {
     if (st.kind === "claim") await notifyAdmins(env, DB, "new_claim", "admin_new_claim", {
       ...st.adminVars || {},
@@ -3729,6 +3748,142 @@ async function bvToTeam(env, DB, st, why) {
       business: E(st.business || "your business")
     }, "", undefined, st.ownerCid);
   } catch {}
+}
+
+// Off switch: set CITY_BV_OFF = 1 in a city's dashboard Variables and claims / new listings go back to the
+// old team-review flow at once, no deploy needed.
+const BV_ON = env => String(env.CITY_BV_OFF || "").trim() !== "1";
+
+// Which codes a claim can use: a text to the listing's phone, an email to the listing's email, or — when the
+// claimant's own email is on the business's website domain (tier A) — an email to them. null = none.
+function bvClaimState(b, id, email, name, tier, rowId, adminVars) {
+  const smsOk = !!(b.ph && id), emOk = !!(b.email && !junkEmail(b.email)), ownOk = tier === "A";
+  if (!smsOk && !emOk && !ownOk) return null;
+  const emailTo = emOk ? NRM(b.email) : ownOk ? NRM(email) : "";
+  const prevOwner = b.claimed ? NRM(b.owner_email || "") : "";
+  return {
+    kind: "claim",
+    rowId: rowId,
+    bizId: id,
+    business: b.name,
+    email: NRM(email),
+    name: name,
+    smsCid: smsOk ? id : "",
+    smsShown: MASKPH(b.ph),
+    emailTo: emailTo,
+    emailShown: MASKEM(emailTo),
+    prefer: tier === "B" || !emOk && ownOk ? "email" : "sms",
+    prevOwner: prevOwner && prevOwner !== NRM(email) ? prevOwner : "",
+    adminVars: adminVars
+  };
+}
+
+// A GHL task on the contact for its assigned rep (the account manager), due tomorrow. Best effort.
+async function ghlTask(env, cid, title, body, tag) {
+  if (!cid) return false;
+  try {
+    const c = await ghlGetContact(env, cid);
+    const r = await fetch(`${API}/contacts/${cid}/tasks`, {
+      method: "POST",
+      headers: {
+        ...H(env),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: title,
+        body: body,
+        dueDate: new Date(Date.now() + 864e5).toISOString(),
+        completed: false,
+        ...c && c.assignedTo ? {
+          assignedTo: c.assignedTo
+        } : {}
+      })
+    });
+    if (!r.ok) console.log("ghl task " + r.status + ": " + (await r.text()).slice(0, 200));
+    if (tag) await ghlAddTag(env, cid, [ tag ]);
+    return r.ok;
+  } catch (e) {
+    console.log("ghl task failed: " + e.message);
+    return false;
+  }
+}
+
+// Someone verified a listing another person already owns: tell the current owner, who has 72 hours to keep it.
+async function bvStartTransfer(env, DB, st, how) {
+  const KV = KVOF(env), t = RID(24);
+  if (KV) await KV.put("keep:" + t, JSON.stringify({
+    rowId: st.rowId,
+    bizId: st.bizId,
+    business: st.business,
+    claimant: st.email
+  }), {
+    expirationTtl: 80 * 3600
+  });
+  if (st.rowId) await DB.prepare("UPDATE claims SET status='transfer-pending', decided_at=?1, notes=trim(coalesce(notes,'') || ?2) WHERE id=?3").bind(Date.now(), "\n[" + how + "; current owner has 72h to object]", st.rowId).run();
+  await sendTplEmail(env, DB, st.prevOwner, "transfer_notice", {
+    business: E(st.business)
+  }, AUTH.SITE_URL + "/keep-listing?t=" + t, undefined, st.bizId);
+}
+
+// Hourly: finish ownership changes nobody objected to (72h), and send one "finish verifying" reminder to people
+// who started a claim or a new listing 2h–7 days ago without entering their code.
+async function bvHourly(env, DB) {
+  const out = {
+    moved: 0,
+    reminded: 0
+  };
+  const due = (await DB.prepare("SELECT * FROM claims WHERE status='transfer-pending' AND decided_at<?1 ORDER BY decided_at LIMIT 20").bind(Date.now() - 72 * 3600 * 1e3).all()).results || [];
+  for (const r of due) try {
+    await approveClaim(env, DB, r.id, r.ghl_id, NRM(r.email), "ownership moved: no objection from the previous owner in 72 hours");
+    out.moved++;
+  } catch (e) {
+    console.log("transfer " + r.id + " failed: " + e.message);
+  }
+  // A verification that died half-way (timeout mid-publish) goes back to its queue after 15 minutes.
+  try {
+    await DB.prepare("UPDATE claims SET status=substr(status,11) WHERE status IN ('verifying-pending','verifying-pending-listing') AND decided_at<?1").bind(Date.now() - 15 * 60 * 1e3).run();
+  } catch (e) {
+    console.log("verifying reset failed: " + e.message);
+  }
+  // Still not verified a day after the reminder: hand it to the team once (per item, no daily digest).
+  try {
+    const late = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[reminded]%' AND notes NOT LIKE '%[to-team%' AND created_at<?1 LIMIT 10").bind(Date.now() - 26 * 3600 * 1e3).all()).results || [];
+    for (const r of late) await bvToTeam(env, DB, {
+      kind: r.status === "pending" ? "claim" : "add",
+      rowId: r.id,
+      business: r.business,
+      email: NRM(r.email),
+      ownerCid: r.ghl_id || undefined,
+      adminVars: {
+        business: E(r.business || "-"),
+        name: E(r.name || "-"),
+        email: E(r.email || "-"),
+        phone: E(r.phone || "-"),
+        reason: E("started but never entered the code")
+      }
+    }, "never entered the code");
+  } catch (e) {
+    console.log("late hand-off failed: " + e.message);
+  }
+  if (!BV_ON(env)) return out;
+  const KV = KVOF(env);
+  if (!KV) return out;
+  const now = Date.now();
+  const rows = (await DB.prepare("SELECT id,business,email,ghl_id FROM claims WHERE status IN ('pending','pending-listing') AND created_at BETWEEN ?1 AND ?2 AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[reminded]%' AND notes NOT LIKE '%[to-team%' AND coalesce(email,'')<>'' ORDER BY created_at LIMIT 15").bind(now - 7 * 864e5, now - 2 * 3600 * 1e3).all()).results || [];
+  for (const r of rows) try {
+    const t = RID(24);
+    await KV.put("bvr:" + t, String(r.id), {
+      expirationTtl: 7 * 86400
+    });
+    await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[reminded]", r.id).run();
+    await sendTplEmail(env, DB, NRM(r.email), "verify_reminder", {
+      business: E(r.business || "your business")
+    }, AUTH.SITE_URL + "/verify-business/restart?t=" + t, undefined, r.ghl_id || undefined).catch(() => {});
+    out.reminded++;
+  } catch (e) {
+    console.log("reminder " + r.id + " failed: " + e.message);
+  }
+  return out;
 }
 
 // Approves a claim: owner email + "claimed" tags in GHL, listing refreshed, approval email with a sign-in link.
@@ -3758,6 +3913,12 @@ async function approveClaim(env, DB, claimId, ghlId, email, how) {
     }
     const link = await issueLink(env, email, "login", {});
     if (link) await sendTplEmail(env, DB, email, "claim_approved", {}, link, undefined, ghlId);
+    let bizName = "";
+    try {
+      const nb = await DB.prepare("SELECT name FROM businesses WHERE ghl_id=?1").bind(ghlId).first();
+      bizName = nb && nb.name || "";
+    } catch {}
+    await ghlTask(env, ghlId, `Welcome call: ${bizName || "new owner"}`, `${email} just became the verified owner${how ? " (" + how + ")" : ""}. Call to welcome them as their account manager and help them add hours, services and photos.`, "welcome-call");
   }
   if (claimId && DB) try {
     await DB.prepare("UPDATE claims SET status='approved', decided_at=?1, notes=trim(coalesce(notes,'') || ?3) WHERE id=?2").bind(Date.now(), claimId, how ? "\n[" + how + "]" : "").run();
@@ -3935,6 +4096,7 @@ async function publishListing(env, DB, rowId, cid, email) {
     if (em) {
       const link = await issueLink(env, em, "login", {});
       if (link) await sendTplEmail(env, DB, em, "listing_live_existing", { brand: S.brand }, link, undefined, cid); else await sendTplEmail(env, DB, em, "listing_live_new", { brand: S.brand }, AUTH.SITE_URL + "/login", undefined, cid);
+      await ghlTask(env, cid, `Welcome call: ${row && row.business || "new listing"}`, `${em} just put this business live on the directory. Call to welcome them as their account manager and help them add hours, services and photos.`, "welcome-call");
     }
   } else {
     if (!perr) perr = "Could not obtain a business contact id.";
@@ -4645,6 +4807,35 @@ const EMAIL_TEMPLATES = {
     body: "<p>Someone requested ownership of <b>{{business}}</b>. No changes have been made. If this wasn't you, reply to this email.</p>",
     btn: ""
   },
+  transfer_notice: {
+    label: "Ownership change — notice to the current owner",
+    description: "Sent to the current owner when someone else verifies a claim on their listing by code. Ownership moves after 72 hours unless they tap the button.",
+    vars: [ "business", "link" ],
+    subject: "Action needed: someone verified {{business}}",
+    title: "Is someone else now running {{business}}?",
+    body: "<p>Someone just verified <b>{{business}}</b> using the business phone or email on the listing, and asked to take over the listing.</p><p>If that's right — for example the business has a new owner or manager — you don't need to do anything: the listing moves to them in 72 hours.</p><p><b>If that's not right, tap the button below to keep your listing.</b> Your account manager will then sort it out with you.</p>",
+    btn: "Keep my listing",
+    noExpiry: true
+  },
+  transfer_kept: {
+    label: "Ownership change — current owner kept the listing",
+    description: "Sent to the person who verified a claim when the current owner asked to keep the listing.",
+    vars: [ "business" ],
+    subject: "About your claim for {{business}}",
+    title: "We need to check one thing",
+    body: "<p>The current owner of <b>{{business}}</b> asked to keep the listing, so we haven't moved it yet. Your account manager will be in touch to sort it out with you both.</p>",
+    btn: ""
+  },
+  verify_reminder: {
+    label: "Reminder to finish verifying",
+    description: "Sent once, a couple of hours after someone started a claim or a new listing but didn't enter their code.",
+    vars: [ "business", "link" ],
+    subject: "Finish verifying {{business}} — it takes 30 seconds",
+    title: "You're one step away",
+    body: "<p>You started verifying <b>{{business}}</b> but didn't enter the code. Tap below and we'll send a fresh 6-digit code to the business phone or email. Enter it and you're done.</p>",
+    btn: "Send me a new code",
+    noExpiry: true
+  },
   listing_received: {
     label: "\"We've got your listing\" confirmation",
     description: "Sent right after someone submits a new business through \"List your business\".",
@@ -4899,37 +5090,6 @@ const NOTIFY_TPL = {
   enquiry: "admin_enquiry"
 };
 const DEFAULT_NOTIFY_EMAIL = "dev1@mianrosystems.com";
-
-// Once a day (after 8am New York time): one email to the team listing the claims and new listings still waiting
-// for a person — the ones that couldn't be verified by code. Nothing is sent when the queues are empty.
-async function needsHumanDigest(env, DB) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false
-  }).formatToParts(new Date);
-  const g = t => (parts.find(p => p.type === t) || {}).value;
-  const day = `${g("year")}-${g("month")}-${g("day")}`;
-  if (parseInt(g("hour"), 10) < 8) return 0;
-  const last = await DB.prepare("SELECT v FROM meta WHERE k='needs_human_day'").first().catch(() => null);
-  if (last && last.v === day) return 0;
-  await DB.prepare("INSERT OR REPLACE INTO meta(k,v) VALUES('needs_human_day',?1)").bind(day).run();
-  const cutoff = Date.now() - 30 * 60 * 1e3;
-  const rows = (await DB.prepare("SELECT id,business,name,email,phone,status,created_at FROM claims WHERE status IN ('pending','pending-listing') AND created_at<?1 ORDER BY created_at LIMIT 60").bind(cutoff).all()).results || [];
-  if (!rows.length) return 0;
-  const claims = rows.filter(r => r.status === "pending"), adds = rows.filter(r => r.status === "pending-listing");
-  const li = r => `<li><b>${E(r.business || "-")}</b> — ${E(r.name || "")} · ${E(r.email || "")}${r.phone ? " · " + E(r.phone) : ""} <span style="color:#7A8CA0">(${new Date(r.created_at).toLocaleDateString("en-US", { timeZone: "America/New_York" })})</span></li>`;
-  const body = `<p>These couldn't be verified automatically (no code entered, no phone/email on file, or a dispute), so they need a person.</p>
-${claims.length ? `<p style="margin-top:14px"><b>Claims (${claims.length})</b> — <a href="${AUTH.SITE_URL}/admin/claims">open Claims</a></p><ul>${claims.map(li).join("")}</ul>` : ""}
-${adds.length ? `<p style="margin-top:14px"><b>New listings (${adds.length})</b> — <a href="${AUTH.SITE_URL}/admin/pending">open Pending listings</a></p><ul>${adds.map(li).join("")}</ul>` : ""}`;
-  const title = `${rows.length} waiting for a person on ${S.brand}`;
-  const list = await getNotifyEmails(DB, env, "new_claim");
-  await Promise.all(list.map(to => sendEmail(env, to, title, MAIL_INTERNAL(title, body, ""), title).catch(() => {})));
-  return rows.length;
-}
 
 async function getNotifyEmails(DB, env, kind) {
   if (DB) try {
@@ -7670,10 +7830,10 @@ const _export = {
         console.log("cron pending-email-invite batch failed: " + e.message);
       }
       if (hourly) try {
-        const n = await needsHumanDigest(env, DB);
-        if (n) console.log(`cron: needs-a-human digest sent (${n} waiting)`);
+        const n = await bvHourly(env, DB);
+        if (n.moved || n.reminded) console.log(`cron: verification — ${n.moved} ownership change(s) completed, ${n.reminded} reminder(s) sent`);
       } catch (e) {
-        console.log("cron needs-a-human digest failed: " + e.message);
+        console.log("cron verification jobs failed: " + e.message);
       }
       try {
         const KV = KVOF(env);
@@ -9939,7 +10099,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (p[0] === "admin" && p[1] === "claims" && p.length === 2 && req.method === "GET") {
         if (!await isStaff(env, req, u)) return Response.redirect(AUTH.SITE_URL + "/admin/login", 302);
         const role = await getRole(env, req, u);
-        const pending = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','auto-verified') ORDER BY created_at DESC LIMIT 100").all()).results || [];
+        const pending = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','auto-verified','transfer-pending','disputed') ORDER BY created_at DESC LIMIT 100").all()).results || [];
         const done = (await DB.prepare("SELECT * FROM claims WHERE status IN ('approved','rejected') ORDER BY decided_at DESC LIMIT 30").all()).results || [];
         return new Response(ADMINCLAIMS(pending, done, env.ADMIN_LOGIN_KEY, role), {
           headers: {
@@ -11818,6 +11978,11 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             console.log("add: phone dedup lookup failed: " + e.message);
           }
         }
+        // Phone matched a listing that's already on the site: nothing on it changes until the owner proves the phone.
+        let matchedLive = false;
+        if (cid && DB) try {
+          matchedLive = !!await DB.prepare("SELECT 1 FROM businesses WHERE ghl_id=?1").bind(cid).first();
+        } catch {}
         if (cid) {
           try {
             await ghlAddTag(env, cid, [ "pending-listing" ]);
@@ -11856,7 +12021,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           });
           console.log("add: no contact created for " + l.email + " — duplicate email; a business contact is created at publish time");
         } else if (!cid) console.log("add: no contact created and no email supplied");
-        if (cid) {
+        if (cid && !matchedLive) {
           try {
             await ghlUpdateContact(env, cid, {
               name: l.business || undefined,
@@ -11967,10 +12132,13 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         if (cid && DB) try {
           ownedElsewhere = !!await DB.prepare("SELECT 1 FROM businesses WHERE ghl_id=?1 AND claimed=1 AND lower(coalesce(owner_email,''))<>?2").bind(cid, NRM(l.email)).first();
         } catch {}
-        const addSms = !!(cid && l.phone), addEm = !!NRM(l.email);
+        // Texts only to US numbers; for an existing listing only the listing's own phone counts (an email they type
+        // proves nothing about that business).
+        const usPhone = /^1?\d{10}$/.test(String(l.phone || "").replace(/\D/g, ""));
+        const addSms = !!(cid && l.phone && usPhone), addEm = !!NRM(l.email) && !matchedLive;
         // Caps on codes sent from this form (stops it being used to text strangers): per visitor and per phone, per hour.
         const bvAllowed = (addSms || addEm) && await rateOk(env, "bvadd:" + (leadIp || "0"), 4) && (!addSms || await rateOk(env, "bvph:" + String(l.phone).replace(/\D/g, "").slice(-10), 3));
-        if (saved && !ownedElsewhere && bvAllowed) {
+        if (BV_ON(env) && saved && !ownedElsewhere && bvAllowed) {
           let rowId = null;
           try {
             const rr = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND ((?1<>'' AND ghl_id=?1) OR (?2<>'' AND email=?2)) ORDER BY id DESC LIMIT 1").bind(cid || "", NRM(l.email)).first();
@@ -11988,6 +12156,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
             smsShown: MASKPH(l.phone),
             emailTo: addEm ? NRM(l.email) : "",
             emailShown: addEm ? MASKEM(l.email) : "",
+            matchedLive: matchedLive,
             adminVars: addAdminVars
           }) : null;
           if (ref) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + ref, 302);
@@ -12103,15 +12272,90 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (!r) return R2(NOTICE(d, "Listing not found", "We couldn't find that listing.", "Search again", "/claim"), 404);
       return R2(CLAIMSTART(d, ROWOF(r), u.searchParams.get("err") || ""));
     }
+    // "Keep my listing" from the transfer_notice email. GET only shows a button (email scanners open links on their
+    // own); the POST stops the move, tags the business "dispute" and gives its account manager a task.
+    if (u.pathname === "/keep-listing") {
+      const KV = KVOF(env), t = String(u.searchParams.get("t") || "");
+      let k = null;
+      try {
+        k = KV && /^[A-Za-z0-9]{10,64}$/.test(t) ? JSON.parse(await KV.get("keep:" + t) || "null") : null;
+      } catch {}
+      const row = k && k.rowId ? await DB.prepare("SELECT id,status FROM claims WHERE id=?1").bind(k.rowId).first().catch(() => null) : null;
+      if (!k || !row || row.status !== "transfer-pending") return R2(NOTICE(d, "Nothing to do here", "This link has expired or the request was already handled. If you have a question about your listing, just reply to our email.", "Back to the directory", "/"));
+      if (req.method !== "POST") return R2(PAGE(d, {
+        title: `Keep your listing | ${S.brand}`,
+        desc: "Keep your listing.",
+        can: S.dom + "/keep-listing",
+        body: `<div class="wrap" style="padding:70px 24px;text-align:center;max-width:620px"><h1>Keep ${E(k.business)}?</h1><p style="color:${T.body};margin:14px 0 24px">Someone else verified this listing and asked to take it over. Tap below to keep it with you — your account manager will then sort it out with you both.</p><form method="POST" action="/keep-listing?t=${E(t)}"><button class="btn btn-p btn-lg">Keep my listing</button></form></div>`
+      }));
+      const kept = await DB.prepare("UPDATE claims SET status='disputed', decided_at=?1, notes=trim(coalesce(notes,'') || ?2) WHERE id=?3 AND status='transfer-pending'").bind(Date.now(), "\n[current owner asked to keep the listing]", k.rowId).run();
+      await KV.delete("keep:" + t);
+      if (!kept.meta || !kept.meta.changes) return R2(NOTICE(d, "Nothing to do here", "This request was already handled. If you have a question about your listing, just reply to our email.", "Back to the directory", "/"));
+      await ghlTask(env, k.bizId, `Ownership dispute: ${k.business}`, `${k.claimant} verified this listing by code, but the current owner asked to keep it. Speak to both, then approve or reject the claim in Admin → Claims.`, "dispute");
+      if (k.claimant) await sendTplEmail(env, DB, k.claimant, "transfer_kept", {
+        business: E(k.business)
+      }).catch(() => {});
+      return R2(NOTICE(d, "Your listing stays with you", "Thanks — nothing has changed. Your account manager will be in touch to sort it out.", "Back to the directory", "/"));
+    }
+    // "Send me a new code" from the verify_reminder email: GET shows a button, POST starts a fresh code.
+    if (u.pathname === "/verify-business/restart") {
+      const KV = KVOF(env), t = String(u.searchParams.get("t") || "");
+      const rowId = KV && /^[A-Za-z0-9]{10,64}$/.test(t) ? await KV.get("bvr:" + t) : null;
+      const row = rowId ? await DB.prepare("SELECT * FROM claims WHERE id=?1").bind(rowId).first().catch(() => null) : null;
+      if (!row || ![ "pending", "pending-listing" ].includes(row.status)) return R2(NOTICE(d, "Nothing to do here", "This link has expired or that request is already done.", "Back to the directory", "/"));
+      if (req.method !== "POST") return R2(PAGE(d, {
+        title: `Finish verifying | ${S.brand}`,
+        desc: "Finish verifying your business.",
+        can: S.dom + "/verify-business/restart",
+        body: `<div class="wrap" style="padding:70px 24px;text-align:center;max-width:620px"><h1>Finish verifying ${E(row.business || "your business")}</h1><p style="color:${T.body};margin:14px 0 24px">Tap below and we'll send a fresh 6-digit code.</p><form method="POST" action="/verify-business/restart?t=${E(t)}"><button class="btn btn-p btn-lg">Send me a new code</button></form></div>`
+      }));
+      let st = null;
+      if (BV_ON(env) && await rateOk(env, "bvrestart:" + row.id, 3)) {
+        const vars = {
+          business: E(row.business || "-"),
+          name: E(row.name || "-"),
+          email: E(row.email || "-"),
+          phone: E(row.phone || "-")
+        };
+        if (row.status === "pending") {
+          const br = await DB.prepare("SELECT * FROM businesses WHERE ghl_id=?1").bind(row.ghl_id).first().catch(() => null);
+          if (br) {
+            const b = ROWOF(br);
+            st = bvClaimState(b, row.ghl_id, row.email, row.name || "", claimTier(b, row.email).tier, row.id, vars);
+          }
+        } else {
+          const owned = row.ghl_id ? await DB.prepare("SELECT 1 FROM businesses WHERE ghl_id=?1 AND claimed=1 AND lower(coalesce(owner_email,''))<>?2").bind(row.ghl_id, NRM(row.email)).first().catch(() => null) : null;
+          const live = row.ghl_id ? !!await DB.prepare("SELECT 1 FROM businesses WHERE ghl_id=?1").bind(row.ghl_id).first().catch(() => null) : false;
+          if (!owned) st = {
+            kind: "add",
+            rowId: row.id,
+            cid: row.ghl_id || "",
+            ownerCid: row.ghl_id || "",
+            business: row.business || "your business",
+            email: NRM(row.email),
+            name: row.name || "",
+            smsCid: row.ghl_id && row.phone ? row.ghl_id : "",
+            smsShown: MASKPH(row.phone),
+            emailTo: live ? "" : NRM(row.email),
+            emailShown: live ? "" : MASKEM(row.email),
+            adminVars: vars
+          };
+        }
+      }
+      const ref = st ? await bvStart(env, DB, st) : null;
+      if (ref) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + ref, 302);
+      return R2(NOTICE(d, "We'll check it for you", "We couldn't send a new code just now, so your account manager will check it and email you.", "Back to the directory", "/"));
+    }
     if (u.pathname === "/verify-business" && req.method === "GET") {
       const ref = u.searchParams.get("ref") || "", st = await bvGet(env, ref);
-      if (!st || st.done) return R2(NOTICE(d, "That code has expired", "Verification codes last 15 minutes. Your request is saved with our team, and we'll be in touch — or start again for a new code.", "Back to the directory", "/"));
+      if (!st || st.done) return R2(NOTICE(d, "That code has expired", "Verification codes last 15 minutes. We'll email you a link to get a fresh one — or simply start again.", "Back to the directory", "/"));
       return R2(BIZVERIFY(d, ref, st, "", u.searchParams.has("resent")));
     }
     if (u.pathname === "/verify-business/send" && req.method === "POST") {
       const f = await req.formData(), ref = String(f.get("ref") || ""), st = await bvGet(env, ref);
       if (!st || st.done) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + encodeURIComponent(ref), 302);
       if ((st.sends || 0) >= BV_MAX_SENDS) return R2(BIZVERIFY(d, ref, st, "That's the most codes we can send for now. Use the last code you got, or send it to our team to check."));
+      if (st.sentAt && Date.now() - st.sentAt < 60 * 1e3) return R2(BIZVERIFY(d, ref, st, "A code is already on its way — give it a minute before asking for another."));
       const ok = await bvSend(env, DB, st, String(f.get("ch")) === "email" ? "email" : "sms");
       await bvPut(env, ref, st);
       if (!ok) return R2(BIZVERIFY(d, ref, st, "We couldn't send that one. Try the other option, or send it to our team to check."));
@@ -12131,6 +12375,15 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (!st || st.done) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + encodeURIComponent(ref), 302);
       const code = String(f.get("code") || "").replace(/\D/g, "");
       const fresh = st.codeAt && Date.now() - st.codeAt < BV_CODE_MS;
+      // Every guess is counted in D1 first (atomic, so parallel guesses can't share one count), plus a per-visitor cap.
+      const ipKey = "bvtry:" + (req.headers.get("cf-connecting-ip") || "0");
+      const counted = st.rowId ? await DB.prepare("UPDATE claims SET bv_tries=coalesce(bv_tries,0)+1 WHERE id=?1 AND coalesce(bv_tries,0)<?2").bind(st.rowId, BV_MAX_TRIES).run().catch(() => null) : null;
+      if (!counted || !counted.meta || !counted.meta.changes || !await rateOk(env, ipKey, 30)) {
+        await bvToTeam(env, DB, st, "too many wrong codes");
+        st.done = true;
+        await bvPut(env, ref, st);
+        return R2(NOTICE(d, "Sent to our team", "That code didn't match a few times, so we've passed your request to our local team. They'll email you once it's checked.", "Back to the directory", "/"));
+      }
       if (!fresh || code !== st.code) {
         st.tries = (st.tries || 0) + 1;
         if (st.tries >= BV_MAX_TRIES) {
@@ -12144,14 +12397,46 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       }
       st.done = true;
       await bvPut(env, ref, st);
+      // One winner per request even on a double tap: the claims row moves out of its waiting status atomically.
+      const from = st.kind === "claim" ? "pending" : "pending-listing";
+      const lock = st.rowId ? await DB.prepare("UPDATE claims SET status=?3, decided_at=?4 WHERE id=?1 AND status=?2").bind(st.rowId, from, "verifying-" + from, Date.now()).run().catch(() => null) : null;
+      if (!lock || !lock.meta || !lock.meta.changes) return R2(NOTICE(d, "Already verified", "This request was already completed. Check your email, or sign in to see your listing.", "Sign in", "/login"));
       const how = "verified by " + (st.ch === "sms" ? "text code to " + st.smsShown : "email code to " + st.emailShown);
       let liveId = "";
+      // Anything below that throws puts the row back in its queue and tells the team, instead of a 500.
+      const backToQueue = async e => {
+        console.log("verify-business finish failed: " + (e && e.message));
+        await DB.prepare("UPDATE claims SET status=?1 WHERE id=?2 AND status=?3").bind(from, st.rowId, "verifying-" + from).run().catch(() => {});
+        await bvToTeam(env, DB, st, "verified, but finishing failed");
+        return R2(NOTICE(d, "Verified — one more step on our side", "You're verified, but we hit a problem finishing up. Our team has been told and will email you shortly.", "Back to the directory", "/"));
+      };
+      if (st.kind === "claim" && st.prevOwner) {
+        try {
+          await bvStartTransfer(env, DB, st, how);
+        } catch (e) {
+          return backToQueue(e);
+        }
+        ctx.waitUntil(notifyAdmins(env, DB, "new_claim", "admin_new_claim", {
+          ...st.adminVars || {},
+          reason: ((st.adminVars || {}).reason || "") + E(" — " + how + ". The current owner has 72 hours to keep it; otherwise it moves automatically. No action needed.")
+        }, AUTH.SITE_URL + "/admin/claims").catch(() => {}));
+        return R2(NOTICE(d, "Verified — almost there", `This listing already has an owner, so we've let them know. If they don't object within 72 hours, ${st.business} moves to you automatically and we'll email you.`, "Back to the directory", "/"));
+      }
       if (st.kind === "claim") {
-        await approveClaim(env, DB, st.rowId, st.bizId, st.email, how);
+        try {
+          await approveClaim(env, DB, st.rowId, st.bizId, st.email, how);
+        } catch (e) {
+          return backToQueue(e);
+        }
         liveId = st.bizId;
       } else {
-        liveId = await publishListing(env, DB, st.rowId, st.cid, st.email);
+        try {
+          liveId = await publishListing(env, DB, st.rowId, st.cid, st.email);
+        } catch (e) {
+          return backToQueue(e);
+        }
         if (!liveId) {
+          await DB.prepare("UPDATE claims SET status='pending-listing' WHERE id=?1 AND status='verifying-pending-listing'").bind(st.rowId).run().catch(() => {});
           await bvToTeam(env, DB, st, "verified, but publishing failed");
           return R2(NOTICE(d, "Verified — one more step on our side", "Your business is verified, but we hit a problem putting the page live. Our team has been told and will email you shortly.", "Back to the directory", "/"));
         }
@@ -12166,7 +12451,11 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         ...st.adminVars || {},
         business: E(st.business) + E(" — PUBLISHED AUTOMATICALLY (" + how + "). No action needed.")
       }, AUTH.SITE_URL + (st.kind === "claim" ? "/admin/claims" : "/admin/pending")).catch(() => {}));
-      const cookie = st.email ? await startSession(env, st.email, await resolveDisplayName(env, st.email, st.name)) : null;
+      // Sign them in only when the code went to that very email; a phone code proves the business, not the inbox —
+      // they sign in from the link in the approval email instead.
+      const emailProven = st.ch === "email" && st.email && NRM(st.emailTo) === NRM(st.email);
+      if (!emailProven) return R2(NOTICE(d, st.kind === "claim" ? "You're verified — it's yours" : "You're verified — you're live", `We've emailed ${MASKEM(st.email) || "you"} a sign-in link. Open it to manage your listing.`, "Back to the directory", "/"));
+      const cookie = await startSession(env, st.email, await resolveDisplayName(env, st.email, st.name));
       const hdrs = new Headers({
         Location: cookie ? "/account?verified=1" : "/login",
         "Cache-Control": "no-store"
@@ -12198,8 +12487,9 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const ip = req.headers.get("cf-connecting-ip") || "0";
       if (!await rateOk(env, "claim:" + ip, AUTH.CLAIM_RATE_PER_HOUR) || !await rateOk(env, "claimb:" + id, AUTH.CLAIM_RATE_PER_HOUR)) return R2(NOTICE(d, "Too many attempts", "Please wait an hour before trying again.", "Back", "/claim"), 429);
       try {
-        const dup = await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND lower(email)=?2 AND status IN ('pending','approved','auto-verified') AND created_at>?3 LIMIT 1").bind(id, email, Date.now() - 864e5).first();
-        if (dup) return R2(NOTICE(d, "We already have your claim", `Your claim for ${b.name} is with our team. There's no need to send it again — we'll email ${email} as soon as it's reviewed.`, "Back to the listing", `/${b.cs}/${b.slug}`));
+        const dup = await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND lower(email)=?2 AND status IN ('pending','approved','auto-verified','transfer-pending') AND created_at>?3 LIMIT 1").bind(id, email, Date.now() - 864e5).first();
+        const open = dup ? null : await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND lower(email)=?2 AND status IN ('transfer-pending','disputed') LIMIT 1").bind(id, email).first();
+        if (dup || open) return R2(NOTICE(d, "We already have your claim", `Your claim for ${b.name} is with our team. There's no need to send it again — we'll email ${email} as soon as it's reviewed.`, "Back to the listing", `/${b.cs}/${b.slug}`));
       } catch {}
       const {tier: tier, reason: reason} = claimTier(b, email);
       const already = !!b.claimed;
@@ -12257,29 +12547,17 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         tier: E(tier),
         reason: E(reason)
       };
-      // Instant route: a code to the phone or email already on the listing proves it's theirs (not for a listing
-      // someone already owns — those disputes stay with the team).
-      const smsOk = !!(b.ph && id), emOk = !!(b.email && !junkEmail(b.email));
-      if (!already && (smsOk || emOk)) {
+      // Instant route: a code to the phone or email on the listing (or to the claimant's own inbox on the business's
+      // website domain) proves it's theirs. On a listing someone else already owns, the current owner then gets 72
+      // hours to object before it moves (bvStartTransfer).
+      if (BV_ON(env)) {
         let rowId = null;
         try {
           const rr = await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND lower(email)=?2 AND status='pending' ORDER BY id DESC LIMIT 1").bind(id, email).first();
           rowId = rr && rr.id;
         } catch {}
-        const ref = await bvStart(env, DB, {
-          kind: "claim",
-          rowId: rowId,
-          bizId: id,
-          business: b.name,
-          email: email,
-          name: name,
-          smsCid: smsOk ? id : "",
-          smsShown: MASKPH(b.ph),
-          emailTo: emOk ? NRM(b.email) : "",
-          emailShown: emOk ? MASKEM(b.email) : "",
-          prefer: tier === "B" ? "email" : "sms",
-          adminVars: adminVars
-        });
+        const st = rowId ? bvClaimState(b, id, email, name, tier, rowId, adminVars) : null;
+        const ref = st ? await bvStart(env, DB, st) : null;
         if (ref) return Response.redirect(AUTH.SITE_URL + "/verify-business?ref=" + ref, 302);
       }
       const link = await issueLink(env, email, "claim-confirm", {
