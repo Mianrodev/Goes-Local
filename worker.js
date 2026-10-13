@@ -2193,6 +2193,26 @@ async function syncStep(env, DB, maxPages) {
         const tl = (c.tags || []).map(t => String(t).trim().toLowerCase());
         if (tl.includes("seoinbound") && tl.includes("emailreplied") && await ghlRemoveTag(env, c.id, [ "seoinbound" ])) seoFix++;
       }
+      // Leftover workflow tags (25 per page): a claimed listing is live, so drop "pending-listing"; "claim-request"
+      // goes from a claimed business, or from a claimant's own person contact (approval only cleans the business),
+      // once no claim of theirs is still waiting in the claims queue. Hand-tagged "claimed" is covered too.
+      let tagFix = 0;
+      for (const c of page.contacts) {
+        if (tagFix >= 25) break;
+        const tl = (c.tags || []).map(t => String(t).trim().toLowerCase());
+        const drop = [];
+        if (tl.includes("claimed") && tl.includes(S.tag) && tl.includes("pending-listing")) drop.push("pending-listing");
+        const isBiz = tl.includes("claimed") || tl.includes(S.tag);
+        const isPersonTag = !isBiz && (tl.includes("consumer") || tl.includes("owner-account")) && c.email;
+        if (tl.includes("claim-request") && (tl.includes("claimed") || isPersonTag)) {
+          let waiting = true;
+          try {
+            waiting = !!(tl.includes("claimed") ? await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND status='pending' LIMIT 1").bind(c.id).first() : await DB.prepare("SELECT id FROM claims WHERE lower(email)=?1 AND status='pending' LIMIT 1").bind(String(c.email).trim().toLowerCase()).first());
+          } catch {}
+          if (!waiting) drop.push("claim-request");
+        }
+        if (drop.length && await ghlRemoveTag(env, c.id, drop)) tagFix++;
+      }
       let pageList = page.contacts.filter(c => (c.tags || []).some(t => String(t).toLowerCase() === S.tag) && !isPerson(c)).map(c => norm(c, m));
       if (dupHidden.size) {
         const unhide = [];
@@ -7189,7 +7209,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.43-shared";
+const BUILD = "v16.44-shared";
 
 const APP_COOKIE = "gl_app";
 
