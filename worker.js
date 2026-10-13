@@ -2148,9 +2148,13 @@ async function syncStep(env, DB, maxPages) {
     // A contact the team has approved as a listing (tagged "claimed" by the Listing Verification webhook) is a
     // business even if it started life as someone's login contact ("consumer"/"owner-account") — otherwise an
     // approved listing appears for a few minutes and is then dropped by the next two sync passes.
+    // "pending-listing" only hides a contact the add-a-business form itself created (a brand-new submission waiting
+    // for approval). An existing listing whose owner sends the form again stays live while that submission waits.
     const isPerson = c => {
       const tags = (c.tags || []).map(t => String(t).trim().toLowerCase());
-      return !tags.includes("claimed") && tags.some(t => /^(consumer|owner-account|pending-listing)$/.test(t));
+      if (tags.includes("claimed")) return false;
+      if (tags.some(t => t === "consumer" || t === "owner-account")) return true;
+      return tags.includes("pending-listing") && /add-a-business/i.test(String(c.source || ""));
     };
     const existingSlugs = new Map;
     const priorByGhlId = new Map;
@@ -7209,7 +7213,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.44-shared";
+const BUILD = "v16.45-shared";
 
 const APP_COOKIE = "gl_app";
 
