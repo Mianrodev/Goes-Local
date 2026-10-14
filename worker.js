@@ -1429,6 +1429,9 @@ async function migrate(DB, env) {
     await DB.prepare("ALTER TABLE claims ADD COLUMN bv_tries INTEGER DEFAULT 0").run();
   } catch {}
   try {
+    await DB.prepare("ALTER TABLE claims ADD COLUMN extra TEXT").run();
+  } catch {}
+  try {
     await DB.prepare("ALTER TABLE claims ADD COLUMN referral TEXT DEFAULT ''").run();
   } catch {}
   try {
@@ -4102,6 +4105,24 @@ async function publishListing(env, DB, rowId, cid, email) {
       if (res.ok) {
         cid = res.id;
         pubC = res.contact;
+        let x = {};
+        try {
+          x = JSON.parse(row.extra || "{}") || {};
+        } catch {}
+        try {
+          await ghlUpdateContact(env, cid, {
+            descr: row.notes || undefined,
+            website: x.website || undefined,
+            services: x.services || undefined,
+            hood: x.hood || undefined,
+            yrs: x.yrs || undefined,
+            ownerName: row.name || undefined,
+            ownerPhone: x.ownerPhone || undefined
+          });
+          pubC = await ghlGetContact(env, cid) || pubC;
+        } catch (e) {
+          console.log("publish: copying submitted details failed: " + e.message);
+        }
         if (cid && row.notes) try {
           await fetch(`${API}/contacts/${cid}/notes`, {
             method: "POST",
@@ -6557,7 +6578,7 @@ const ADD = (d, x) => {
 <ul class="lpx-li"><li><span>✓</span><div><b>Free forever</b> — no credit card, no contract</div></li><li><span>✓</span><div><b>Your own Google-friendly page</b> in your ${E(AREA.lo)}</div></li><li><span>✓</span><div><b>Customer enquiries</b> straight to your inbox</div></li></ul>
 <div class="lpx-proof">${proof.length ? `<span class="lpx-av">${proof.map(b => `<span>${PHOTO(b)}</span>`).join("")}</span>` : ""}<span>Join <b>${NUM(d.count || 0)}</b> ${E(S.city)} businesses</span></div></div>
 <div class="lpx-card" id="start"><h2>Add your business — free</h2><div class="lpx-sub" id="lpxStepTxt">Step 1 of 2 · takes about 3 minutes</div><div class="lpx-pg"><i class="on"></i><i id="lpxPg2"></i></div>
-<script>document.addEventListener("DOMContentLoaded",function(){var e=new URLSearchParams(location.search).get("email");if(e&&/^[^@\s]+@[^@\s]+$/.test(e)){["oe","be"].forEach(function(i){var x=document.getElementById(i);if(x&&!x.value)x.value=e})}})</script><form method="POST" action="/api/lead" id="addBizForm"><input type="hidden" name="type" value="add">\n<input type="hidden" name="utm_source" id="lfSrc"><input type="hidden" name="utm_medium" id="lfMed">\n<input type="hidden" name="utm_campaign" id="lfCam"><input type="hidden" name="landing_page" id="lfLand">\n<input type="hidden" name="referrer_domain" id="lfRef">\n<script>(function(){try{\nvar m=document.cookie.match(/(?:^|; )gl_attr=([^;]*)/);\nif(!m)return;var a=JSON.parse(decodeURIComponent(m[1]));\nvar set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||""};\nset("lfSrc",a.source);set("lfMed",a.medium);set("lfCam",a.campaign);set("lfLand",a.landing);set("lfRef",a.source)\n}catch(e){}})();<\/script>
+<script>document.addEventListener("DOMContentLoaded",function(){var e=new URLSearchParams(location.search).get("email");if(e&&/^[^@ ]+@[^@ ]+$/.test(e)){["oe","be"].forEach(function(i){var x=document.getElementById(i);if(x&&!x.value)x.value=e})}})</script><form method="POST" action="/api/lead" id="addBizForm"><input type="hidden" name="type" value="add">\n<input type="hidden" name="utm_source" id="lfSrc"><input type="hidden" name="utm_medium" id="lfMed">\n<input type="hidden" name="utm_campaign" id="lfCam"><input type="hidden" name="landing_page" id="lfLand">\n<input type="hidden" name="referrer_domain" id="lfRef">\n<script>(function(){try{\nvar m=document.cookie.match(/(?:^|; )gl_attr=([^;]*)/);\nif(!m)return;var a=JSON.parse(decodeURIComponent(m[1]));\nvar set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||""};\nset("lfSrc",a.source);set("lfMed",a.medium);set("lfCam",a.campaign);set("lfLand",a.landing);set("lfRef",a.source)\n}catch(e){}})();<\/script>
 <div id="lpxS1">
 <div class="fld2"><label for="bn">Business name *</label><input id="bn" name="business" required placeholder="${AREA.byCity ? "e.g. Main Street Plumbing" : "e.g. Blue Palm Plumbing"}"></div>
 <div class="fld2"><label for="bc">What do you do?</label><select id="bc" name="category">
@@ -7858,7 +7879,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.49-shared";
+const BUILD = "v16.50-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -12266,6 +12287,14 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
               console.log(e3.message);
             }
           }
+        }
+        // Details the claims row has no column for. When the contact can't be made on submit (the email is already in
+        // GHL, e.g. an owner adding another location), publishListing creates it later and copies these onto it.
+        if (DB && saved) try {
+          const extra = JSON.stringify({ website: l.website || "", services: l.services || "", hood: l.hood || "", yrs: l.yrs || "", ownerPhone: l.owner_phone || "" });
+          await DB.prepare("UPDATE claims SET extra=?1 WHERE id=(SELECT id FROM claims WHERE status='pending-listing' AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3)) ORDER BY id DESC LIMIT 1)").bind(extra, cid || "", NRM(l.email)).run();
+        } catch (e) {
+          console.log("add: extra details not saved (run /admin/migrate): " + e.message);
         }
         if (!saved && !cid) return R2(NOTICE(d, "Something went wrong", "We couldn't save your listing just now. Please try again in a minute — if it keeps happening, email us.", "Try again", "/add"), 500);
         const channelTag = leadChannelTag(utmSource || referrerDomain, utmMedium);

@@ -254,5 +254,15 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   // T21 gmail users never get team access
   sql("UPDATE businesses SET owner_email='someone@gmail.com' WHERE ghl_id='QA9'");
   sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA9'");
+  // T22 "Add another location" fills the email in, also for emails containing the letter s (live bug in v16.49)
+  const ad = await (await F(BASE + "/add?email=sales%40mrsclean.com")).text();
+  const rx = (ad.match(/get\("email"\);if\(e&&(\/.*?\/)\.test\(e\)/) || [])[1] || "";
+  let fills = false; try { fills = new Function("return " + rx)().test("sales@mrsclean.com"); } catch {}
+  ok(fills, "T22 add form email fill-in accepts an email with an s in it", rx);
+  // T23 extra details saved with a new listing request (copied onto the listing when it is created at publish time)
+  await F(BASE + "/api/lead", { method: "POST", redirect: "manual", body: new URLSearchParams({ type: "add", business: "QA Extra Co", category: "Other", email: "extra@qaextra.com", owner_name: "Ex Tra", address: "1 Extra Rd", zip: "33602", website: "qaextra.com", services: "Thing one, Thing two", hood: "Downtown", yrs: "2001", details: "We do extra things." }) });
+  const ex = sql("SELECT extra FROM claims WHERE email='extra@qaextra.com' ORDER BY id DESC LIMIT 1");
+  const exj = (() => { try { return JSON.parse(ex[0].extra); } catch { return {}; } })();
+  ok(exj.services === "Thing one, Thing two" && exj.website === "qaextra.com" && exj.hood === "Downtown" && exj.yrs === "2001", "T23 website, services, area and year are kept with the request", JSON.stringify(ex));
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });
