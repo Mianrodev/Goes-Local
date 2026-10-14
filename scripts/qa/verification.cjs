@@ -102,17 +102,18 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   r = await post("/verify-business", { ref, code: lastCode() });
   ok(/You're verified/.test(txt(r.html)) && !/almost there/.test(txt(r.html)), "T5 current owner re-verifying is approved directly (no dispute)", r.status);
 
-  // T6 five wrong codes → team, row stays pending
+  // T6 five wrong codes → the attempt stops quietly (no team), row stays pending until it expires
   r = await claim("QA4", "t6@example.com", "10.0.0.7");
   ref = refOf(r.loc);
   pg = await get("/verify-business?ref=" + ref);
   ok(!/Email the code/.test(txt(pg.html)), "T6 no email option when listing has no email");
   for (let i = 0; i < 4; i++) await post("/verify-business", { ref, code: "111111" });
   r = await post("/verify-business", { ref, code: "111111" });
-  ok(/Sent to our team/.test(txt(r.html)), "T6 5th wrong code → team");
+  ok(/start again/i.test(txt(r.html)) && !/our team/.test(txt(r.html)), "T6 5th wrong code → attempt stops, owner can start again (nobody alerted)");
+  ok(!/to-team/.test(sql("SELECT notes FROM claims WHERE email='t6@example.com'")[0].notes), "T6 lockout is not handed to anyone");
   r = await post("/verify-business", { ref, code: lastCode() });
   ok(!/account/.test(r.loc), "T6 right code after lockout does nothing", r.loc);
-  ok(sql("SELECT status FROM claims WHERE email='t6@example.com'")[0].status === "pending", "T6 row stays pending for the team");
+  ok(sql("SELECT status FROM claims WHERE email='t6@example.com'")[0].status === "pending", "T6 row stays pending (closes itself after 7 days)");
 
   // T7 resend limit (5 sends per request)
   r = await claim("QA7", "t7@example.com", "10.0.0.8");
@@ -291,29 +292,27 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   const ex27 = sql("SELECT business, extra FROM claims WHERE email='multi@qamulti.com' ORDER BY id");
   const ofb = nm => { try { return JSON.parse((ex27.find(x => x.business === nm) || {}).extra || "{}"); } catch { return {}; } };
   ok(ofb("QA Loc One").website === "loc-one.com" && ofb("QA Loc Two").website !== "loc-one.com", "T27 resubmitted location keeps its own details", JSON.stringify(ex27));
-  // T28–T32 sales work in GHL: duplicates close, waiting requests become one GHL task, the rep's tag approves/rejects
-  const kvPut = (k, v) => execSync(`${W} kv key put --binding SESSIONS --env tampa --local --persist-to ${SP}/wstate ${JSON.stringify(k)} ${JSON.stringify(v)}`, { stdio: "ignore" });
+  // T28–T33 no people: duplicates close, never-coded requests get an invite, no-channel ones reach the dev team, old ones expire
   const hourlyRun = async () => { sql("DELETE FROM meta WHERE k='cron_hourly_at'"); await get("/cdn-cgi/handler/scheduled?cron=*/5+*+*+*+*"); };
   const ago = Date.now() - 2 * 3600e3;
   sql("UPDATE businesses SET claimed=1, owner_email='dup@qadup.com' WHERE ghl_id='QA2'");
   sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA2','QA Two Roofing','Dup','dup@qadup.com','','pending-listing','already mine',${ago})`);
-  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA7','QA Seven Movers','Ann','ann@qaann.com','8135550177','pending','no code',${ago})`);
-  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA7','QA Seven Movers','Ann','ann@qaann.com','8135550177','pending','no code again',${ago + 1000})`);
-  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA9','QA Nine Florist','Spam','spam@qaspam.com','','pending-listing','[code-sent]\n[to-team: never entered the code]',${ago})`);
+  sql("UPDATE businesses SET claimed=0, owner_email=NULL WHERE ghl_id='QA7'");
+  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA7','QA Seven Movers','Ann','ann@qaann.com','8135550177','pending','no code yet',${ago})`);
+  sql("UPDATE businesses SET ph='', email='', web='' WHERE ghl_id='QA5'");
+  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA5','QA Five','Nochan','nochan@qanochan.com','','pending','no channel',${ago})`);
   sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA4','QA Four Pools','Fresh','fresh@qafresh.com','','pending','just now',${Date.now()})`);
+  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at,decided_at) VALUES('QA9','QA Nine Florist','Old','old@qaold.com','','pending-listing','[code-sent]',${Date.now() - 9 * 864e5},${Date.now() - 8 * 864e5})`);
   await hourlyRun();
-  await until(() => sql("SELECT status FROM claims WHERE email='dup@qadup.com'")[0].status === "listed", 120000);
+  await until(() => sql("SELECT status FROM claims WHERE email='old@qaold.com'")[0].status === "expired" && sql("SELECT status FROM claims WHERE email='dup@qadup.com'")[0].status === "listed", 120000);
   ok(sql("SELECT status FROM claims WHERE email='dup@qadup.com'")[0].status === "listed", "T28 duplicate request for a business the person already owns closes by itself");
-  await until(() => sql("SELECT count(*) n FROM claims WHERE email='ann@qaann.com' AND notes LIKE '%[sales-task: QA7]%'")[0].n === 2, 120000);
-  ok(sql("SELECT count(*) n FROM claims WHERE email='ann@qaann.com' AND notes LIKE '%[sales-task: QA7]%'")[0].n === 2, "T29 both waiting requests for one business are tied to one GHL task");
-  ok(/\[sales-task: QA9\]/.test(sql("SELECT notes FROM claims WHERE email='spam@qaspam.com'")[0].notes), "T29 a request handed to the team gets a GHL task");
-  ok(!/sales-task/.test(sql("SELECT notes FROM claims WHERE email='fresh@qafresh.com'")[0].notes || ""), "T30 a brand-new request isn't handed to sales before it had a chance to verify");
-  kvPut("testtags:QA7", JSON.stringify(["approve-request"]));
-  kvPut("testtags:QA9", JSON.stringify(["reject-request"]));
+  await until(() => /\[invited\]/.test(sql("SELECT notes FROM claims WHERE email='ann@qaann.com'")[0].notes), 60000);
+  ok(/\[invited\]/.test(sql("SELECT notes FROM claims WHERE email='ann@qaann.com'")[0].notes), "T29 a request that never got a code is invited to verify automatically");
+  ok(/\[dev: no phone or email/.test(sql("SELECT notes FROM claims WHERE email='nochan@qanochan.com'")[0].notes), "T30 a claim with no way to send a code goes to the dev team");
+  ok(!/invited|dev:/.test(sql("SELECT notes FROM claims WHERE email='fresh@qafresh.com'")[0].notes || ""), "T31 a brand-new request is left alone for 30 minutes");
+  ok(sql("SELECT status FROM claims WHERE email='old@qaold.com'")[0].status === "expired", "T32 a request never verified within 7 days closes by itself");
   await hourlyRun();
-  await until(() => sql("SELECT status FROM claims WHERE email='spam@qaspam.com'")[0].status === "rejected", 120000);
-  const st31 = sql("SELECT status FROM claims WHERE email='ann@qaann.com' ORDER BY id").map(x => x.status);
-  ok(st31.includes("approved"), "T31 the rep's approve-request tag approves the claim", JSON.stringify(st31));
-  ok(sql("SELECT status FROM claims WHERE email='spam@qaspam.com'")[0].status === "rejected", "T32 the rep's reject-request tag rejects the request");
+  await sleep(4000);
+  ok((sql("SELECT notes FROM claims WHERE email='ann@qaann.com'")[0].notes.match(/\[invited\]/g) || []).length === 1, "T33 the invite goes out only once");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });

@@ -3780,19 +3780,26 @@ async function bvToTeam(env, DB, st, why) {
   if (st.toTeam) return;
   st.toTeam = why;
   if (st.rowId) await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[to-team: " + why + "]", st.rowId).run().catch(() => {});
-  try {
-    if (st.kind === "claim") await notifyAdmins(env, DB, "new_claim", "admin_new_claim", {
-      ...st.adminVars || {},
-      reason: ((st.adminVars || {}).reason || "") + E(" — not verified by code: " + why)
-    }, AUTH.SITE_URL + "/admin/claims"); else await notifyAdmins(env, DB, "new_listing", "admin_new_listing", st.adminVars || {}, AUTH.SITE_URL + "/admin/pending");
-  } catch (e) {
-    console.log("bvToTeam notify failed: " + e.message);
-  }
+  await devAlert(env, DB, {
+    business: st.business,
+    name: st.name,
+    email: st.email,
+    status: st.kind === "claim" ? "pending" : "pending-listing"
+  }, why, st.kind === "claim" ? "A claim the website couldn't finish on its own. Approve or reject it in Admin → Claims, or pass it to a sales rep." : "A new listing the website couldn't finish on its own. Publish or reject it in Admin → Pending listings, or pass it to a sales rep.");
   if (st.kind === "add" && st.email) try {
     await sendTplEmail(env, DB, st.email, "listing_received", {
       business: E(st.business || "your business")
     }, "", undefined, st.ownerCid);
   } catch {}
+}
+
+// Too many wrong codes: this attempt stops (could be someone guessing). Nobody is alerted; the owner can start again,
+// and an untouched request closes itself after 7 days.
+async function bvLocked(env, DB, d, ref, st) {
+  st.done = true;
+  await bvPut(env, ref, st);
+  if (st.rowId) await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[locked: too many wrong codes]", st.rowId).run().catch(() => {});
+  return NOTICE(d, "Let's start again", "That code didn't match a few times, so we've stopped this attempt to keep the listing safe. You can start again any time — we'll send a fresh code.", "Start again", st.kind === "add" ? "/add" : "/claim");
 }
 
 // Off switch: set CITY_BV_OFF = 1 in a city's dashboard Variables and claims / new listings go back to the
@@ -3893,25 +3900,13 @@ async function bvHourly(env, DB) {
   } catch (e) {
     console.log("verifying reset failed: " + e.message);
   }
-  // Still not verified a day after the reminder: hand it to the team once (per item, no daily digest).
+  // Never verified 7 days after the last code or invite: the request closes by itself (no hand-off, no alert).
+  // The reminder in between gives them one more nudge; they can always start again. Dev-team cases are left alone.
   try {
-    const late = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[code-sent]%' AND notes NOT LIKE '%[to-team%' AND coalesce(decided_at,created_at)<?1 LIMIT 10").bind(Date.now() - 26 * 3600 * 1e3).all()).results || [];
-    for (const r of late) await bvToTeam(env, DB, {
-      kind: r.status === "pending" ? "claim" : "add",
-      rowId: r.id,
-      business: r.business,
-      email: NRM(r.email),
-      ownerCid: r.ghl_id || undefined,
-      adminVars: {
-        business: E(r.business || "-"),
-        name: E(r.name || "-"),
-        email: E(r.email || "-"),
-        phone: E(r.phone || "-"),
-        reason: E("started but never entered the code")
-      }
-    }, "never entered the code");
+    const old = await DB.prepare("UPDATE claims SET status='expired', notes=trim(coalesce(notes,'') || ?1) WHERE status IN ('pending','pending-listing') AND (notes LIKE '%[code-sent]%' OR notes LIKE '%[invited]%') AND notes NOT LIKE '%[to-team%' AND notes NOT LIKE '%[dev:%' AND decided_at IS NOT NULL AND decided_at<?2").bind("\n[closed: never verified within 7 days]", Date.now() - 7 * 864e5).run();
+    out.expired = old.meta && old.meta.changes || 0;
   } catch (e) {
-    console.log("late hand-off failed: " + e.message);
+    console.log("expiry failed: " + e.message);
   }
   if (!BV_ON(env)) return out;
   const KV = KVOF(env);
@@ -3934,108 +3929,68 @@ async function bvHourly(env, DB) {
   return out;
 }
 
-// Sales work only inside GHL (14 Oct). Every request that needs a person becomes a GHL task on the contact, and the
-// rep answers with a tag: approve-request or reject-request. This runs hourly and does the rest. It also closes
-// duplicate requests for a business that is already live and owned by the same person.
-const SALES_OK = "approve-request", SALES_NO = "reject-request", SALES_WAIT = "needs-review";
-async function salesHourly(env, DB) {
-  const out = { closed: 0, tasks: 0, approved: 0, rejected: 0 };
+// Everything without people (Eric, 14 Oct: "remove the sales rep from this process … everything automated"). Hourly:
+// closes requests that are already done or can't go anywhere, invites everyone else to verify with a code, and only
+// the true edge cases reach the dev team (needs_dev), who decide whether a person should step in.
+async function autoHourly(env, DB) {
+  const out = { closed: 0, invited: 0, dev: 0 };
   const now = Date.now();
-  // 1. Duplicates: the same person already owns this business on the site.
+  const close = async (r, status, why) => {
+    const ch = await DB.prepare("UPDATE claims SET status=?1, decided_at=?2, notes=trim(coalesce(notes,'') || ?3) WHERE id=?4 AND status=?5").bind(status, now, "\n[closed: " + why + "]", r.id, r.status).run();
+    if (ch.meta && ch.meta.changes) out.closed++;
+  };
+  // 1. The same person already owns this business on the site.
   try {
     const dup = (await DB.prepare("SELECT c.id,c.status FROM claims c JOIN businesses b ON b.ghl_id=c.ghl_id WHERE c.status IN ('pending','pending-listing') AND c.ghl_id<>'' AND b.claimed=1 AND lower(coalesce(b.owner_email,''))=lower(c.email) LIMIT 50").all()).results || [];
-    for (const r of dup) {
-      await DB.prepare("UPDATE claims SET status=?1, decided_at=?2, notes=trim(coalesce(notes,'') || ?3) WHERE id=?4 AND status=?5").bind(r.status === "pending" ? "approved" : "listed", now, "\n[closed: already live and owned by this person]", r.id, r.status).run();
-      out.closed++;
-    }
+    for (const r of dup) await close(r, r.status === "pending" ? "approved" : "listed", "already live and owned by this person");
   } catch (e) {
-    console.log("sales: duplicate close failed: " + e.message);
+    console.log("auto: duplicate close failed: " + e.message);
   }
-  // 2. New hand-offs: a GHL task for the rep (once per request).
+  // 2. Requests that never got a code (form fallbacks, off switch, rate limits): invite them once, after 30 minutes.
   try {
-    const need = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND created_at>?1 AND coalesce(notes,'') NOT LIKE '%[sales-task%' AND coalesce(notes,'') NOT LIKE '%[held%' AND (coalesce(notes,'') LIKE '%[to-team%' OR (coalesce(notes,'') NOT LIKE '%[code-sent]%' AND coalesce(notes,'') NOT LIKE '%[invited]%' AND created_at<?2)) ORDER BY id LIMIT 15").bind(now - 14 * 864e5, now - 30 * 60 * 1e3).all()).results || [];
-    const tasked = new Set();
-    for (const r of need) try {
-      const claim = r.status === "pending";
-      let cid = r.ghl_id || "";
-      if (!cid && r.email) cid = await ghlFindOrCreateContact(env, NRM(r.email), { name: r.name || "", phone: r.phone || "" }) || "";
-      if (!cid) continue;
-      // One task per contact: a second waiting request for the same business rides on the first one's task.
-      const has = tasked.has(cid) || !!await DB.prepare("SELECT 1 FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE ?1 LIMIT 1").bind("%[sales-task: " + cid + "]%").first();
-      if (has) {
-        await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[sales-task: " + cid + "]", r.id).run();
-        continue;
-      }
-      tasked.add(cid);
-      const why = ((String(r.notes || "").match(/\[to-team: ([^\]]*)\]/) || [])[1]) || "they didn't verify with a code";
-      const who = `${r.name || "Someone"} (${[ r.email, r.phone ].filter(Boolean).join(", ") || "no contact details"})`;
-      let owner = "";
-      if (claim) try {
-        const b = await DB.prepare("SELECT claimed,owner_email FROM businesses WHERE ghl_id=?1").bind(cid).first();
-        if (b && b.claimed && b.owner_email) owner = `\n\nHeads up: this listing already has an owner (${b.owner_email}). Approving moves it to the new person.`;
-      } catch {}
-      const title = claim ? `Check claim: ${r.business}` : `Check new listing: ${r.business}`;
-      const body = (claim
-        ? `${who} wants to manage "${r.business}" on ${S.brand}, but couldn't be verified with a code (${why}).\n\nCall the business on the phone number on its listing (not the one they gave us) and confirm this person works there.`
-        : `${who} added "${r.business}" to ${S.brand}, but it couldn't be verified with a code (${why}).\n\nCheck it's a real local business (call them, look it up on Google).`) +
-        `\n\nThen, on this contact:\n• Real → add the tag ${SALES_OK}. ${claim ? "They get access" : "The listing goes live"} within an hour and get the email.\n• Not real / spam → add the tag ${SALES_NO}.\nNo need to touch anything else.` + owner;
-      await ghlTask(env, cid, title, body, SALES_WAIT);
-      await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[sales-task: " + cid + "]", r.id).run();
-      out.tasks++;
-    } catch (e) {
-      console.log("sales: task for " + r.id + " failed: " + e.message);
-    }
-  } catch (e) {
-    console.log("sales: hand-off scan failed: " + e.message);
-  }
-  // 3. Answers: the rep's tag on the contact approves or rejects every waiting request tied to it.
-  try {
-    const open = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[sales-task: %' ORDER BY id LIMIT 40").all()).results || [];
-    const seen = new Map();
-    for (const r of open) try {
-      const cid = (String(r.notes).match(/\[sales-task: ([^\]\s]+)\]/) || [])[1];
-      if (!cid) continue;
-      if (!seen.has(cid)) {
-        // Local testing only (BV_TEST_ECHO, never on a live site): the rep's tags come from KV instead of GHL.
-        const KVT = env.BV_TEST_ECHO === "1" ? KVOF(env) : null;
-        const c = KVT ? { tags: JSON.parse(await KVT.get("testtags:" + cid) || "[]") } : await ghlGetContact(env, cid);
-        seen.set(cid, c ? (c.tags || []).map(t => String(t).trim().toLowerCase()) : null);
-      }
-      const tags = seen.get(cid);
-      if (!tags) continue;
-      const claim = r.status === "pending";
-      if (tags.includes(SALES_OK)) {
-        const lock = await DB.prepare("UPDATE claims SET status=?1, decided_at=?2 WHERE id=?3 AND status=?4").bind("verifying-" + r.status, Date.now(), r.id, r.status).run();
-        if (!lock.meta || !lock.meta.changes) continue;
-        if (claim) await approveClaim(env, DB, r.id, r.ghl_id, NRM(r.email), "approved by sales in GHL"); else {
-          const live = await publishListing(env, DB, r.id, r.ghl_id, r.email);
-          if (!live) {
-            await DB.prepare("UPDATE claims SET status='pending-listing' WHERE id=?1 AND status='verifying-pending-listing'").bind(r.id).run();
-            continue;
-          }
-          await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[approved by sales in GHL]", r.id).run();
-        }
-        out.approved++;
-      } else if (tags.includes(SALES_NO)) {
-        await DB.prepare("UPDATE claims SET status='rejected', decided_at=?1, notes=trim(coalesce(notes,'') || ?2) WHERE id=?3 AND status=?4").bind(Date.now(), "\n[rejected by sales in GHL]", r.id, r.status).run();
-        try {
-          await ghlRemoveTag(env, cid, [ claim ? "claim-request" : "pending-listing" ]);
-        } catch {}
-        out.rejected++;
+    const KV = KVOF(env);
+    const list = await bvBacklog(env, DB);
+    let sent = 0;
+    for (const x of list) try {
+      const r = x.row, notes = String(r.notes || "");
+      if (r.created_at > now - 30 * 60 * 1e3 || r.created_at < now - 30 * 864e5) continue;
+      if (/\[(invited|code-sent|held|to-team|dev)/.test(notes)) continue;
+      if (x.send) {
+        if (!KV || sent >= 20) continue;
+        const t = RID(24);
+        await KV.put("bvr:" + t, String(r.id), { expirationTtl: 14 * 86400 });
+        await DB.prepare("UPDATE claims SET decided_at=?1, notes=trim(coalesce(notes,'') || ?2) WHERE id=?3").bind(now, "\n[invited]", r.id).run();
+        await sendTplEmail(env, DB, NRM(r.email), "verify_backlog", { business: E(r.business || "your business"), brand: S.brand }, AUTH.SITE_URL + "/verify-business/restart?t=" + t, undefined, r.ghl_id || undefined).catch(() => {});
+        sent++;
+        out.invited++;
+      } else if (/duplicate|already theirs|looks like a test|no longer on the site/.test(x.why)) {
+        await close(r, x.why === "already theirs" ? (r.status === "pending" ? "approved" : "listed") : "rejected", x.why);
+      } else if (/no phone or email|no US phone/.test(x.why)) {
+        await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[dev: " + x.why + "]", r.id).run();
+        await devAlert(env, DB, r, "can't be verified automatically", x.why + ". There is no phone or email we can send a code to, so the website can't finish this on its own.");
+        out.dev++;
       }
     } catch (e) {
-      console.log("sales: answer for " + r.id + " failed: " + e.message);
+      console.log("auto: row " + (x.row && x.row.id) + " failed: " + e.message);
     }
-    // Tidy the rep's tags once nothing is left waiting on that contact.
-    for (const [cid, tags] of seen) try {
-      if (!tags || !(tags.includes(SALES_OK) || tags.includes(SALES_NO))) continue;
-      const left = await DB.prepare("SELECT 1 FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE ?1 LIMIT 1").bind("%[sales-task: " + cid + "]%").first();
-      if (!left) await ghlRemoveTag(env, cid, [ SALES_OK, SALES_NO, SALES_WAIT ]);
-    } catch {}
   } catch (e) {
-    console.log("sales: answer scan failed: " + e.message);
+    console.log("auto: invite scan failed: " + e.message);
   }
   return out;
+}
+
+// One email per edge case to the dev team's list (Admin → Notifications → "Edge cases", default the dev inbox).
+async function devAlert(env, DB, r, what, details, href) {
+  try {
+    await notifyAdmins(env, DB, "needs_dev", "admin_needs_dev", {
+      business: E(r.business || "-"),
+      what: E(what),
+      who: E([ r.name, r.email, r.phone ].filter(Boolean).join(" · ") || "-"),
+      details: E(details || "")
+    }, href || AUTH.SITE_URL + (r.status === "pending" ? "/admin/claims" : "/admin/pending"));
+  } catch (e) {
+    console.log("devAlert failed: " + e.message);
+  }
 }
 
 // One-off (Eric, 13 Oct): everyone who was waiting for a call before codes existed gets one "finish in 30
@@ -5137,6 +5092,16 @@ const EMAIL_TEMPLATES = {
     body: "<p style=\"font-size:16px\"><b>{{business}}</b></p>\n<p><b>Submitted:</b> {{when}}<br>\n<b>Listing category:</b> {{bizCategory}}<br>\n<b>Listing address:</b> {{bizAddress}}<br>\n<b>Listing phone on file:</b> {{bizPhone}}</p>\n<p><b>Claimant name:</b> {{name}}<br>\n<b>Email:</b> {{email}}<br>\n<b>Phone:</b> {{phone}}<br>\n<b>Role at business:</b> {{role}}</p>\n<p><b>Owner name (if not claimant):</b> {{ownerName}}<br>\n<b>Owner email:</b> {{ownerEmail}}<br>\n<b>Owner phone:</b> {{ownerPhone}}</p>\n<p><b>Notes from claimant:</b><br>{{notes}}</p>\n<p><b>Already claimed?</b> {{alreadyText}}<br>\n<b>System note:</b> {{tier}} ({{reason}})</p>",
     btn: ""
   },
+  admin_needs_dev: {
+    label: "[Admin] Edge case for the dev team",
+    description: "Sent to the \"Edge cases\" notification list (default: the dev inbox) when the website can't finish a claim or new listing by itself — no way to send a code, the owner asked for a manual check, an ownership dispute, or a publish error.",
+    internal: true,
+    vars: [ "business", "what", "who", "details", "when" ],
+    subject: "Needs a look: {{business}} — {{what}}",
+    title: "The website couldn't finish this one by itself",
+    body: "<p style=\"font-size:16px\"><b>{{business}}</b></p>\n<p><b>What happened:</b> {{what}}<br>\n<b>Who:</b> {{who}}<br>\n<b>When:</b> {{when}}</p>\n<p>{{details}}</p>",
+    btn: ""
+  },
   admin_cancellation_request: {
     label: "[Admin] Plan cancellation requested",
     description: "Sent to the cancellation-request notification list every time an owner asks to cancel their Plus/Pro plan.",
@@ -5312,7 +5277,8 @@ const NOTIFY_KINDS = {
   cancellation: "Cancellation requests",
   ad_request: "Ad space requests",
   deletion_request: "Deletion requests",
-  enquiry: "Customer messages to businesses that haven't claimed their listing"
+  enquiry: "Customer messages to businesses that haven't claimed their listing",
+  needs_dev: "Edge cases the website couldn't finish by itself (dev team)"
 };
 const NOTIFY_TPL = {
   new_listing: "admin_new_listing",
@@ -5320,7 +5286,8 @@ const NOTIFY_TPL = {
   cancellation: "admin_cancellation_request",
   ad_request: "admin_ad_request",
   deletion_request: "admin_deletion_request",
-  enquiry: "admin_enquiry"
+  enquiry: "admin_enquiry",
+  needs_dev: "admin_needs_dev"
 };
 const DEFAULT_NOTIFY_EMAIL = "dev1@mianrosystems.com";
 
@@ -5331,6 +5298,8 @@ async function getNotifyEmails(DB, env, kind) {
   } catch (e) {
     console.log("getNotifyEmails failed: " + e.message);
   }
+  // Edge cases go to the dev team only, never to a sales list (Eric, 14 Oct).
+  if (kind === "needs_dev") return [ DEFAULT_NOTIFY_EMAIL ];
   // No list saved for this alert: use ADMIN_NOTIFY_EMAIL if it is a real address, else the company default (Eric, 29 Sep).
   const fb = String(env.ADMIN_NOTIFY_EMAIL || "").trim();
   return [ /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fb) ? fb : DEFAULT_NOTIFY_EMAIL ];
@@ -8093,10 +8062,10 @@ const _export = {
         console.log("cron pending-email-invite batch failed: " + e.message);
       }
       if (hourly) try {
-        const sh = await salesHourly(env, DB);
-        if (sh.closed || sh.tasks || sh.approved || sh.rejected) console.log(`cron: sales — ${sh.closed} duplicate(s) closed, ${sh.tasks} task(s) made, ${sh.approved} approved, ${sh.rejected} rejected in GHL`);
+        const ah = await autoHourly(env, DB);
+        if (ah.closed || ah.invited || ah.dev) console.log(`cron: requests — ${ah.closed} closed, ${ah.invited} invited to verify, ${ah.dev} sent to the dev team`);
       } catch (e) {
-        console.log("cron sales jobs failed: " + e.message);
+        console.log("cron request jobs failed: " + e.message);
       }
       if (hourly) try {
         const n = await bvHourly(env, DB);
@@ -12600,11 +12569,15 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const kept = await DB.prepare("UPDATE claims SET status='disputed', decided_at=?1, notes=trim(coalesce(notes,'') || ?2) WHERE id=?3 AND status='transfer-pending'").bind(Date.now(), "\n[current owner asked to keep the listing]", k.rowId).run();
       await KV.delete("keep:" + t);
       if (!kept.meta || !kept.meta.changes) return R2(NOTICE(d, "Nothing to do here", "This request was already handled. If you have a question about your listing, just reply to our email.", "Back to the directory", "/"));
-      await ghlTask(env, k.bizId, `Ownership dispute: ${k.business}`, `${k.claimant} verified this listing by code, but the current owner asked to keep it. Speak to both, then approve or reject the claim in Admin → Claims.`, "dispute");
+      await devAlert(env, DB, {
+        business: k.business,
+        email: k.claimant,
+        status: "pending"
+      }, "ownership dispute", `${k.claimant} verified this listing by code, but the current owner asked to keep it. Nothing changes until you decide: approve or reject the claim in Admin → Claims, or pass it to a sales rep.`);
       if (k.claimant) await sendTplEmail(env, DB, k.claimant, "transfer_kept", {
         business: E(k.business)
       }).catch(() => {});
-      return R2(NOTICE(d, "Your listing stays with you", "Thanks — nothing has changed. Your account manager will be in touch to sort it out.", "Back to the directory", "/"));
+      return R2(NOTICE(d, "Your listing stays with you", "Thanks — nothing has changed. We'll be in touch if we need anything from you.", "Back to the directory", "/"));
     }
     // "Send me a new code" from the verify_reminder email: GET shows a button, POST starts a fresh code.
     if (u.pathname === "/verify-business/restart") {
@@ -12688,18 +12661,12 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const ipKey = "bvtry:" + (req.headers.get("cf-connecting-ip") || "0");
       const counted = st.rowId ? await DB.prepare("UPDATE claims SET bv_tries=coalesce(bv_tries,0)+1 WHERE id=?1 AND coalesce(bv_tries,0)<?2").bind(st.rowId, BV_MAX_TRIES).run().catch(() => null) : null;
       if (!counted || !counted.meta || !counted.meta.changes || !await rateOk(env, ipKey, 30)) {
-        await bvToTeam(env, DB, st, "too many wrong codes");
-        st.done = true;
-        await bvPut(env, ref, st);
-        return R2(NOTICE(d, "Sent to our team", "That code didn't match a few times, so we've passed your request to our local team. They'll email you once it's checked.", "Back to the directory", "/"));
+        return R2(await bvLocked(env, DB, d, ref, st));
       }
       if (!fresh || code !== st.code) {
         st.tries = (st.tries || 0) + 1;
         if (st.tries >= BV_MAX_TRIES) {
-          await bvToTeam(env, DB, st, "too many wrong codes");
-          st.done = true;
-          await bvPut(env, ref, st);
-          return R2(NOTICE(d, "Sent to our team", "That code didn't match a few times, so we've passed your request to our local team. They'll email you once it's checked.", "Back to the directory", "/"));
+          return R2(await bvLocked(env, DB, d, ref, st));
         }
         await bvPut(env, ref, st);
         return R2(BIZVERIFY(d, ref, st, fresh ? "That code doesn't match. Check it and try again." : "That code has expired — tap \"Send the code again\" for a new one."));
