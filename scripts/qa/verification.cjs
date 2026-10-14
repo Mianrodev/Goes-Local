@@ -303,6 +303,8 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA5','QA Five','Nochan','nochan@qanochan.com','','pending','no channel',${ago})`);
   sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA4','QA Four Pools','Fresh','fresh@qafresh.com','','pending','just now',${Date.now()})`);
   sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at,decided_at) VALUES('QA9','QA Nine Florist','Old','old@qaold.com','','pending-listing','[code-sent]',${Date.now() - 9 * 864e5},${Date.now() - 8 * 864e5})`);
+  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA8','QA Eight Bakery','Inv','inv@qainv.com','','pending','[invited]',${Date.now() - 20 * 864e5})`);
+  sql(`INSERT INTO claims(ghl_id,business,name,email,phone,status,notes,created_at) VALUES('QA8','QA Eight Bakery','Held','held@qaheld.com','','pending-listing','[invited]\n[held: looks like spam]',${Date.now() - 20 * 864e5})`);
   await hourlyRun();
   await until(() => sql("SELECT status FROM claims WHERE email='old@qaold.com'")[0].status === "expired" && sql("SELECT status FROM claims WHERE email='dup@qadup.com'")[0].status === "listed", 120000);
   ok(sql("SELECT status FROM claims WHERE email='dup@qadup.com'")[0].status === "listed", "T28 duplicate request for a business the person already owns closes by itself");
@@ -314,5 +316,8 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   await hourlyRun();
   await sleep(4000);
   ok((sql("SELECT notes FROM claims WHERE email='ann@qaann.com'")[0].notes.match(/\[invited\]/g) || []).length === 1, "T33 the invite goes out only once");
+  const inv34 = sql("SELECT status,decided_at FROM claims WHERE email='inv@qainv.com'")[0];
+  ok(inv34.status === "pending" && inv34.decided_at > Date.now() - 3600e3, "T34 an old backlog invite starts its 7 days now instead of expiring at once", JSON.stringify(inv34));
+  ok(sql("SELECT status FROM claims WHERE email='held@qaheld.com'")[0].status === "rejected", "T34 a request held back as likely spam is closed");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });

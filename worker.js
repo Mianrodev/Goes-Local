@@ -3946,6 +3946,15 @@ async function autoHourly(env, DB) {
   } catch (e) {
     console.log("auto: duplicate close failed: " + e.message);
   }
+  // 1b. Backlog invites from before this job existed had no date, so they could never expire: start their 7 days now.
+  // Requests held back as likely spam on 13 Oct (never invited) are closed.
+  try {
+    await DB.prepare("UPDATE claims SET decided_at=?1 WHERE status IN ('pending','pending-listing') AND notes LIKE '%[invited]%' AND notes NOT LIKE '%[held%' AND decided_at IS NULL").bind(now).run();
+    const held = (await DB.prepare("SELECT id,status FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[held%' LIMIT 50").all()).results || [];
+    for (const r of held) await close(r, "rejected", "held back as likely spam");
+  } catch (e) {
+    console.log("auto: backlog tidy failed: " + e.message);
+  }
   // 2. Requests that never got a code (form fallbacks, off switch, rate limits): invite them once, after 30 minutes.
   try {
     const KV = KVOF(env);
@@ -7973,7 +7982,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.53-shared";
+const BUILD = "v16.54-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8017,6 +8026,20 @@ const _export = {
         hourly = !hr || Date.now() - +hr.v >= 55 * 60 * 1e3;
         if (hourly) await DB.prepare("INSERT INTO meta(k,v) VALUES('cron_hourly_at',?1) ON CONFLICT(k) DO UPDATE SET v=?1").bind(String(Date.now())).run();
       } catch {}
+      // Claims / new-listing jobs first: the slower hourly batches below can use up the run's time (14 Oct: the
+      // 22:15 run never reached them).
+      if (hourly) try {
+        const ah = await autoHourly(env, DB);
+        if (ah.closed || ah.invited || ah.dev) console.log(`cron: requests — ${ah.closed} closed, ${ah.invited} invited to verify, ${ah.dev} sent to the dev team`);
+      } catch (e) {
+        console.log("cron request jobs failed: " + e.message);
+      }
+      if (hourly) try {
+        const n = await bvHourly(env, DB);
+        if (n.moved || n.reminded) console.log(`cron: verification — ${n.moved} ownership change(s) completed, ${n.reminded} reminder(s) sent`);
+      } catch (e) {
+        console.log("cron verification jobs failed: " + e.message);
+      }
       // Weekly: map pins for listings added since the last run (free Census geocoder, one request).
       try {
         const gw = await DB.prepare("SELECT v FROM meta WHERE k='cron_geo_at'").first();
@@ -8063,18 +8086,6 @@ const _export = {
         if (pe.sent) console.log(`cron: sent ${pe.sent} claim invite(s) once email showed up, ${pe.left} still waiting`);
       } catch (e) {
         console.log("cron pending-email-invite batch failed: " + e.message);
-      }
-      if (hourly) try {
-        const ah = await autoHourly(env, DB);
-        if (ah.closed || ah.invited || ah.dev) console.log(`cron: requests — ${ah.closed} closed, ${ah.invited} invited to verify, ${ah.dev} sent to the dev team`);
-      } catch (e) {
-        console.log("cron request jobs failed: " + e.message);
-      }
-      if (hourly) try {
-        const n = await bvHourly(env, DB);
-        if (n.moved || n.reminded) console.log(`cron: verification — ${n.moved} ownership change(s) completed, ${n.reminded} reminder(s) sent`);
-      } catch (e) {
-        console.log("cron verification jobs failed: " + e.message);
       }
       try {
         const KV = KVOF(env);
