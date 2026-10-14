@@ -260,6 +260,8 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   ok(!(await canEdit("QA9")), "T21 shared corporate domain (website is a sub-page) gives no access");
   sql("UPDATE businesses SET web='https://boss.qaeight.com' WHERE ghl_id='QA9'");
   ok(!(await canEdit("QA9")), "T21 agent sub-site on the same domain gives no access");
+  sql("UPDATE businesses SET web='https://qaeight.com/?location=12' WHERE ghl_id='QA9'");
+  ok(!(await canEdit("QA9")), "T21 brand home page with a location query gives no access");
   sql("UPDATE businesses SET web='https://bossbakery.com' WHERE ghl_id='QA9'");
   ok(!(await canEdit("QA9")), "T21 same email domain but a different website gives no access");
   // T24 corporate colleague claiming another agent's listing is a dispute, not an instant hand-over
@@ -284,5 +286,10 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   // T26 sending the same business twice is still treated as a repeat (no duplicate)
   await F(BASE + "/api/lead", { method: "POST", redirect: "manual", body: new URLSearchParams({ type: "add", business: "QA Loc Two", category: "Other", email: "multi@qamulti.com", owner_name: "Mul Ti", address: "1 Multi Rd", zip: "33602", details: "x" }) });
   ok(sql("SELECT count(*) n FROM claims WHERE email='multi@qamulti.com'")[0].n === 2, "T26 the same business sent twice is updated, not duplicated");
+  // T27 location A, then B, then A again: A's details land on A's request, not B's
+  await F(BASE + "/api/lead", { method: "POST", redirect: "manual", body: new URLSearchParams({ type: "add", business: "QA Loc One", category: "Other", email: "multi@qamulti.com", owner_name: "Mul Ti", address: "1 Multi Rd", zip: "33611", website: "loc-one.com", details: "x" }) });
+  const ex27 = sql("SELECT business, extra FROM claims WHERE email='multi@qamulti.com' ORDER BY id");
+  const ofb = nm => { try { return JSON.parse((ex27.find(x => x.business === nm) || {}).extra || "{}"); } catch { return {}; } };
+  ok(ofb("QA Loc One").website === "loc-one.com" && ofb("QA Loc Two").website !== "loc-one.com", "T27 resubmitted location keeps its own details", JSON.stringify(ex27));
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });

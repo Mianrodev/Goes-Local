@@ -2960,7 +2960,7 @@ const OWNSITE = (web, dom) => {
   if (!dom || FREEMAIL.has(dom) || /\.(edu|gov|mil)$/.test(dom) || !web) return false;
   try {
     const u = new URL(/^https?:\/\//i.test(web) ? web : "https://" + web);
-    return u.hostname.replace(/^www\./, "").toLowerCase() === dom && /^\/?$/.test(u.pathname);
+    return u.hostname.replace(/^www\./, "").toLowerCase() === dom && /^\/?$/.test(u.pathname) && !u.search && !u.hash;
   } catch {
     return false;
   }
@@ -12311,7 +12311,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         // GHL, e.g. an owner adding another location), publishListing creates it later and copies these onto it.
         if (DB && saved) try {
           const extra = JSON.stringify({ website: l.website || "", services: l.services || "", hood: l.hood || "", yrs: l.yrs || "", ownerPhone: l.owner_phone || "", zip: l.zip || "" });
-          await DB.prepare("UPDATE claims SET extra=?1 WHERE id=(SELECT id FROM claims WHERE status='pending-listing' AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3)) ORDER BY id DESC LIMIT 1)").bind(extra, cid || "", NRM(l.email)).run();
+          await DB.prepare("UPDATE claims SET extra=?1 WHERE id=(SELECT id FROM claims WHERE status='pending-listing' AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3)) AND lower(trim(business))=lower(trim(?4)) ORDER BY id DESC LIMIT 1)").bind(extra, cid || "", NRM(l.email), String(l.business || "Unnamed")).run();
         } catch (e) {
           console.log("add: extra details not saved (run /admin/migrate): " + e.message);
         }
@@ -12340,7 +12340,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         if (BV_ON(env) && saved && !ownedElsewhere && bvAllowed) {
           let rowId = null;
           try {
-            const rr = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND ((?1<>'' AND ghl_id=?1) OR (?2<>'' AND email=?2)) ORDER BY id DESC LIMIT 1").bind(cid || "", NRM(l.email)).first();
+            const rr = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND ((?1<>'' AND ghl_id=?1) OR (?2<>'' AND email=?2)) AND lower(trim(business))=lower(trim(?3)) ORDER BY id DESC LIMIT 1").bind(cid || "", NRM(l.email), String(l.business || "Unnamed")).first();
             rowId = rr && rr.id;
           } catch {}
           const ref = rowId ? await bvStart(env, DB, {
