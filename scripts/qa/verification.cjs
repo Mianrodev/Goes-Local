@@ -250,7 +250,7 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   // T20 colleague access to the account: sign in as colleague via a fresh email code on QA8? use ownedIds through /manage/edit GET
   sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA8'");
   const pg20 = await F(BASE + "/manage/edit?id=QA8", { headers: { cookie: ownerCookie } });
-  ok(pg20.status === 200 && /Services offered/.test(await pg20.text()), "T20 owner can open the edit page");
+  ok(pg20.status === 200 && /Services you offer/.test(await pg20.text()), "T20 owner can open the edit page");
   // T21 gmail users never get team access
   sql("UPDATE businesses SET owner_email='someone@gmail.com' WHERE ghl_id='QA9'");
   sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA9'");
