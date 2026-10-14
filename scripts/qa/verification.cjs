@@ -192,6 +192,7 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   ok(/o•••@qaeight\.com/.test(txt(pg.html)), "T15 listing-email match gets the code by email first");
   r = await post("/verify-business", { ref, code: lastCode() });
   ok(r.status === 302 && /account\?verified=1/.test(r.loc) && /gl_sess/.test(r.cookie), "T15 proven email → signed in", r.status + " " + r.loc);
+  const ownerCookie = (r.cookie.match(/gl_sess=[^;]+/) || [""])[0];
 
   // T16 20 parallel wrong guesses → at most 5 count; the right code is then refused
   r = await claim("QA9", "t16@example.com", "10.0.0.16");
@@ -234,5 +235,24 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   await sleep(45000);
   const n17 = sql("SELECT notes FROM claims WHERE id=" + inv[0].id)[0].notes;
   ok(!/to-team/.test(n17) && !/reminded/.test(n17), "T17 no instant reminder/team hand-off after a fresh code", n17);
+
+  // T18 colleague (same company domain) claiming an owned listing → approved, no dispute
+  sql("UPDATE businesses SET claimed=1, owner_email='boss@qaten.com', email='', ph='(813) 555-0110' WHERE ghl_id='QA1'");
+  r = await claim("QA1", "colleague@qaten.com", "10.0.0.18");
+  ref = refOf(r.loc);
+  r = await post("/verify-business", { ref, code: lastCode() });
+  ok(/You're verified/.test(txt(r.html)) && !/almost there/.test(txt(r.html)), "T18 colleague claim approved without a dispute", r.status);
+  // T19 owner whose sign-in email = business email can save edits (Sun Kissed case)
+  sql("UPDATE businesses SET claimed=1, owner_email='owner@qaeight.com', email='owner@qaeight.com' WHERE ghl_id='QA8'");
+  const ed = await F(BASE + "/manage/edit", { method: "POST", redirect: "manual", headers: { cookie: ownerCookie }, body: new URLSearchParams({ id: "QA8", bizname: "QA Eight Bakery", bizemail: "owner@qaeight.com", services: "Bread, cakes", hours: "Mon 9-5" }) });
+  const edLoc = ed.headers.get("location") || "";
+  ok(ed.status === 302 && !/Business%20email/i.test(edLoc), "T19 business email = sign-in email no longer blocks the save (local copy has no GHL, so only the CRM step fails)", ed.status + " " + edLoc);
+  // T20 colleague access to the account: sign in as colleague via a fresh email code on QA8? use ownedIds through /manage/edit GET
+  sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA8'");
+  const pg20 = await F(BASE + "/manage/edit?id=QA8", { headers: { cookie: ownerCookie } });
+  ok(pg20.status === 200 && /Services offered/.test(await pg20.text()), "T20 owner can open the edit page");
+  // T21 gmail users never get team access
+  sql("UPDATE businesses SET owner_email='someone@gmail.com' WHERE ghl_id='QA9'");
+  sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA9'");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });
