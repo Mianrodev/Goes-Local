@@ -236,12 +236,13 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   const n17 = sql("SELECT notes FROM claims WHERE id=" + inv[0].id)[0].notes;
   ok(!/to-team/.test(n17) && !/reminded/.test(n17), "T17 no instant reminder/team hand-off after a fresh code", n17);
 
-  // T18 colleague (same company domain) claiming an owned listing → approved, no dispute
-  sql("UPDATE businesses SET claimed=1, owner_email='boss@qaten.com', email='', ph='(813) 555-0110' WHERE ghl_id='QA1'");
+  // T18 colleague (same company domain, and the listing's website is that domain) claiming an owned listing → approved, no dispute
+  sql("UPDATE businesses SET claimed=1, owner_email='boss@qaten.com', email='', ph='(813) 555-0110', web='https://www.qaten.com/' WHERE ghl_id='QA1'");
   r = await claim("QA1", "colleague@qaten.com", "10.0.0.18");
   ref = refOf(r.loc);
   r = await post("/verify-business", { ref, code: lastCode() });
-  ok(/You're verified/.test(txt(r.html)) && !/almost there/.test(txt(r.html)), "T18 colleague claim approved without a dispute", r.status);
+  const st18 = sql("SELECT status FROM claims WHERE email='colleague@qaten.com' ORDER BY id DESC LIMIT 1")[0].status;
+  ok(st18 === "approved" && !/almost there/.test(txt(r.html)), "T18 colleague claim approved without a dispute", st18);
   // T19 owner whose sign-in email = business email can save edits (Sun Kissed case)
   sql("UPDATE businesses SET claimed=1, owner_email='owner@qaeight.com', email='owner@qaeight.com' WHERE ghl_id='QA8'");
   const ed = await F(BASE + "/manage/edit", { method: "POST", redirect: "manual", headers: { cookie: ownerCookie }, body: new URLSearchParams({ id: "QA8", bizname: "QA Eight Bakery", bizemail: "owner@qaeight.com", services: "Bread, cakes", hours: "Mon 9-5" }) });
@@ -251,9 +252,21 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA8'");
   const pg20 = await F(BASE + "/manage/edit?id=QA8", { headers: { cookie: ownerCookie } });
   ok(pg20.status === 200 && /Services you offer/.test(await pg20.text()), "T20 owner can open the edit page");
-  // T21 gmail users never get team access
-  sql("UPDATE businesses SET owner_email='someone@gmail.com' WHERE ghl_id='QA9'");
-  sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA9'");
+  // T21 team access: a colleague on the listing's own website domain gets in; a shared corporate domain does not
+  const canEdit = async id => (await F(BASE + "/manage/edit?id=" + id, { redirect: "manual", headers: { cookie: ownerCookie } })).status === 200;
+  sql("UPDATE businesses SET claimed=1, owner_email='boss@qaeight.com', web='https://qaeight.com' WHERE ghl_id='QA9'");
+  ok(await canEdit("QA9"), "T21 colleague at the business's own website domain can manage it");
+  sql("UPDATE businesses SET web='https://www.qaeight.com/agents/boss' WHERE ghl_id='QA9'");
+  ok(!(await canEdit("QA9")), "T21 shared corporate domain (website is a sub-page) gives no access");
+  sql("UPDATE businesses SET web='https://boss.qaeight.com' WHERE ghl_id='QA9'");
+  ok(!(await canEdit("QA9")), "T21 agent sub-site on the same domain gives no access");
+  sql("UPDATE businesses SET web='https://bossbakery.com' WHERE ghl_id='QA9'");
+  ok(!(await canEdit("QA9")), "T21 same email domain but a different website gives no access");
+  // T24 corporate colleague claiming another agent's listing is a dispute, not an instant hand-over
+  sql("UPDATE businesses SET claimed=1, owner_email='agent1@qacorp.com', email='', ph='(813) 555-0124', web='https://www.qacorp.com/agents/one' WHERE ghl_id='QA4'");
+  r = await claim("QA4", "agent2@qacorp.com", "10.0.0.24");
+  r = await post("/verify-business", { ref: refOf(r.loc), code: lastCode() });
+  ok(/almost there/.test(txt(r.html)), "T24 same corporate domain, different agent → dispute notice to the owner", r.status);
   // T22 "Add another location" fills the email in, also for emails containing the letter s (live bug in v16.49)
   const ad = await (await F(BASE + "/add?email=sales%40mrsclean.com")).text();
   const rx = (ad.match(/get\("email"\);if\(e&&(\/.*?\/)\.test\(e\)/) || [])[1] || "";
@@ -264,5 +277,12 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   const ex = sql("SELECT extra FROM claims WHERE email='extra@qaextra.com' ORDER BY id DESC LIMIT 1");
   const exj = (() => { try { return JSON.parse(ex[0].extra); } catch { return {}; } })();
   ok(exj.services === "Thing one, Thing two" && exj.website === "qaextra.com" && exj.hood === "Downtown" && exj.yrs === "2001", "T23 website, services, area and year are kept with the request", JSON.stringify(ex));
+  // T25 an owner adding a second location while the first is still waiting does not overwrite the first
+  for (const nm of ["QA Loc One", "QA Loc Two"]) await F(BASE + "/api/lead", { method: "POST", redirect: "manual", body: new URLSearchParams({ type: "add", business: nm, category: "Other", email: "multi@qamulti.com", owner_name: "Mul Ti", address: "1 Multi Rd", zip: "33602", details: "x" }) });
+  const locs = sql("SELECT business FROM claims WHERE email='multi@qamulti.com' ORDER BY id").map(x => x.business);
+  ok(locs.length === 2 && locs[0] === "QA Loc One" && locs[1] === "QA Loc Two", "T25 two locations from one owner stay two separate requests", JSON.stringify(locs));
+  // T26 sending the same business twice is still treated as a repeat (no duplicate)
+  await F(BASE + "/api/lead", { method: "POST", redirect: "manual", body: new URLSearchParams({ type: "add", business: "QA Loc Two", category: "Other", email: "multi@qamulti.com", owner_name: "Mul Ti", address: "1 Multi Rd", zip: "33602", details: "x" }) });
+  ok(sql("SELECT count(*) n FROM claims WHERE email='multi@qamulti.com'")[0].n === 2, "T26 the same business sent twice is updated, not duplicated");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });

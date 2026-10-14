@@ -2953,6 +2953,19 @@ const HOSTOF = w => {
   }
 };
 
+// A company email domain counts as "this business" only when the listing's own website is exactly that domain's
+// home page: two State Farm agents share statefarm.com, but neither listing's website is statefarm.com itself.
+// Never a public mail provider, a school or a government address.
+const OWNSITE = (web, dom) => {
+  if (!dom || FREEMAIL.has(dom) || /\.(edu|gov|mil)$/.test(dom) || !web) return false;
+  try {
+    const u = new URL(/^https?:\/\//i.test(web) ? web : "https://" + web);
+    return u.hostname.replace(/^www\./, "").toLowerCase() === dom && /^\/?$/.test(u.pathname);
+  } catch {
+    return false;
+  }
+};
+
 const RID = n => {
   const a = new Uint8Array(n || 32);
   crypto.getRandomValues(a);
@@ -3390,13 +3403,16 @@ async function ownedIds(env, email) {
   const DB = getDB(env);
   if (!DB) return [];
   try {
-    // Colleagues share access (Mr Jeff Cleaners, 14 Oct: sergio@laundryus.app couldn't see the listing owned by
-    // connect@laundryus.app): anyone signed in with the same company email domain as the owner — never a public
-    // provider like gmail.com — manages that listing too.
+    // Colleagues share access: someone signed in at the business's own email domain manages the listing too, but only
+    // when the listing's website is that domain (OWNSITE) — a shared corporate or franchise domain is not enough.
     const em = NRM(email), dom = DOMOF(em);
-    const team = dom && !FREEMAIL.has(dom) ? dom : "";
-    const r = (await DB.prepare("SELECT ghl_id FROM businesses WHERE owner_email=?1 OR (?2<>'' AND substr(owner_email, instr(owner_email,'@')+1)=?2)").bind(em, team).all()).results || [];
-    return r.map(x => x.ghl_id);
+    const own = (await DB.prepare("SELECT ghl_id FROM businesses WHERE owner_email=?1").bind(em).all()).results || [];
+    const ids = own.map(x => x.ghl_id);
+    if (dom && !FREEMAIL.has(dom) && !/\.(edu|gov|mil)$/.test(dom)) {
+      const team = (await DB.prepare("SELECT ghl_id,web FROM businesses WHERE owner_email LIKE ?1 AND owner_email<>?2").bind("%@" + dom, em).all()).results || [];
+      for (const t of team) if (OWNSITE(t.web, dom) && !ids.includes(t.ghl_id)) ids.push(t.ghl_id);
+    }
+    return ids;
   } catch {
     return [];
   }
@@ -3802,7 +3818,7 @@ function bvClaimState(b, id, email, name, tier, rowId, adminVars) {
     emailTo: emailTo,
     emailShown: MASKEM(emailTo),
     prefer: tier === "B" || !emOk && ownOk ? "email" : "sms",
-    prevOwner: prevOwner && prevOwner !== NRM(email) && !(DOMOF(prevOwner) === DOMOF(NRM(email)) && !FREEMAIL.has(DOMOF(prevOwner))) ? prevOwner : "",
+    prevOwner: prevOwner && prevOwner !== NRM(email) && !(DOMOF(prevOwner) === DOMOF(NRM(email)) && OWNSITE(b.web, DOMOF(prevOwner))) ? prevOwner : "",
     adminVars: adminVars
   };
 }
@@ -4052,6 +4068,10 @@ async function publishListing(env, DB, rowId, cid, email) {
       const fm = await fields(env);
       categoryFid = fieldId(fm, "category", "business category", "primary category", "main category");
     } catch {}
+    let x = {};
+    try {
+      x = JSON.parse(row.extra || "{}") || {};
+    } catch {}
     const mk = async body => {
       const r = await fetch(`${API}/contacts/`, {
         method: "POST",
@@ -4076,6 +4096,7 @@ async function publishListing(env, DB, rowId, cid, email) {
         firstName: row.business || "Unnamed",
         phone: row.phone || undefined,
         address1: row.verify || undefined,
+        postalCode: x.zip || undefined,
         tags: [ "business", category, "New" ],
         ...categoryFid ? {
           customFields: [ {
@@ -4092,6 +4113,7 @@ async function publishListing(env, DB, rowId, cid, email) {
           companyName: row.business || "Unnamed",
           firstName: row.business || "Unnamed",
           address1: row.verify || undefined,
+        postalCode: x.zip || undefined,
           tags: [ "business", category, "New" ],
           ...categoryFid ? {
             customFields: [ {
@@ -4105,13 +4127,9 @@ async function publishListing(env, DB, rowId, cid, email) {
       if (res.ok) {
         cid = res.id;
         pubC = res.contact;
-        let x = {};
-        try {
-          x = JSON.parse(row.extra || "{}") || {};
-        } catch {}
         try {
           await ghlUpdateContact(env, cid, {
-            descr: String(row.notes || "").split("\n").filter(ln => !/^\[[^\]]*\]$/.test(ln.trim())).join("\n").trim() || undefined,
+            descr: String(row.notes || "").split("\n").filter(ln => !/^\[[^\]]*\]$/.test(ln.trim())).join("\n").trim().slice(0, 600) || undefined,
             website: x.website || undefined,
             services: x.services || undefined,
             hood: x.hood || undefined,
@@ -7879,7 +7897,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.50-shared";
+const BUILD = "v16.51-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8541,7 +8559,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         if (!em) return TXT("Add &email=someone@example.com");
         const owns = (await DB.prepare("SELECT ghl_id,name,cs,slug,claimed,premium FROM businesses WHERE owner_email=?1").bind(em).all()).results || [];
         const listed = (await DB.prepare("SELECT ghl_id,name,claimed,owner_email FROM businesses WHERE email=?1").bind(em).all()).results || [];
-        return TXT([ `WHOAMI  ${em}`, "", `OWNS ${owns.length} listing(s) — this is exactly what /login and /manage check:`, ...owns.map(r => `  • ${r.name}  [${r.ghl_id}]  /${r.cs}/${r.slug}  claimed=${r.claimed} premium=${r.premium}`), "", `Is the contact email on ${listed.length} listing(s):`, ...listed.map(r => `  • ${r.name}  [${r.ghl_id}]  claimed=${r.claimed}  owner_email=${r.owner_email || "(blank)"}`), "", owns.length ? "=> Sign-in WILL work for this address." : "=> Sign-in will send NOTHING. The 'owner email' custom field is not set on any business contact. Set it in your CRM (or approve the claim at /admin/claims), then run /admin/sync." ].join("\n"));
+        return TXT([ `WHOAMI  ${em}`, "", `OWNS ${owns.length} listing(s) as owner (colleagues signed in at the listing's own website domain can manage it too):`, ...owns.map(r => `  • ${r.name}  [${r.ghl_id}]  /${r.cs}/${r.slug}  claimed=${r.claimed} premium=${r.premium}`), "", `Is the contact email on ${listed.length} listing(s):`, ...listed.map(r => `  • ${r.name}  [${r.ghl_id}]  claimed=${r.claimed}  owner_email=${r.owner_email || "(blank)"}`), "", owns.length ? "=> Sign-in WILL work for this address." : "=> Sign-in will send NOTHING. The 'owner email' custom field is not set on any business contact. Set it in your CRM (or approve the claim at /admin/claims), then run /admin/sync." ].join("\n"));
       }
       if (p[1] === "comments" && p[2] === "reply" && req.method === "POST") {
         const f = await req.formData();
@@ -12242,7 +12260,8 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         // pending entry instead of adding a new one, and don't email the team or the owner a second time.
         let repeatOf = null;
         if (DB) try {
-          repeatOf = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND created_at>?1 AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3)) ORDER BY id DESC LIMIT 1").bind(Date.now() - 864e5, cid || "", NRM(l.email)).first();
+          // Same email + same business name; an owner adding another location is a new entry, not a repeat.
+          repeatOf = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND created_at>?1 AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3 AND lower(trim(business))=lower(trim(?4)))) ORDER BY id DESC LIMIT 1").bind(Date.now() - 864e5, cid || "", NRM(l.email), String(l.business || "Unnamed")).first();
         } catch {}
         const addAdminVars = {
             business: E(l.business || "(not given)"),
@@ -12291,7 +12310,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         // Details the claims row has no column for. When the contact can't be made on submit (the email is already in
         // GHL, e.g. an owner adding another location), publishListing creates it later and copies these onto it.
         if (DB && saved) try {
-          const extra = JSON.stringify({ website: l.website || "", services: l.services || "", hood: l.hood || "", yrs: l.yrs || "", ownerPhone: l.owner_phone || "" });
+          const extra = JSON.stringify({ website: l.website || "", services: l.services || "", hood: l.hood || "", yrs: l.yrs || "", ownerPhone: l.owner_phone || "", zip: l.zip || "" });
           await DB.prepare("UPDATE claims SET extra=?1 WHERE id=(SELECT id FROM claims WHERE status='pending-listing' AND ((?2<>'' AND ghl_id=?2) OR (?3<>'' AND email=?3)) ORDER BY id DESC LIMIT 1)").bind(extra, cid || "", NRM(l.email)).run();
         } catch (e) {
           console.log("add: extra details not saved (run /admin/migrate): " + e.message);
