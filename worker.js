@@ -3519,9 +3519,9 @@ async function sendEmail(env, to, subject, html, text, contactId) {
     }
   }
   try {
-    const cid = contactId || await ghlFindOrCreateContact(env, to, {});
+    let cid = contactId || await ghlFindOrCreateContact(env, to, {});
     if (!cid) return false;
-    const r = await fetch(`${API}/conversations/messages`, {
+    const post = id => fetch(`${API}/conversations/messages`, {
       method: "POST",
       headers: {
         ...H(env),
@@ -3529,7 +3529,7 @@ async function sendEmail(env, to, subject, html, text, contactId) {
       },
       body: JSON.stringify({
         type: "Email",
-        contactId: cid,
+        contactId: id,
         emailTo: to,
         emailFrom: `${AUTH.FROM_NAME} <${AUTH.FROM_EMAIL}>`,
         subject: subject,
@@ -3537,6 +3537,22 @@ async function sendEmail(env, to, subject, html, text, contactId) {
         message: text || subject
       })
     });
+    let r = await post(cid);
+    // GHL refuses ("Contact has no email") when the given contact — often a business contact whose email lives in
+    // a custom field — has no email of its own. Send through the recipient's own contact instead (14 Oct: 22 of 70
+    // verification invites failed this way, and claim-approved emails to claimants could too).
+    if (!r.ok && contactId) {
+      const why = (await r.text()).slice(0, 200);
+      const own = await ghlFindOrCreateContact(env, to, {});
+      if (own && own !== contactId) {
+        console.log("ghl email via " + contactId + " failed (" + r.status + " " + why + ") — retrying via the recipient's own contact");
+        cid = own;
+        r = await post(own);
+      } else {
+        console.log("ghl email " + r.status + ": " + why);
+        return false;
+      }
+    }
     if (!r.ok) {
       console.log("ghl email " + r.status + ": " + (await r.text()).slice(0, 200));
       return false;
@@ -7807,7 +7823,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.47-shared";
+const BUILD = "v16.48-shared";
 
 const APP_COOKIE = "gl_app";
 
