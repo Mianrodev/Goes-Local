@@ -3934,6 +3934,110 @@ async function bvHourly(env, DB) {
   return out;
 }
 
+// Sales work only inside GHL (14 Oct). Every request that needs a person becomes a GHL task on the contact, and the
+// rep answers with a tag: approve-request or reject-request. This runs hourly and does the rest. It also closes
+// duplicate requests for a business that is already live and owned by the same person.
+const SALES_OK = "approve-request", SALES_NO = "reject-request", SALES_WAIT = "needs-review";
+async function salesHourly(env, DB) {
+  const out = { closed: 0, tasks: 0, approved: 0, rejected: 0 };
+  const now = Date.now();
+  // 1. Duplicates: the same person already owns this business on the site.
+  try {
+    const dup = (await DB.prepare("SELECT c.id,c.status FROM claims c JOIN businesses b ON b.ghl_id=c.ghl_id WHERE c.status IN ('pending','pending-listing') AND c.ghl_id<>'' AND b.claimed=1 AND lower(coalesce(b.owner_email,''))=lower(c.email) LIMIT 50").all()).results || [];
+    for (const r of dup) {
+      await DB.prepare("UPDATE claims SET status=?1, decided_at=?2, notes=trim(coalesce(notes,'') || ?3) WHERE id=?4 AND status=?5").bind(r.status === "pending" ? "approved" : "listed", now, "\n[closed: already live and owned by this person]", r.id, r.status).run();
+      out.closed++;
+    }
+  } catch (e) {
+    console.log("sales: duplicate close failed: " + e.message);
+  }
+  // 2. New hand-offs: a GHL task for the rep (once per request).
+  try {
+    const need = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND created_at>?1 AND coalesce(notes,'') NOT LIKE '%[sales-task%' AND coalesce(notes,'') NOT LIKE '%[held%' AND (coalesce(notes,'') LIKE '%[to-team%' OR (coalesce(notes,'') NOT LIKE '%[code-sent]%' AND coalesce(notes,'') NOT LIKE '%[invited]%' AND created_at<?2)) ORDER BY id LIMIT 15").bind(now - 14 * 864e5, now - 30 * 60 * 1e3).all()).results || [];
+    const tasked = new Set();
+    for (const r of need) try {
+      const claim = r.status === "pending";
+      let cid = r.ghl_id || "";
+      if (!cid && r.email) cid = await ghlFindOrCreateContact(env, NRM(r.email), { name: r.name || "", phone: r.phone || "" }) || "";
+      if (!cid) continue;
+      // One task per contact: a second waiting request for the same business rides on the first one's task.
+      const has = tasked.has(cid) || !!await DB.prepare("SELECT 1 FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE ?1 LIMIT 1").bind("%[sales-task: " + cid + "]%").first();
+      if (has) {
+        await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[sales-task: " + cid + "]", r.id).run();
+        continue;
+      }
+      tasked.add(cid);
+      const why = ((String(r.notes || "").match(/\[to-team: ([^\]]*)\]/) || [])[1]) || "they didn't verify with a code";
+      const who = `${r.name || "Someone"} (${[ r.email, r.phone ].filter(Boolean).join(", ") || "no contact details"})`;
+      let owner = "";
+      if (claim) try {
+        const b = await DB.prepare("SELECT claimed,owner_email FROM businesses WHERE ghl_id=?1").bind(cid).first();
+        if (b && b.claimed && b.owner_email) owner = `\n\nHeads up: this listing already has an owner (${b.owner_email}). Approving moves it to the new person.`;
+      } catch {}
+      const title = claim ? `Check claim: ${r.business}` : `Check new listing: ${r.business}`;
+      const body = (claim
+        ? `${who} wants to manage "${r.business}" on ${S.brand}, but couldn't be verified with a code (${why}).\n\nCall the business on the phone number on its listing (not the one they gave us) and confirm this person works there.`
+        : `${who} added "${r.business}" to ${S.brand}, but it couldn't be verified with a code (${why}).\n\nCheck it's a real local business (call them, look it up on Google).`) +
+        `\n\nThen, on this contact:\n• Real → add the tag ${SALES_OK}. ${claim ? "They get access" : "The listing goes live"} within an hour and get the email.\n• Not real / spam → add the tag ${SALES_NO}.\nNo need to touch anything else.` + owner;
+      await ghlTask(env, cid, title, body, SALES_WAIT);
+      await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[sales-task: " + cid + "]", r.id).run();
+      out.tasks++;
+    } catch (e) {
+      console.log("sales: task for " + r.id + " failed: " + e.message);
+    }
+  } catch (e) {
+    console.log("sales: hand-off scan failed: " + e.message);
+  }
+  // 3. Answers: the rep's tag on the contact approves or rejects every waiting request tied to it.
+  try {
+    const open = (await DB.prepare("SELECT * FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE '%[sales-task: %' ORDER BY id LIMIT 40").all()).results || [];
+    const seen = new Map();
+    for (const r of open) try {
+      const cid = (String(r.notes).match(/\[sales-task: ([^\]\s]+)\]/) || [])[1];
+      if (!cid) continue;
+      if (!seen.has(cid)) {
+        // Local testing only (BV_TEST_ECHO, never on a live site): the rep's tags come from KV instead of GHL.
+        const KVT = env.BV_TEST_ECHO === "1" ? KVOF(env) : null;
+        const c = KVT ? { tags: JSON.parse(await KVT.get("testtags:" + cid) || "[]") } : await ghlGetContact(env, cid);
+        seen.set(cid, c ? (c.tags || []).map(t => String(t).trim().toLowerCase()) : null);
+      }
+      const tags = seen.get(cid);
+      if (!tags) continue;
+      const claim = r.status === "pending";
+      if (tags.includes(SALES_OK)) {
+        const lock = await DB.prepare("UPDATE claims SET status=?1, decided_at=?2 WHERE id=?3 AND status=?4").bind("verifying-" + r.status, Date.now(), r.id, r.status).run();
+        if (!lock.meta || !lock.meta.changes) continue;
+        if (claim) await approveClaim(env, DB, r.id, r.ghl_id, NRM(r.email), "approved by sales in GHL"); else {
+          const live = await publishListing(env, DB, r.id, r.ghl_id, r.email);
+          if (!live) {
+            await DB.prepare("UPDATE claims SET status='pending-listing' WHERE id=?1 AND status='verifying-pending-listing'").bind(r.id).run();
+            continue;
+          }
+          await DB.prepare("UPDATE claims SET notes=trim(coalesce(notes,'') || ?1) WHERE id=?2").bind("\n[approved by sales in GHL]", r.id).run();
+        }
+        out.approved++;
+      } else if (tags.includes(SALES_NO)) {
+        await DB.prepare("UPDATE claims SET status='rejected', decided_at=?1, notes=trim(coalesce(notes,'') || ?2) WHERE id=?3 AND status=?4").bind(Date.now(), "\n[rejected by sales in GHL]", r.id, r.status).run();
+        try {
+          await ghlRemoveTag(env, cid, [ claim ? "claim-request" : "pending-listing" ]);
+        } catch {}
+        out.rejected++;
+      }
+    } catch (e) {
+      console.log("sales: answer for " + r.id + " failed: " + e.message);
+    }
+    // Tidy the rep's tags once nothing is left waiting on that contact.
+    for (const [cid, tags] of seen) try {
+      if (!tags || !(tags.includes(SALES_OK) || tags.includes(SALES_NO))) continue;
+      const left = await DB.prepare("SELECT 1 FROM claims WHERE status IN ('pending','pending-listing') AND notes LIKE ?1 LIMIT 1").bind("%[sales-task: " + cid + "]%").first();
+      if (!left) await ghlRemoveTag(env, cid, [ SALES_OK, SALES_NO, SALES_WAIT ]);
+    } catch {}
+  } catch (e) {
+    console.log("sales: answer scan failed: " + e.message);
+  }
+  return out;
+}
+
 // One-off (Eric, 13 Oct): everyone who was waiting for a call before codes existed gets one "finish in 30
 // seconds" email whose button starts a fresh code (/verify-business/restart). One email per person per listing;
 // skipped: already theirs, nothing to send a code to, or looks like a test.
@@ -7897,7 +8001,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.51-shared";
+const BUILD = "v16.52-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -7987,6 +8091,12 @@ const _export = {
         if (pe.sent) console.log(`cron: sent ${pe.sent} claim invite(s) once email showed up, ${pe.left} still waiting`);
       } catch (e) {
         console.log("cron pending-email-invite batch failed: " + e.message);
+      }
+      if (hourly) try {
+        const sh = await salesHourly(env, DB);
+        if (sh.closed || sh.tasks || sh.approved || sh.rejected) console.log(`cron: sales — ${sh.closed} duplicate(s) closed, ${sh.tasks} task(s) made, ${sh.approved} approved, ${sh.rejected} rejected in GHL`);
+      } catch (e) {
+        console.log("cron sales jobs failed: " + e.message);
       }
       if (hourly) try {
         const n = await bvHourly(env, DB);
