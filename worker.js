@@ -4111,7 +4111,7 @@ async function publishListing(env, DB, rowId, cid, email) {
         } catch {}
         try {
           await ghlUpdateContact(env, cid, {
-            descr: row.notes || undefined,
+            descr: String(row.notes || "").split("\n").filter(ln => !/^\[[^\]]*\]$/.test(ln.trim())).join("\n").trim() || undefined,
             website: x.website || undefined,
             services: x.services || undefined,
             hood: x.hood || undefined,
