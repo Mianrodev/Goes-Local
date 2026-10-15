@@ -3805,6 +3805,10 @@ async function bvLocked(env, DB, d, ref, st) {
 // Off switch: set CITY_BV_OFF = 1 in a city's dashboard Variables and claims / new listings go back to the
 // old team-review flow at once, no deploy needed.
 const BV_ON = env => String(env.CITY_BV_OFF || "").trim() !== "1";
+// Auto-approve switch (Eric, 15 Oct, Home Services state sites): CITY_AUTO_APPROVE = 1 approves every claim and puts
+// every new listing live straight away, with no code. A listing someone else already owns still goes through the
+// normal code + 72-hour notice route. City sites don't set it.
+const AUTO_APPROVE = env => String(env.CITY_AUTO_APPROVE || "").trim() === "1";
 
 // Which codes a claim can use: a text to the listing's phone, an email to the listing's email, or — when the
 // claimant's own email is on the business's website domain (tier A) — an email to them. null = none.
@@ -3939,6 +3943,17 @@ async function autoHourly(env, DB) {
     const ch = await DB.prepare("UPDATE claims SET status=?1, decided_at=?2, notes=trim(coalesce(notes,'') || ?3) WHERE id=?4 AND status=?5").bind(status, now, "\n[closed: " + why + "]", r.id, r.status).run();
     if (ch.meta && ch.meta.changes) out.closed++;
   };
+  // 0. Auto-approve sites: approve waiting claims (unless someone else owns the listing) and put waiting listings live.
+  if (AUTO_APPROVE(env)) try {
+    const rows = (await DB.prepare("SELECT c.id,c.status,c.ghl_id,c.email FROM claims c LEFT JOIN businesses b ON b.ghl_id=c.ghl_id WHERE c.status IN ('pending','pending-listing') AND c.email LIKE '%_@_%' AND (c.status='pending-listing' OR (b.ghl_id IS NOT NULL AND (b.claimed=0 OR lower(coalesce(b.owner_email,''))=lower(c.email)))) ORDER BY c.id LIMIT 20").all()).results || [];
+    for (const r of rows) {
+      if (r.status === "pending") await approveClaim(env, DB, r.id, r.ghl_id, NRM(r.email), "approved automatically (CITY_AUTO_APPROVE)");
+      else await publishListing(env, DB, r.id, r.ghl_id || "", NRM(r.email));
+      out.approved = (out.approved || 0) + 1;
+    }
+  } catch (e) {
+    console.log("auto: auto-approve failed: " + e.message);
+  }
   // 1. The same person already owns this business on the site.
   try {
     const dup = (await DB.prepare("SELECT c.id,c.status FROM claims c JOIN businesses b ON b.ghl_id=c.ghl_id WHERE c.status IN ('pending','pending-listing') AND c.ghl_id<>'' AND b.claimed=1 AND lower(coalesce(b.owner_email,''))=lower(c.email) LIMIT 50").all()).results || [];
@@ -7982,7 +7997,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.54-shared";
+const BUILD = "v16.55-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -12430,6 +12445,23 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         const addSms = !!(cid && l.phone && usPhone), addEm = !!NRM(l.email) && !matchedLive;
         // Caps on codes sent from this form (stops it being used to text strangers): per visitor and per phone, per hour.
         const bvAllowed = (addSms || addEm) && await rateOk(env, "bvadd:" + (leadIp || "0"), 4) && (!addSms || await rateOk(env, "bvph:" + String(l.phone).replace(/\D/g, "").slice(-10), 3));
+        if (AUTO_APPROVE(env) && saved && !ownedElsewhere && !repeatOf) {
+          let rowId = null;
+          try {
+            const rr = await DB.prepare("SELECT id FROM claims WHERE status='pending-listing' AND ((?1<>'' AND ghl_id=?1) OR (?2<>'' AND email=?2)) AND lower(trim(business))=lower(trim(?3)) ORDER BY id DESC LIMIT 1").bind(cid || "", NRM(l.email), String(l.business || "Unnamed")).first();
+            rowId = rr && rr.id;
+          } catch {}
+          let liveId = "";
+          if (rowId) try {
+            liveId = await publishListing(env, DB, rowId, cid, NRM(l.email));
+          } catch (e) {
+            console.log("auto-approve publish failed, using the normal route: " + e.message);
+          }
+          if (liveId) {
+            ctx.waitUntil(notifyAdmins(env, DB, "new_listing", "admin_new_listing", addAdminVars, AUTH.SITE_URL + "/admin/pending").catch(() => {}));
+            return R2(NOTICE(d, "You're live", `${l.business || "Your business"} is now listed on ${S.brand}. We've emailed you a link to sign in and finish your page.`, "Back to the directory", "/"));
+          }
+        }
         if (BV_ON(env) && saved && !ownedElsewhere && bvAllowed) {
           let rowId = null;
           try {
@@ -12840,6 +12872,20 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       // Instant route: a code to the phone or email on the listing (or to the claimant's own inbox on the business's
       // website domain) proves it's theirs. On a listing someone else already owns, the current owner then gets 72
       // hours to object before it moves (bvStartTransfer).
+      if (AUTO_APPROVE(env) && !already) {
+        let rowId = null;
+        try {
+          const rr = await DB.prepare("SELECT id FROM claims WHERE ghl_id=?1 AND lower(email)=?2 AND status='pending' ORDER BY id DESC LIMIT 1").bind(id, email).first();
+          rowId = rr && rr.id;
+        } catch {}
+        try {
+          await approveClaim(env, DB, rowId, id, email, "approved automatically (CITY_AUTO_APPROVE)");
+          ctx.waitUntil(notifyAdmins(env, DB, "new_claim", "admin_new_claim", { ...adminVars, reason: adminVars.reason + E(" — APPROVED AUTOMATICALLY. No action needed.") }, AUTH.SITE_URL + "/admin/claims").catch(() => {}));
+          return R2(NOTICE(d, "It's yours", `${b.name} is now yours on ${S.brand}. We've emailed you a link to sign in and update your hours, services and photos.`, "Back to the directory", "/"));
+        } catch (e) {
+          console.log("auto-approve claim failed, using the normal route: " + e.message);
+        }
+      }
       if (BV_ON(env)) {
         let rowId = null;
         try {
