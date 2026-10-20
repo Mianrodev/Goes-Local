@@ -557,7 +557,50 @@ let CATMAP = {
   d: {}
 };
 
+// One spelling per sub-category (Eric, 20 Oct): "General contractor" and "General Contractor" are the same thing.
+// Names that differ only in capitals or spaces go to the best-capitalised one (most capitals, then most listings);
+// a name with no look-alike is left exactly as it is.
+let SUBCANON = {
+  t: 0,
+  d: {}
+};
+const SUBKEY = s => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+async function subCanonMap(DB) {
+  const rows = (await DB.prepare("SELECT sub, COUNT(*) n FROM businesses WHERE sub<>'' GROUP BY sub").all()).results || [];
+  const best = {};
+  for (const r of rows) {
+    const name = String(r.sub).trim().replace(/\s+/g, " "), k = name.toLowerCase(), caps = (name.match(/[A-Z]/g) || []).length;
+    const b = best[k];
+    if (!b || caps > b.caps || caps === b.caps && r.n > b.n) best[k] = {
+      name: name,
+      caps: caps,
+      n: r.n
+    };
+  }
+  const d = {};
+  for (const k in best) d[k] = best[k].name;
+  return d;
+}
+async function loadSubCanon(DB) {
+  const now = Date.now();
+  if (!DB || now - SUBCANON.t < 600 * 1e3) return SUBCANON.d;
+  try {
+    SUBCANON = {
+      t: now,
+      d: await subCanonMap(DB)
+    };
+  } catch {
+    SUBCANON.t = now;
+  }
+  return SUBCANON.d;
+}
+const SUBCANONOF = s => {
+  const t = String(s || "").trim().replace(/\s+/g, " ");
+  return SUBCANON.d[t.toLowerCase()] || t;
+};
+
 async function loadCatMap(DB) {
+  await loadSubCanon(DB);
   const now = Date.now();
   if (!DB || now - CATMAP.t < 60 * 1e3) return CATMAP.d;
   try {
@@ -1254,7 +1297,7 @@ function norm(c, m) {
     const tagCat = allMains().find(m => (c.tags || []).some(t => String(t).trim().toLowerCase() === m.toLowerCase())) || ((c.tags || []).some(t => String(t).trim().toLowerCase() === "other") ? "Other" : "");
     if (tagCat) cat = tagCat;
   }
-  const sub = FIXMOJI(String(P(v, "subcategory", "sub category", "secondary category") || rawSub || "").split(",")[0].trim());
+  const sub = SUBCANONOF(FIXMOJI(String(P(v, "subcategory", "sub category", "secondary category") || rawSub || "").split(",")[0].trim()));
   const nm = FIXMOJI(/[A-Z]/.test(name) ? name : TC(name));
   const ph = c.phone || P(v, "phone", "formatted phone") || PC(v, "gbp phone", "phone 1", "mobile 1", "phone") || "";
   const addr = FIXMOJI(c.address1 || P(v, "address", "full address") || "");
@@ -1376,6 +1419,24 @@ async function geocodeBatch(DB, n) {
 }
 
 async function migrate(DB, env) {
+  // Sub-category names that differ only in capitals or spaces become one (SUBCANONOF keeps new writes that way).
+  // Ad slots, their queue and category banners follow, so paid placements keep matching.
+  try {
+    const canon = await subCanonMap(DB);
+    const rows = (await DB.prepare("SELECT DISTINCT sub FROM businesses WHERE sub<>''").all()).results || [];
+    const moves = rows.map(r => [ r.sub, canon[SUBKEY(r.sub)] ]).filter(([ from, to ]) => to && to !== from);
+    for (let i = 0; i < moves.length; i += 50) await DB.batch(moves.slice(i, i + 50).map(([ from, to ]) => DB.prepare("UPDATE businesses SET sub=?1 WHERE sub=?2").bind(to, from)));
+    for (const [ from, to ] of moves) for (const q of [ "UPDATE OR IGNORE ad_slots SET sub=?1 WHERE sub=?2", "UPDATE ad_slot_queue SET sub=?1 WHERE sub=?2", "UPDATE category_banners SET sub=?1 WHERE sub=?2" ]) try {
+      await DB.prepare(q).bind(to, from).run();
+    } catch {}
+    if (moves.length) {
+      SUBCANON.t = 0;
+      SHELL_DIRTY = true;
+      console.log(`migrate: merged ${moves.length} sub-category spellings`);
+    }
+  } catch (e) {
+    console.log("migrate: sub-category merge failed: " + e.message);
+  }
   for (const q of DDL) await DB.prepare(q).run();
   try {
     await DB.prepare("ALTER TABLE businesses ADD COLUMN hood TEXT DEFAULT ''").run();
@@ -8024,7 +8085,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.60-shared";
+const BUILD = "v16.61-shared";
 
 const APP_COOKIE = "gl_app";
 

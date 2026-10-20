@@ -319,5 +319,17 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   const inv34 = sql("SELECT status,decided_at FROM claims WHERE email='inv@qainv.com'")[0];
   ok(inv34.status === "pending" && inv34.decided_at > Date.now() - 3600e3, "T34 an old backlog invite starts its 7 days now instead of expiring at once", JSON.stringify(inv34));
   ok(sql("SELECT status FROM claims WHERE email='held@qaheld.com'")[0].status === "rejected", "T34 a request held back as likely spam is closed");
+  // T35 sub-category spellings that differ only in capitals or spaces merge on migrate; others stay as they are
+  sql("DELETE FROM businesses WHERE ghl_id LIKE 'SC%'");
+  sql(`INSERT INTO businesses(ghl_id,city,cat,cs,sub,slug,name,addr,claimed,updated_at) VALUES
+    ('SC1','Tampa','Home Services','home-services','General Contractor','sc-1','SC One','1 St',0,1),
+    ('SC2','Tampa','Home Services','home-services','General contractor','sc-2','SC Two','2 St',0,1),
+    ('SC3','Tampa','Home Services','home-services','general  contractor ','sc-3','SC Three','3 St',0,1),
+    ('SC4','Tampa','Home Services','home-services','Unique sub','sc-4','SC Four','4 St',0,1)`);
+  const lg = await F(BASE + "/admin/login", { method: "POST", redirect: "manual", body: new URLSearchParams({ as: "admin", key: "localtestkey123" }) });
+  await F(BASE + "/admin/migrate", { headers: { cookie: (lg.headers.get("set-cookie") || "").split(";")[0] } });
+  const subs = sql("SELECT ghl_id,sub FROM businesses WHERE ghl_id LIKE 'SC%' ORDER BY ghl_id").map(r => r.sub);
+  ok(subs.slice(0, 3).every(x => x === "General Contractor") && subs[3] === "Unique sub", "T35 look-alike sub-categories merge into one spelling", JSON.stringify(subs));
+  sql("DELETE FROM businesses WHERE ghl_id LIKE 'SC%'");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });
