@@ -6192,7 +6192,8 @@ function HOME(d, feat, hoodCounts, openNow, homeEvents, homePosts, heroTagRows, 
   heroTagRows = heroTagRows || [];
   heroBigRows = heroBigRows || [];
   // Statewide sites count real categories (Plumbing, Electricians…), not every Google business type under them.
-  const totalSubcats = AREA.byCity ? (d.cats || []).filter(c => c.name !== "Other").length : (d.cats || []).reduce((sum, c) => sum + (c.subs ? c.subs.length : 0), 0);
+  // Homepage counts main categories, like the state sites (Eric's boss, 20 Oct: sub-category totals read too high).
+  const totalSubcats = (d.cats || []).filter(c => c.name !== "Other").length;
   const PLACEHOLDER_TAG = [ {
     title: "List your business free",
     subtitle: `Join ${NUM(d.count)} ${S.city} businesses`,
@@ -8120,7 +8121,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.62-shared";
+const BUILD = "v16.63-shared";
 
 const APP_COOKIE = "gl_app";
 
