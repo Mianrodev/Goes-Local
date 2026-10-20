@@ -2223,6 +2223,27 @@ async function syncStep(env, DB, maxPages) {
         }
         if (drop.length && await ghlRemoveTag(env, c.id, drop)) tagFix++;
       }
+      // Sales mark a cold-called business by setting Owner Email and Listing Verification. The GHL workflow is meant
+      // to call /webhooks/ghlstatus, but it doesn't always fire (20 Oct: Orlando's never reached the site), so the
+      // sync does the same thing itself: a verified contact that isn't claimed yet, or whose Plus/Pro tag is
+      // missing, goes through applyListingVerification (10 per page).
+      let lvFix = 0;
+      for (const c of page.contacts) {
+        if (lvFix >= 10) break;
+        const tl = (c.tags || []).map(t => String(t).trim().toLowerCase());
+        if (!(tl.includes(S.tag) && !isPerson(c)) && !tl.includes("pending-listing")) continue;
+        const tier = LISTING_VERIFICATION_TIERS[P(cv(c, m), "listing verification").trim().toLowerCase()];
+        if (!tier) continue;
+        const behind = !tl.includes("claimed") || tier === "plus" && !tl.includes("featured") || tier === "pro" && !tl.includes("premium");
+        if (!behind) continue;
+        lvFix++;
+        try {
+          const r = await applyListingVerification(env, DB, c.id);
+          console.log(`sync: Listing Verification caught up for ${c.id} (${tier}): ${r.handled || r.reason || "ok"}`);
+        } catch (e) {
+          console.log("sync: Listing Verification catch-up failed for " + c.id + ": " + e.message);
+        }
+      }
       let pageList = page.contacts.filter(c => (c.tags || []).some(t => String(t).toLowerCase() === S.tag) && !isPerson(c)).map(c => norm(c, m));
       if (dupHidden.size) {
         const unhide = [];
@@ -2673,6 +2694,10 @@ async function applyListingVerification(env, DB, cid) {
   } catch (e) {
     console.log("applyListingVerification tag update failed: " + e.message);
   }
+  // GHL can still return the old tags for a moment after the update, so the listing is written from this contact
+  // with the new tags applied (otherwise it lands on the site unclaimed until the next sync; QA 20 Oct).
+  const lower = t => String(t).trim().toLowerCase();
+  const fresh = { ...c, tags: [ ...new Set([ ...(c.tags || []).map(lower).filter(t => !removeTags.map(lower).includes(t)), ...addTags.map(lower) ]) ] };
   let newRow = null;
   try {
     newRow = await DB.prepare("SELECT * FROM claims WHERE ghl_id=?1 AND status='pending-listing' ORDER BY created_at DESC LIMIT 1").bind(cid).first();
@@ -2692,7 +2717,7 @@ async function applyListingVerification(env, DB, cid) {
       }
     }
     try {
-      await insertOne(env, DB, cid);
+      await insertOne(env, DB, cid, fresh);
     } catch (e) {
       console.log("applyListingVerification insertOne failed: " + e.message);
     }
@@ -2765,7 +2790,7 @@ async function applyListingVerification(env, DB, cid) {
     };
   }
   try {
-    await insertOne(env, DB, cid);
+    await insertOne(env, DB, cid, fresh);
   } catch (e) {
     console.log("applyListingVerification refresh failed: " + e.message);
   }
@@ -2778,9 +2803,11 @@ async function applyListingVerification(env, DB, cid) {
     // that's entirely ours: it only flips once we've actually sent this exact
     // email, so it's what keeps this from sending twice.
     if (biz && !biz.claim_invited_at) {
-      if (biz.email && !junkEmail(biz.email)) {
+      // To the Owner Email sales confirmed on the call when there is one, else the business email.
+      const inviteTo = [ biz.owner_email, biz.email ].map(x => NRM(x || "")).find(x => x && !junkEmail(x)) || "";
+      if (inviteTo) {
         const href = CLAIMLINK(biz);
-        const sent = await sendTplEmail(env, DB, biz.email, "claim_invite", {
+        const sent = await sendTplEmail(env, DB, inviteTo, "claim_invite", {
           business: biz.name,
           brand: S.brand,
           email: biz.owner_email || biz.email
@@ -7997,7 +8024,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.55-shared";
+const BUILD = "v16.57-shared";
 
 const APP_COOKIE = "gl_app";
 
