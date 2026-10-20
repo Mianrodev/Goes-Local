@@ -8024,7 +8024,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.57-shared";
+const BUILD = "v16.58-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8687,6 +8687,45 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         } catch (e) {
           return TXT("Field fetch failed: " + e.message);
         }
+      }
+      // Test helper for live QA (full admin only): create, change and delete GHL contacts that are clearly tests.
+      // Only names starting "QA " are created, and only contacts carrying the "qa-test" tag can be changed or deleted.
+      if (p[1] === "qa-contact" && req.method === "POST") {
+        if (role !== "admin") return TXT("qa-contact needs full admin access.");
+        const f = await req.formData();
+        const act = String(f.get("action") || ""), id = String(f.get("id") || "").trim();
+        const isQa = c => !!c && (c.tags || []).some(t => String(t).toLowerCase() === "qa-test");
+        if (act === "create") {
+          const name = String(f.get("name") || "").trim();
+          if (!/^QA /.test(name)) return TXT("name must start with \"QA \"");
+          const r = await fetch(`${API}/contacts/`, { method: "POST", headers: { ...H(env), "Content-Type": "application/json" }, body: JSON.stringify({ locationId: env.GHL_LOCATION_ID, companyName: name, firstName: name, email: NRM(f.get("email") || "") || undefined, phone: String(f.get("phone") || "") || undefined, address1: String(f.get("address") || "") || undefined, city: String(f.get("city") || "") || undefined, postalCode: String(f.get("zip") || "") || undefined, tags: [ "business", "qa-test", ...String(f.get("tags") || "").split(",").map(t => t.trim()).filter(Boolean) ], source: "QA test" }) });
+          const j = await r.json().catch(() => ({}));
+          return TXT(r.ok ? "created " + (j.contact && j.contact.id) : "create failed " + r.status + " " + JSON.stringify(j).slice(0, 200));
+        }
+        const c = id ? await ghlGetContact(env, id) : null;
+        if (!isQa(c)) return TXT("not a qa-test contact");
+        if (act === "get") {
+          const m = await fields(env);
+          return TXT(JSON.stringify({ id: c.id, name: c.companyName || c.firstName, email: c.email, tags: c.tags, fields: (c.customFields || []).map(x => [ m[x.id] || x.id, x.value ]) }, null, 1));
+        }
+        if (act === "set") {
+          const m = await fields(env);
+          const fid = fieldId(m, String(f.get("field") || "").toLowerCase().trim());
+          if (!fid) return TXT("no such custom field");
+          const r = await fetch(`${API}/contacts/${id}`, { method: "PUT", headers: { ...H(env), "Content-Type": "application/json" }, body: JSON.stringify({ customFields: [ { id: fid, field_value: String(f.get("value") || "") } ] }) });
+          return TXT(r.ok ? "set" : "set failed " + r.status + " " + (await r.text()).slice(0, 200));
+        }
+        if (act === "delete") {
+          const r = await fetch(`${API}/contacts/${id}`, { method: "DELETE", headers: H(env) });
+          if (DB) {
+            await DB.prepare("DELETE FROM businesses WHERE ghl_id=?1").bind(id).run().catch(() => {});
+            await DB.prepare("DELETE FROM claims WHERE ghl_id=?1").bind(id).run().catch(() => {});
+            C = { t: 0, d: null };
+            SHELL_DIRTY = true;
+          }
+          return TXT(r.ok ? "deleted" : "delete failed " + r.status);
+        }
+        return TXT("action must be create, get, set or delete");
       }
       if (p[1] === "whoami") {
         if (role !== "admin") return TXT("whoami needs full admin access — ask an admin.");
