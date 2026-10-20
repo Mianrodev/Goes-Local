@@ -2694,6 +2694,10 @@ async function applyListingVerification(env, DB, cid) {
   } catch (e) {
     console.log("applyListingVerification tag update failed: " + e.message);
   }
+  // GHL can still return the old tags for a moment after the update, so the listing is written from this contact
+  // with the new tags applied (otherwise it lands on the site unclaimed until the next sync; QA 20 Oct).
+  const lower = t => String(t).trim().toLowerCase();
+  const fresh = { ...c, tags: [ ...new Set([ ...(c.tags || []).map(lower).filter(t => !removeTags.map(lower).includes(t)), ...addTags.map(lower) ]) ] };
   let newRow = null;
   try {
     newRow = await DB.prepare("SELECT * FROM claims WHERE ghl_id=?1 AND status='pending-listing' ORDER BY created_at DESC LIMIT 1").bind(cid).first();
@@ -2713,7 +2717,7 @@ async function applyListingVerification(env, DB, cid) {
       }
     }
     try {
-      await insertOne(env, DB, cid);
+      await insertOne(env, DB, cid, fresh);
     } catch (e) {
       console.log("applyListingVerification insertOne failed: " + e.message);
     }
@@ -2786,7 +2790,7 @@ async function applyListingVerification(env, DB, cid) {
     };
   }
   try {
-    await insertOne(env, DB, cid);
+    await insertOne(env, DB, cid, fresh);
   } catch (e) {
     console.log("applyListingVerification refresh failed: " + e.message);
   }
@@ -8020,7 +8024,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.56-shared";
+const BUILD = "v16.57-shared";
 
 const APP_COOKIE = "gl_app";
 
