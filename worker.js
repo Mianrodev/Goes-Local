@@ -1437,6 +1437,34 @@ async function migrate(DB, env) {
   } catch (e) {
     console.log("migrate: sub-category merge failed: " + e.message);
   }
+  // Listings sitting on a sub-category's address move to their own (e.g. general-contractor → general-contractor-2),
+  // so the sub-category page shows again. No redirect: the old address now is the sub-category page.
+  try {
+    const subs = (await DB.prepare("SELECT DISTINCT cs, sub FROM businesses WHERE sub<>''").all()).results || [];
+    const byCs = {};
+    for (const r of subs) (byCs[r.cs] = byCs[r.cs] || new Set()).add(SLUG(r.sub));
+    let moved = 0;
+    for (const cs in byCs) {
+      const sl = [ ...byCs[cs] ].filter(Boolean);
+      for (let i = 0; i < sl.length; i += 90) {
+        const part = sl.slice(i, i + 90);
+        const hit = (await DB.prepare(`SELECT ghl_id, slug FROM businesses WHERE cs=?1 AND slug IN (${part.map((_, j) => "?" + (j + 2)).join(",")})`).bind(cs, ...part).all()).results || [];
+        for (const h of hit) {
+          const to = await uniqueSlug(DB, cs, h.slug, h.ghl_id);
+          if (to !== h.slug) {
+            await DB.prepare("UPDATE businesses SET slug=?1 WHERE ghl_id=?2").bind(to, h.ghl_id).run();
+            moved++;
+          }
+        }
+      }
+    }
+    if (moved) {
+      SHELL_DIRTY = true;
+      console.log(`migrate: moved ${moved} listings off sub-category addresses`);
+    }
+  } catch (e) {
+    console.log("migrate: sub-category address check failed: " + e.message);
+  }
   for (const q of DDL) await DB.prepare(q).run();
   try {
     await DB.prepare("ALTER TABLE businesses ADD COLUMN hood TEXT DEFAULT ''").run();
@@ -2569,11 +2597,18 @@ const ROWOF = r => ({
   gpSyncedAt: r.gp_synced_at || 0
 });
 
+// A listing never takes a sub-category's address (/{cat}/{sub}): a business called just "General Contractor"
+// would otherwise hide the General Contractor page (Eric, 20 Oct).
+async function subSlugsOf(DB, cs) {
+  const rows = (await DB.prepare("SELECT DISTINCT sub FROM businesses WHERE cs=?1 AND sub<>''").bind(cs).all().catch(() => null) || {}).results || [];
+  return new Set(rows.map(r => SLUG(r.sub)).filter(Boolean));
+}
 async function uniqueSlug(DB, cs, wantSlug, ghlId) {
   let x = wantSlug || "biz", i = 2;
+  const subSlugs = await subSlugsOf(DB, cs);
   while (true) {
-    const clash = await DB.prepare("SELECT ghl_id FROM businesses WHERE cs=?1 AND slug=?2").bind(cs, x).first();
-    if (!clash || clash.ghl_id === ghlId) return x;
+    const clash = subSlugs.has(x) ? { ghl_id: "" } : await DB.prepare("SELECT ghl_id FROM businesses WHERE cs=?1 AND slug=?2").bind(cs, x).first();
+    if (!clash || clash.ghl_id && clash.ghl_id === ghlId) return x;
     x = `${wantSlug || "biz"}-${i++}`;
     if (i > 50) return `${wantSlug || "biz"}-${String(ghlId || "x").slice(-6).toLowerCase()}`;
   }
@@ -8085,7 +8120,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.61-shared";
+const BUILD = "v16.62-shared";
 
 const APP_COOKIE = "gl_app";
 

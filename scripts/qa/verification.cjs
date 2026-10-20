@@ -330,6 +330,12 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   await F(BASE + "/admin/migrate", { headers: { cookie: (lg.headers.get("set-cookie") || "").split(";")[0] } });
   const subs = sql("SELECT ghl_id,sub FROM businesses WHERE ghl_id LIKE 'SC%' ORDER BY ghl_id").map(r => r.sub);
   ok(subs.slice(0, 3).every(x => x === "General Contractor") && subs[3] === "Unique sub", "T35 look-alike sub-categories merge into one spelling", JSON.stringify(subs));
+  // T36 a listing named exactly like a sub-category moves off that address, so the sub-category page shows
+  sql(`INSERT INTO businesses(ghl_id,city,cat,cs,sub,slug,name,addr,claimed,updated_at) VALUES ('SC5','Tampa','Home Services','home-services','General Contractor','general-contractor','General Contractor','5 St',0,1)`);
+  await F(BASE + "/admin/migrate", { headers: { cookie: (lg.headers.get("set-cookie") || "").split(";")[0] } });
+  const sl36 = sql("SELECT slug FROM businesses WHERE ghl_id='SC5'")[0].slug;
+  const pg36 = await get("/home-services/general-contractor");
+  ok(sl36 === "general-contractor-2" && pg36.status === 200 && /SC One/.test(pg36.html), "T36 sub-category page wins over a listing with the same name", sl36 + " " + pg36.status);
   sql("DELETE FROM businesses WHERE ghl_id LIKE 'SC%'");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });
