@@ -2634,6 +2634,24 @@ const DUPKEY = r => {
   const ad = String(r.addr || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   return nm && (ph || ad) ? nm + "|" + ph + "|" + ad : "";
 };
+// Same Google listing = same business (Eric, 21 Oct): the Maps link's CID (?cid=…, or the 0x…:0x… form), else the place id.
+const GKEY = r => {
+  const m = String(r.map || "");
+  let k = (m.match(/[?&]cid=(\d+)/) || [])[1];
+  if (k) return "cid:" + k;
+  k = (m.match(/0x[0-9a-f]+:0x([0-9a-f]+)/i) || [])[1];
+  if (k) try {
+    return "cid:" + BigInt("0x" + k);
+  } catch {}
+  k = (m.match(/place_id[=:]([\w-]+)/) || [])[1] || r.gp_id;
+  return k ? "pid:" + k : "";
+};
+
+const NAMEKEY = s => String(s || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+const SAMENAME = (a, b) => {
+  const x = NAMEKEY(a), y = NAMEKEY(b);
+  return !!x && !!y && (x === y || Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x)));
+};
 
 async function dedupeListings(DB) {
   let hidden = 0, released = 0;
@@ -2643,16 +2661,35 @@ async function dedupeListings(DB) {
     for (let i = 0; i < ops.length; i += 400) await DB.batch(ops.slice(i, i + 400));
     released = gone.length;
   }
-  const rows = (await DB.prepare("SELECT id,ghl_id,cs,slug,name,pr,ph,addr,claimed,premium,plus,rev,rat FROM businesses").all()).results || [];
+  const rows = (await DB.prepare("SELECT id,ghl_id,cs,slug,name,pr,ph,addr,claimed,premium,plus,rev,rat,map,gp_id FROM businesses").all()).results || [];
+  const rank = (a, b) => (b.claimed || 0) - (a.claimed || 0) || (b.plus || 0) - (a.plus || 0) || (b.premium || 0) - (a.premium || 0) || (b.rev || 0) - (a.rev || 0) || (b.rat || 0) - (a.rat || 0) || a.id - b.id;
+  const now = Date.now(), ops = [];
+  // Rows sharing name + phone + address, or the same Google listing, are one business (joined across both).
+  const up = new Map, find = x => {
+    while (up.get(x) !== x) {
+      up.set(x, up.get(up.get(x)));
+      x = up.get(x);
+    }
+    return x;
+  };
+  const seen = new Map, byG = new Map;
+  for (const r of rows) {
+    up.set(r.ghl_id, r.ghl_id);
+    const k = DUPKEY(r), g = GKEY(r);
+    if (k) {
+      if (seen.has(k)) up.set(find(r.ghl_id), find(seen.get(k))); else seen.set(k, r.ghl_id);
+    }
+    if (g) (byG.get(g) || byG.set(g, []).get(g)).push(r);
+  }
+  // Same Google listing only counts when the names agree too ("Walgreens" / "Walgreens Pharmacy"): in Miami many
+  // different businesses carry a Google link copied from another one, and those must not disappear (Admin → /admin/duplicates?google lists them for fixing).
+  for (const g of byG.values()) for (let i = 0; i < g.length; i++) for (let j = i + 1; j < g.length; j++) if (SAMENAME(g[i].name, g[j].name)) up.set(find(g[i].ghl_id), find(g[j].ghl_id));
   const groups = new Map;
   for (const r of rows) {
-    const k = DUPKEY(r);
-    if (!k) continue;
+    const k = find(r.ghl_id);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(r);
   }
-  const rank = (a, b) => (b.claimed || 0) - (a.claimed || 0) || (b.plus || 0) - (a.plus || 0) || (b.premium || 0) - (a.premium || 0) || (b.rev || 0) - (a.rev || 0) || (b.rat || 0) - (a.rat || 0) || a.id - b.id;
-  const now = Date.now(), ops = [];
   for (const g of groups.values()) {
     if (g.length < 2) continue;
     g.sort(rank);
@@ -2664,6 +2701,8 @@ async function dedupeListings(DB) {
     }
   }
   for (let i = 0; i < ops.length; i += 399) await DB.batch(ops.slice(i, i + 399));
+  // A listing that was kept before and is now hidden hands its earlier copies on to the new kept listing.
+  if (hidden) await DB.prepare("UPDATE dup_hidden SET keep_id=(SELECT h.keep_id FROM dup_hidden h WHERE h.ghl_id=dup_hidden.keep_id) WHERE keep_id IN (SELECT ghl_id FROM dup_hidden)").run();
   if (hidden) await DB.prepare("UPDATE slug_redirects SET ghl_id=(SELECT keep_id FROM dup_hidden h WHERE h.ghl_id=slug_redirects.ghl_id) WHERE ghl_id IN (SELECT ghl_id FROM dup_hidden)").run();
   return {
     hidden: hidden,
@@ -8121,7 +8160,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.63-shared";
+const BUILD = "v16.64-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8506,6 +8545,24 @@ const _export = {
       if (p[1] === "duplicates") {
         if (role !== "admin") return TXT("Duplicates needs full admin access — ask an admin.");
         await migrate(DB, env);
+        if (u.searchParams.has("google")) {
+          const rows = (await DB.prepare("SELECT ghl_id,cs,slug,name,map,gp_id,rev FROM businesses WHERE coalesce(map,'')<>'' OR coalesce(gp_id,'')<>''").all()).results || [];
+          const byG = new Map;
+          for (const r of rows) {
+            const g = GKEY(r);
+            if (g) (byG.get(g) || byG.set(g, []).get(g)).push(r);
+          }
+          const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+          const out = [];
+          for (const g of byG.values()) if (g.length > 1 && g.some(r => !SAMENAME(r.name, g[0].name))) for (const r of g) out.push([ r.map || r.gp_id, r.name, r.ghl_id, S.dom + "/" + r.cs + "/" + r.slug, r.rev || 0 ].map(q).join(","));
+          return new Response("Google link,Business,CRM contact id,Web address,Google reviews\n" + out.join("\n"), {
+            headers: {
+              "content-type": "text/csv; charset=utf-8",
+              "content-disposition": 'attachment; filename="shared-google-links.csv"',
+              "cache-control": "no-store"
+            }
+          });
+        }
         if (u.searchParams.has("csv")) {
           const rows = (await DB.prepare("SELECT h.name,h.ghl_id,h.cs,h.slug,h.keep_id,b.cs kcs,b.slug kslug FROM dup_hidden h LEFT JOIN businesses b ON b.ghl_id=h.keep_id ORDER BY h.name").all()).results || [];
           const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';

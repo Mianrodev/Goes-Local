@@ -336,6 +336,16 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   const sl36 = sql("SELECT slug FROM businesses WHERE ghl_id='SC5'")[0].slug;
   const pg36 = await get("/home-services/general-contractor");
   ok(sl36 === "general-contractor-2" && pg36.status === 200 && /SC One/.test(pg36.html), "T36 sub-category page wins over a listing with the same name", sl36 + " " + pg36.status);
+  // T37 two listings on the same Google listing (same CID) become one; the hidden one's address goes to the kept one
+  sql(`INSERT INTO businesses(ghl_id,city,cat,cs,sub,slug,name,addr,map,rev,claimed,updated_at) VALUES
+    ('GC1','Tampa','Home Services','home-services','Plumber','gc-best','GC Best Plumbing','9 St','https://www.google.com/maps?cid=123456789',50,0,1),
+    ('GC2','Tampa','Home Services','home-services','Plumber','gc-copy','GC Best Plumbing LLC','10 Ave','https://www.google.com/maps?cid=123456789',3,0,1),
+    ('GC3','Tampa','Home Services','home-services','Plumber','gc-own','GC Different Business','11 St','https://www.google.com/maps?cid=123456789',3,0,1)`);
+  await F(BASE + "/admin/duplicates", { headers: { cookie: (lg.headers.get("set-cookie") || "").split(";")[0] } });
+  const left37 = sql("SELECT ghl_id FROM businesses WHERE ghl_id LIKE 'GC%' ORDER BY ghl_id").map(r => r.ghl_id).join(",");
+  const r37 = await F(BASE + "/home-services/gc-copy", { redirect: "manual" });
+  ok(left37 === "GC1,GC3" && r37.status === 301 && /gc-best/.test(r37.headers.get("location") || ""), "T37 same Google listing + same name shows once (copy forwards); a different name on that link stays", left37 + " " + r37.status);
+  sql("DELETE FROM businesses WHERE ghl_id LIKE 'GC%'"); sql("DELETE FROM dup_hidden WHERE ghl_id LIKE 'GC%'"); sql("DELETE FROM slug_redirects WHERE ghl_id LIKE 'GC%'");
   sql("DELETE FROM businesses WHERE ghl_id LIKE 'SC%'");
   console.log(`\n${n - fails}/${n} passed`);
 })().catch(e => { console.log("CRASH", e); process.exit(1); });
