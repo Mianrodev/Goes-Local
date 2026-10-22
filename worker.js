@@ -8160,7 +8160,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.64-shared";
+const BUILD = "v16.65-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -12299,22 +12299,32 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       return R(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Setup needed</title><style>${CSS}</style></head>\n<body><div class="wrap" style="padding:70px 24px;max-width:680px"><h1>Database not set up yet</h1>\n<div class="blk"><p style="font-family:monospace;font-size:12.5px">${E(e.message)}</p></div>\n<p>Run <a href="/admin/migrate">/admin/migrate</a>, then <a href="/admin/sync">/admin/sync</a>.</p>\n</div></body></html>`, 500);
     }
     if (!d.count) return R(NOTICE(d, "No listings yet", "Run the sync to pull listings in from GoHighLevel.", "Run sync now", "/admin/sync"));
-    const XMLURLSET = urls => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(x => `<url><loc>${S.dom}${x}</loc></url>`).join("\n")}\n</urlset>`;
+    // Each entry may carry when it last changed ([path, ms]) so search engines can see what is new (SEO team, 22 Oct).
+    const LASTMOD = ms => ms > 0 ? `<lastmod>${new Date(ms).toISOString().slice(0, 10)}</lastmod>` : "";
+    const XMLURLSET = urls => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(x => Array.isArray(x) ? `<url><loc>${S.dom}${x[0]}</loc>${LASTMOD(x[1])}</url>` : `<url><loc>${S.dom}${x}</loc></url>`).join("\n")}\n</urlset>`;
+    const MAXOF = async q => +((await DB.prepare(q).first().catch(() => null)) || {}).m || 0;
     const XMLRESP = body => new Response(body, {
       headers: {
         "content-type": "application/xml"
       }
     });
     if (u.pathname === "/sitemap-index.xml" || u.pathname === "/sitemap.xml") {
-      const now = new Date().toISOString();
-      const parts = [ "sitemap-categories.xml", "sitemap-locations.xml", "sitemap-best.xml", "sitemap-listings.xml", "post-sitemap.xml", "news-sitemap.xml" ];
-      return XMLRESP(`<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${parts.map(f => `<sitemap><loc>${S.dom}/${f}</loc><lastmod>${now}</lastmod></sitemap>`).join("\n")}\n</sitemapindex>`);
+      // lastmod is when that file's content last really changed, not "now" (search engines ignore a date that always moves).
+      const [biz, hid, post, news] = await Promise.all([ MAXOF("SELECT MAX(updated_at) m FROM businesses"), MAXOF("SELECT MAX(created_at) m FROM dup_hidden"), MAXOF("SELECT MAX(coalesce(updated_at,created_at)) m FROM posts WHERE published=1"), MAXOF("SELECT MAX(coalesce(updated_at,created_at)) m FROM news WHERE published=1") ]);
+      const list = Math.max(biz, hid);
+      const parts = [ [ "sitemap-categories.xml", Math.max(list, post) ], [ "sitemap-locations.xml", list ], [ "sitemap-best.xml", list ], [ "sitemap-listings.xml", list ], [ "post-sitemap.xml", post ], [ "news-sitemap.xml", news ] ];
+      return XMLRESP(`<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${parts.map(([ f, ms ]) => `<sitemap><loc>${S.dom}/${f}</loc>${ms ? `<lastmod>${new Date(ms).toISOString()}</lastmod>` : ""}</sitemap>`).join("\n")}\n</sitemapindex>`);
     }
     if (u.pathname === "/sitemap-categories.xml") {
-      const posts = (await DB.prepare("SELECT slug FROM posts WHERE published=1 AND archived=0").all().catch(() => ({
+      const posts = (await DB.prepare("SELECT slug, coalesce(updated_at,created_at) m FROM posts WHERE published=1 AND archived=0").all().catch(() => ({
         results: []
       }))).results || [];
-      const us = [ "/", "/add", "/claim", "/login", "/categories", "/" + AREA.paths, "/claimed", "/about", ...S.freeOnly ? [] : [ "/pricing" ], "/privacy", "/terms", "/blog", "/news", ...d.cats.flatMap(c => [ `/${c.slug}`, ...(c.subs || []).map(s => `/${c.slug}/${SLUG(s.name)}`) ]), ...posts.map(p => `/blog/${p.slug}`) ];
+      const csM = {}, subM = {};
+      for (const r of (await DB.prepare("SELECT cs, sub, MAX(updated_at) m FROM businesses GROUP BY cs, sub").all().catch(() => ({ results: [] }))).results || []) {
+        csM[r.cs] = Math.max(csM[r.cs] || 0, r.m || 0);
+        subM[r.cs + "|" + SLUG(r.sub)] = Math.max(subM[r.cs + "|" + SLUG(r.sub)] || 0, r.m || 0);
+      }
+      const us = [ "/", "/add", "/claim", "/login", "/categories", "/" + AREA.paths, "/claimed", "/about", ...S.freeOnly ? [] : [ "/pricing" ], "/privacy", "/terms", "/blog", "/news", ...d.cats.flatMap(c => [ [ `/${c.slug}`, csM[c.slug] ], ...(c.subs || []).map(s => [ `/${c.slug}/${SLUG(s.name)}`, subM[c.slug + "|" + SLUG(s.name)] ]) ]), ...posts.map(p => [ `/blog/${p.slug}`, p.m ]) ];
       return XMLRESP(XMLURLSET(us));
     }
     if (u.pathname === "/sitemap-locations.xml") {
@@ -12322,23 +12332,23 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       return XMLRESP(XMLURLSET(us));
     }
     if (u.pathname === "/sitemap-listings.xml") {
-      const rows = (await DB.prepare("SELECT cs,slug FROM businesses").all()).results || [];
-      return XMLRESP(XMLURLSET(rows.map(r => `/${r.cs}/${r.slug}`)));
+      const rows = (await DB.prepare("SELECT cs,slug,updated_at FROM businesses").all()).results || [];
+      return XMLRESP(XMLURLSET(rows.map(r => [ `/${r.cs}/${r.slug}`, r.updated_at ])));
     }
     if (u.pathname === "/post-sitemap.xml" || u.pathname === "/blog-sitemap.xml") {
-      const posts = (await DB.prepare("SELECT slug FROM posts WHERE published=1 AND archived=0 ORDER BY created_at DESC").all().catch(() => ({
+      const posts = (await DB.prepare("SELECT slug, coalesce(updated_at,created_at) m FROM posts WHERE published=1 AND archived=0 ORDER BY created_at DESC").all().catch(() => ({
         results: []
       }))).results || [];
-      return XMLRESP(XMLURLSET([ "/blog", ...posts.map(p => `/blog/${p.slug}`) ]));
+      return XMLRESP(XMLURLSET([ "/blog", ...posts.map(p => [ `/blog/${p.slug}`, p.m ]) ]));
     }
     // News items live in their own table, separate from blog posts — they were
     // missing from every sitemap file, so search engines had no listing of
     // /news pages at all. This gives them the same treatment as the blog.
     if (u.pathname === "/news-sitemap.xml") {
-      const items = (await DB.prepare("SELECT slug FROM news WHERE published=1 ORDER BY created_at DESC").all().catch(() => ({
+      const items = (await DB.prepare("SELECT slug, coalesce(updated_at,created_at) m FROM news WHERE published=1 ORDER BY created_at DESC").all().catch(() => ({
         results: []
       }))).results || [];
-      return XMLRESP(XMLURLSET([ "/news", ...items.map(n => `/news/${n.slug}`) ]));
+      return XMLRESP(XMLURLSET([ "/news", ...items.map(n => [ `/news/${n.slug}`, n.m ]) ]));
     }
     if (p[0] === "art" && p.length === 3 && /\.svg$/.test(p[2])) {
       const kind = [ "hood", "cat", "type" ].includes(p[1]) ? p[1] : "cat";

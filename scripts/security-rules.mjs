@@ -22,7 +22,7 @@ const api = async (path, method = "GET", body) => {
 };
 
 const AI_AGENTS = [ "GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot", "bingbot", "DuckAssistBot", "MistralAI-User", "Amazonbot" ];
-const EXEMPT = `not starts_with(http.request.uri.path, "/webhooks/") and not starts_with(http.request.uri.path, "/admin") and not http.request.uri.path in {"/robots.txt" "/llms.txt" "/sitemap.xml" "/sitemap-index.xml" "/sitemap-categories.xml" "/sitemap-locations.xml" "/sitemap-listings.xml" "/post-sitemap.xml" "/news-sitemap.xml"} and not any(http.request.headers["x-gl-check"][*] eq "${CHECK}")`;
+const EXEMPT = `not starts_with(http.request.uri.path, "/webhooks/") and not starts_with(http.request.uri.path, "/admin") and not http.request.uri.path in {"/robots.txt" "/llms.txt" "/sitemap.xml" "/sitemap-index.xml" "/sitemap-categories.xml" "/sitemap-locations.xml" "/sitemap-listings.xml" "/post-sitemap.xml" "/news-sitemap.xml" "/sitemap-best.xml" "/blog-sitemap.xml"} and not any(http.request.headers["x-gl-check"][*] eq "${CHECK}")`;
 const NOT_AI = `not (${AI_AGENTS.map(a => `http.user_agent contains "${a}"`).join(" or ")})`;
 const CLOUD_ASNS = "45102 16276 14061 24940 16509 14618 8075 396982 63949 20473";
 const SEO_BOTS = [ "SemrushBot", "AhrefsBot", "MJ12bot", "DotBot", "PetalBot", "Bytespider" ];
