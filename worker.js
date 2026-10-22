@@ -3686,7 +3686,43 @@ async function rateOk(env, key, limit) {
   return true;
 }
 
-async function sendEmail(env, to, subject, html, text, contactId) {
+// Emails to a business go out from the sales rep assigned to it in GHL, not "No Reply" (Eric, 22 Oct).
+// The rep's own address is used only when it is on this site's domain (e.g. zack.m@miamigoeslocal.com): mail is sent
+// through the site's GHL sending domain, and Miami's domain rejects mail "from" it that isn't aligned, while an address
+// on another domain (…@mianrosystems.com) would land in spam. Otherwise: the rep's name with the site's address.
+// No rep, or GHL can't tell us who it is → the site's usual sender.
+let REPS = {};
+const ORGDOM = h => String(h || "").toLowerCase().split(".").slice(-2).join(".");
+async function repSender(env, contactIds) {
+  try {
+    let uid = "";
+    for (const id of [ ...new Set(contactIds.filter(Boolean)) ]) {
+      const c = await ghlGetContact(env, id);
+      if (c && c.assignedTo) {
+        uid = c.assignedTo;
+        break;
+      }
+    }
+    if (!uid) return null;
+    let u = REPS[uid];
+    if (!u || Date.now() - u.t > 6 * 3600e3) {
+      const r = await fetch(`${API}/users/${uid}`, { headers: H(env) });
+      const j = r.ok ? await r.json().catch(() => ({})) : {};
+      if (!r.ok) console.log("rep lookup " + uid + " failed: " + r.status);
+      const name = String(j.name || [ j.firstName, j.lastName ].filter(Boolean).join(" ") || "").replace(/[<>"]/g, "").trim();
+      u = REPS[uid] = { t: Date.now(), name: name, email: NRM(j.email || "") };
+    }
+    if (!u.name) return null;
+    const own = ORGDOM(AUTH.FROM_EMAIL.split("@")[1]);
+    const mail = u.email && ORGDOM(u.email.split("@")[1]) === own ? u.email : AUTH.FROM_EMAIL;
+    return { uid: uid, from: mail === AUTH.FROM_EMAIL ? `${u.name} | ${AUTH.FROM_NAME} <${mail}>` : `${u.name} <${mail}>` };
+  } catch (e) {
+    console.log("rep sender failed: " + e.message);
+    return null;
+  }
+}
+
+async function sendEmail(env, to, subject, html, text, contactId, opts) {
   if (AUTH.EMAIL_PROVIDER === "resend") {
     try {
       const r = await fetch("https://api.resend.com/emails", {
@@ -3711,6 +3747,7 @@ async function sendEmail(env, to, subject, html, text, contactId) {
   try {
     let cid = contactId || await ghlFindOrCreateContact(env, to, {});
     if (!cid) return false;
+    let rs = opts && opts.rep ? await repSender(env, [ contactId, cid ]) : null;
     const post = id => fetch(`${API}/conversations/messages`, {
       method: "POST",
       headers: {
@@ -3721,13 +3758,25 @@ async function sendEmail(env, to, subject, html, text, contactId) {
         type: "Email",
         contactId: id,
         emailTo: to,
-        emailFrom: `${AUTH.FROM_NAME} <${AUTH.FROM_EMAIL}>`,
+        emailFrom: rs ? rs.from : `${AUTH.FROM_NAME} <${AUTH.FROM_EMAIL}>`,
+        ...rs ? {
+          userId: rs.uid
+        } : {},
         subject: subject,
         html: html,
         message: text || subject
       })
     });
     let r = await post(cid);
+    if (!r.ok && rs) {
+      const why = await r.clone().text().catch(() => "");
+      // "Contact has no email" is handled below and isn't the rep's fault; anything else, retry from the site address.
+      if (!/no email/i.test(why)) {
+        console.log("ghl email from rep failed (" + r.status + " " + why.slice(0, 160) + ") — sending from the site address");
+        rs = null;
+        r = await post(cid);
+      }
+    }
     // GHL refuses ("Contact has no email") when the given contact — often a business contact whose email lives in
     // a custom field — has no email of its own. Send through the recipient's own contact instead (14 Oct: 22 of 70
     // verification invites failed this way, and claim-approved emails to claimants could too).
@@ -3748,7 +3797,7 @@ async function sendEmail(env, to, subject, html, text, contactId) {
       return false;
     }
     const j = await r.json().catch(() => ({}));
-    console.log("ghl email queued: msgId=" + (j.messageId || j.emailMessageId || "?") + " to=" + to);
+    console.log("ghl email queued: msgId=" + (j.messageId || j.emailMessageId || "?") + " to=" + to + (rs ? " from=" + rs.from : ""));
     return true;
   } catch (e) {
     console.log("ghl email fail: " + e.message);
@@ -5467,7 +5516,9 @@ async function sendTplEmail(env, DB, to, key, vars, href, code, contactId) {
   if (pitch) html = withPitch(html);
   const plainBody = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   const text = (t.isCode ? `${title}: ${code}` : `${title}. ${plainBody}`) + (href ? " " + href : "") + (pitch ? PITCH_TEXT() : "");
-  return sendEmail(env, to, subject, html, text, contactId);
+  return sendEmail(env, to, subject, html, text, contactId, {
+    rep: !t.internal && !t.isCode
+  });
 }
 
 const NOTIFY_KINDS = {
@@ -8173,7 +8224,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.66-shared";
+const BUILD = "v16.67-shared";
 
 const APP_COOKIE = "gl_app";
 
