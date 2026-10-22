@@ -1648,6 +1648,10 @@ async function migrate(DB, env) {
   } catch {}
   try {
     await DB.prepare("CREATE TABLE IF NOT EXISTS email_templates(key TEXT PRIMARY KEY, subject TEXT NOT NULL, body TEXT NOT NULL, updated_at INTEGER)").run();
+    // The editor saves the heading and button text too; without these columns every save failed (Eric, 22 Oct).
+    for (const col of [ "title", "btn" ]) try {
+      await DB.prepare(`ALTER TABLE email_templates ADD COLUMN ${col} TEXT`).run();
+    } catch {}
   } catch {}
   try {
     await DB.prepare("CREATE INDEX IF NOT EXISTS ix_updates_biz ON updates(ghl_id,created_at DESC)").run();
@@ -5149,7 +5153,7 @@ const EMAIL_TEMPLATES = {
     subject: "{{business}} is listed on {{brand}} — claim it in 30 seconds",
     badge: "✓ VERIFIED ON {{brand}}",
     title: "{{business}} is live — take control of your page",
-    body: "<p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> on {{brand}} is live. Create your free account in 30 seconds to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
+    body: "<p style=\"margin:0 0 12px\">Your business was recently added to {{brand}}, the largest local directory in {{city}}, so local customers in {{city}} can find you, which means more business for you.</p><p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> is live. Create your free account in 30 seconds to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
     btn: "Manage my listing →",
     noExpiry: true
   },
@@ -5389,6 +5393,14 @@ function glSendNotifyTest(kind, btn){
   }).finally(function(){ btn.disabled = false; btn.textContent = orig; });
 }`;
 
+// Placeholders every email can use, filled from this site's own settings, so one template works for every city and state.
+const SITEVARS = () => ({
+  brand: E(S.brand),
+  city: E(S.city),
+  website: E(S.dom.replace(/^https?:\/\//, ""))
+});
+const TPLVARS = def => [ ...new Set([ ...def.vars || [], ...Object.keys(SITEVARS()) ]) ];
+
 function fillTpl(str, vars) {
   return String(str || "").replace(/\{\{(\w+)\}\}/g, (m, k) => vars[k] !== undefined && vars[k] !== null ? vars[k] : "");
 }
@@ -5439,6 +5451,7 @@ async function sendTplEmail(env, DB, to, key, vars, href, code, contactId) {
   try {
     await catImgOverrides(DB);
   } catch {}
+  vars = { ...SITEVARS(), ...vars || {} };
   const subject = fillTpl(t.subject, vars);
   const title = fillTpl(t.title, vars);
   const body = fillTpl(t.body, vars);
@@ -8160,7 +8173,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.65-shared";
+const BUILD = "v16.66-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8660,7 +8673,7 @@ const _export = {
           const list = await getNotifyEmails(DB, env, kind);
           if (!list.length) return jr({ ok: false, message: "No email address saved for this one yet — add one above and save first." }, 400);
           try {
-            const sampleVars = Object.fromEntries((def.vars || []).map(v => [ v, `[${v}]` ]));
+            const sampleVars = { ...Object.fromEntries(TPLVARS(def).map(v => [ v, `[${v}]` ])), ...SITEVARS() };
             let sent = 0;
             for (const to of list) {
               if (await sendTplEmail(env, DB, to, tplKey, sampleVars, AUTH.SITE_URL, "482913")) sent++;
@@ -8679,7 +8692,7 @@ const _export = {
         if (!def) return jr({ ok: false, message: "Unknown email type." }, 400);
         if (!to || to.indexOf("@") < 0) return jr({ ok: false, message: "Enter a valid email address." }, 400);
         try {
-          const sampleVars = Object.fromEntries((def.vars || []).map(v => [ v, `[${v}]` ]));
+          const sampleVars = { ...Object.fromEntries(TPLVARS(def).map(v => [ v, `[${v}]` ])), ...SITEVARS() };
           const ok = await sendTplEmail(env, DB, to, key, sampleVars, AUTH.SITE_URL, "482913");
           return jr({
             ok,
@@ -8732,7 +8745,7 @@ const _export = {
           const t = await getEmailTemplate(DB, editKey);
           const def = EMAIL_TEMPLATES[editKey];
           const isCustomized = t.subject !== def.subject || t.title !== def.title || t.body !== def.body || (t.btn || "") !== (def.btn || "");
-          const sampleVars = Object.fromEntries((def.vars || []).map(v => [ v, `[${v}]` ]));
+          const sampleVars = { ...Object.fromEntries(TPLVARS(def).map(v => [ v, `[${v}]` ])), ...SITEVARS() };
           const previewSubject = fillTpl(t.subject, sampleVars);
           const previewTitle = fillTpl(t.title, sampleVars);
           const previewBody = fillTpl(t.body, sampleVars);
@@ -8750,7 +8763,7 @@ ${err ? `<div class="note-err" style="margin-bottom:16px">${E(err)}</div>` : ""}
 <label style="font-size:13px;font-weight:600;color:${T.navy}">Heading (shown at the top of the email)<input name="title" value="${E(t.title)}" required></label>
 <label style="font-size:13px;font-weight:600;color:${T.navy}">Message body (HTML)<textarea name="body" rows="6" style="font-family:monospace;font-size:12.5px">${E(t.body)}</textarea></label>
 ${!def.isCode ? `<label style="font-size:13px;font-weight:600;color:${T.navy}">Button text${def.btn ? "" : " (leave blank — this email has no button)"}<input name="btn" value="${E(t.btn || "")}"></label>` : `<input type="hidden" name="btn" value="">`}
-<p style="font-size:11.5px;color:${T.faint}">Available placeholders: ${(def.vars || []).map(v => `<code>{{${v}}}</code>`).join(" ")}${def.isCode ? " — the code display itself is fixed and not editable." : ""}</p>
+<p style="font-size:11.5px;color:${T.faint}">Available placeholders: ${TPLVARS(def).map(v => `<code>{{${v}}}</code>`).join(" ")} — {{city}}, {{brand}} and {{website}} fill in with this site's own name, so the same wording works on every city and state site.${def.isCode ? " — the code display itself is fixed and not editable." : ""}</p>
 <div style="display:flex;gap:10px">
 <button class="btn btn-p">Save changes</button>
 ${isCustomized ? `<button class="btn btn-o" formnovalidate name="_action" value="reset" style="border-color:#B3261E;color:#B3261E" onclick="return confirm('Reset this email back to the built-in default? Your customization will be lost.')">Reset to default</button>` : ""}
