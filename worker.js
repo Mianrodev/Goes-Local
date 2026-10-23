@@ -3688,6 +3688,8 @@ async function rateOk(env, key, limit) {
   return true;
 }
 
+// Sign-in and email-confirmation links come from the site itself, like sign-in codes (22 Oct live test).
+const NO_REP = new Set([ "signin_link", "claim_confirm" ]);
 // Emails to a business go out from the sales rep assigned to it in GHL, not "No Reply" (Eric, 22 Oct).
 // The rep's own address is used only when it is on this site's domain (e.g. zack.m@miamigoeslocal.com): mail is sent
 // through the site's GHL sending domain, and Miami's domain rejects mail "from" it that isn't aligned, while an address
@@ -5519,7 +5521,7 @@ async function sendTplEmail(env, DB, to, key, vars, href, code, contactId) {
   const plainBody = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   const text = (t.isCode ? `${title}: ${code}` : `${title}. ${plainBody}`) + (href ? " " + href : "") + (pitch ? PITCH_TEXT() : "");
   return sendEmail(env, to, subject, html, text, contactId, {
-    rep: !t.internal && !t.isCode
+    rep: !t.internal && !t.isCode && !NO_REP.has(key)
   });
 }
 
@@ -8348,7 +8350,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.71-shared";
+const BUILD = "v16.72-shared";
 
 const APP_COOKIE = "gl_app";
 
