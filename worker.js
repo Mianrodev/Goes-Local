@@ -7132,7 +7132,7 @@ const SIGNUP = (d, err) => PAGE(d, {
 // Each item jumps straight to its box on the edit page.
 const LISTCHECK = b => {
   const svc = Array.isArray(b.svc) ? b.svc.filter(Boolean) : String(b.svc || "").split(",").filter(x => x.trim());
-  const items = [ [ "hours", "Opening hours", !!(b.hrs2 || b.hrs && String(b.hrs).trim()), "Add your opening hours" ], [ "services", "Services you offer", svc.length > 0, "Add the services you offer" ], [ "descr", "Short description", !!(b.desc && String(b.desc).trim()), "Add a short description" ], [ "photos", "Photos or logo", !!(b.logo || b.photos && String(b.photos).length > 2 || b.sprofile || b.scover), "Add photos or your logo" ], [ "phone", "Phone number", !!(b.ph && String(b.ph).trim()), "Add your phone number" ] ];
+  const items = [ [ "hours", "Opening hours", !!(b.hrs2 || b.hrs && String(b.hrs).trim()), "Add your opening hours" ], [ "services", "Services you offer", svc.length > 0, "Add the services you offer" ], [ "descr", "Short description", !!(b.desc && String(b.desc).trim()), "Add a short description" ], [ "photos", "Photos or logo", !!(b.logo || b.photos && String(b.photos).length > 2 || b.sprofile || b.scover || b.slots && (b.slots.profile || b.slots.cover || b.slots.store || b.slots.location || (b.slots.extra || []).length)), "Add photos or your logo" ], [ "phone", "Phone number", !!(b.ph && String(b.ph).trim()), "Add your phone number" ] ];
   return {
     items: items,
     done: items.filter(x => x[2]).length
@@ -8350,7 +8350,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.72-shared";
+const BUILD = "v16.73-shared";
 
 const APP_COOKIE = "gl_app";
 
