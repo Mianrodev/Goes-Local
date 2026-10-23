@@ -1801,6 +1801,13 @@ async function migrate(DB, env) {
   try {
     await DB.prepare(`CREATE TABLE IF NOT EXISTS pending_email_invites(\n  ghl_id TEXT PRIMARY KEY, created_at INTEGER)`).run();
   } catch {}
+  // Listings a sales rep marked Verified, waiting for the owner's first sign-in before they count as claimed.
+  try {
+    await DB.prepare("CREATE TABLE IF NOT EXISTS owner_pending(ghl_id TEXT PRIMARY KEY, email TEXT DEFAULT '', tier TEXT DEFAULT '', created_at INTEGER, reminded_at INTEGER, activated_at INTEGER)").run();
+  } catch {}
+  try {
+    await DB.prepare("CREATE INDEX IF NOT EXISTS ix_owner_pending_email ON owner_pending(email)").run();
+  } catch {}
   try {
     await DB.prepare(`CREATE TABLE IF NOT EXISTS site_seo(\n  page_key TEXT PRIMARY KEY, title TEXT DEFAULT '', desc TEXT DEFAULT '', updated_at INTEGER)`).run();
   } catch {}
@@ -2327,6 +2334,7 @@ async function syncStep(env, DB, maxPages) {
         if (!(tl.includes(S.tag) && !isPerson(c)) && !tl.includes("pending-listing")) continue;
         const tier = LISTING_VERIFICATION_TIERS[P(cv(c, m), "listing verification").trim().toLowerCase()];
         if (!tier) continue;
+        if (tl.includes("awaiting-owner-login") || tl.includes("owner-email-internal")) continue;
         const behind = !tl.includes("claimed") || tier === "plus" && !tl.includes("featured") || tier === "pro" && !tl.includes("premium");
         if (!behind) continue;
         lvFix++;
@@ -2825,10 +2833,22 @@ async function applyListingVerification(env, DB, cid) {
     skipped: true,
     reason: raw ? `"${raw}" isn't a verified status — nothing to do` : "field is blank or still Pending — nothing to do"
   };
-  const addTags = [ "business", "claimed", "Recently Claimed" ];
-  const removeTags = [];
-  if (tier === "plus") addTags.push("featured"); else removeTags.push("featured");
-  if (tier === "pro") addTags.push("premium"); else removeTags.push("premium");
+  // A cold-call "Verified" (no claim or add request from the owner on the site) on a listing nobody has claimed is held:
+  // the invite goes out as before, but the listing only becomes claimed — and gets its claimed/paid tags — when the
+  // owner signs in for the first time with the code we email them (activateOwner). Reps were marking leads Verified
+  // without reaching anyone (Eric, 23 Oct). Listings claimed before this stay as they are.
+  let hold = false;
+  try {
+    const req = await DB.prepare("SELECT 1 FROM claims WHERE ghl_id=?1 AND status IN ('pending-listing','pending','auto-verified') LIMIT 1").bind(cid).first();
+    const row = await DB.prepare("SELECT claimed FROM businesses WHERE ghl_id=?1").bind(cid).first();
+    hold = !req && !(row && row.claimed);
+  } catch {}
+  const addTags = hold ? [ "business", "awaiting-owner-login" ] : [ "business", "claimed", "Recently Claimed" ];
+  const removeTags = hold ? [ "claimed", "Recently Claimed" ] : [];
+  if (!hold) {
+    if (tier === "plus") addTags.push("featured"); else removeTags.push("featured");
+    if (tier === "pro") addTags.push("premium"); else removeTags.push("premium");
+  }
   try {
     await ghlAddTag(env, cid, addTags);
     if (removeTags.length) await ghlRemoveTag(env, cid, removeTags);
@@ -2935,6 +2955,22 @@ async function applyListingVerification(env, DB, cid) {
   } catch (e) {
     console.log("applyListingVerification refresh failed: " + e.message);
   }
+  if (hold) try {
+    const hb = await DB.prepare("SELECT name,email,owner_email FROM businesses WHERE ghl_id=?1").bind(cid).first() || {};
+    const to = [ hb.owner_email, hb.email ].map(x => NRM(x || "")).find(x => x && !junkEmail(x)) || "";
+    const qa = (c.tags || []).some(t => String(t).toLowerCase() === "qa-test");
+    if (to && OURMAIL(to) && !qa) {
+      // A staff address as the owner would let the rep "claim" it themselves — never counts, and the dev team hears.
+      await ghlAddTag(env, cid, [ "owner-email-internal" ]).catch(() => {});
+      await ghlNote(env, cid, `Marked ${tier === "verified" ? "Listing Verified" : "Listing Verified " + tier} with Owner Email ${to}, which is one of our own addresses. No invite was sent and the listing is not claimed. Put the business owner's own email in Owner Email.`);
+      await devAlert(env, DB, { business: hb.name || cid, email: to, status: "pending" }, "staff email used as Owner Email", `A sales rep marked this listing Verified with ${to} as the Owner Email. Nothing was sent and it is not claimed.`);
+      return { ok: true, cid: cid, tier: tier, handled: "internal-owner-email" };
+    }
+    await DB.prepare("INSERT INTO owner_pending(ghl_id,email,tier,created_at) VALUES(?1,?2,?3,?4) ON CONFLICT(ghl_id) DO UPDATE SET email=excluded.email, tier=excluded.tier WHERE owner_pending.activated_at IS NULL").bind(cid, to, tier, Date.now()).run();
+    await ghlNote(env, cid, `Marked ${tier === "verified" ? "Listing Verified" : "Listing Verified " + tier}. Invite ${to ? "sent to " + to : "waiting for an email"}. It counts as claimed only once the owner signs in for the first time with the code we email them.`);
+  } catch (e) {
+    console.log("applyListingVerification hold failed: " + e.message);
+  }
   try {
     const biz = await DB.prepare("SELECT ghl_id,name,cs,slug,email,claimed,owner_email,claim_invited_at FROM businesses WHERE ghl_id=?1").bind(cid).first();
     // The GHL workflow now sets Owner Email itself (Contact.Email → Owner Email)
@@ -2994,8 +3030,66 @@ async function applyListingVerification(env, DB, cid) {
     ok: true,
     cid: cid,
     tier: tier,
-    handled: "plan-update"
+    handled: hold ? "awaiting-owner" : "plan-update"
   };
+}
+
+// Our own staff addresses (this site's domain, the company's) can never be a business owner for a held verification.
+const OURMAIL = em => {
+  const d = ORGDOM(String(em || "").split("@")[1]);
+  return !!d && [ ORGDOM(AUTH.FROM_EMAIL.split("@")[1]), ORGDOM(S.dom.replace(/^https?:\/\//, "").split("/")[0]), "mianrosystems.com" ].includes(d);
+};
+
+async function ghlNote(env, cid, body) {
+  try {
+    await fetch(`${API}/contacts/${cid}/notes`, {
+      method: "POST",
+      headers: {
+        ...H(env),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        body: body
+      })
+    });
+  } catch (e) {
+    console.log("ghl note failed: " + e.message);
+  }
+}
+
+// First sign-in by an owner whose listing a rep marked Verified: now it counts — claimed + paid tags, listing claimed.
+async function activateOwner(env, email) {
+  const DB = getDB(env), em = NRM(email);
+  if (!DB || !em) return 0;
+  let rows = [];
+  try {
+    rows = (await DB.prepare("SELECT * FROM owner_pending WHERE email=?1 AND activated_at IS NULL").bind(em).all()).results || [];
+  } catch {
+    return 0;
+  }
+  let n = 0;
+  for (const r of rows) {
+    try {
+      const add = [ "business", "claimed", "Recently Claimed" ], rm = [ "awaiting-owner-login" ];
+      if (r.tier === "plus") add.push("featured"); else rm.push("featured");
+      if (r.tier === "pro") add.push("premium"); else rm.push("premium");
+      await DB.prepare("UPDATE owner_pending SET activated_at=?1 WHERE ghl_id=?2 AND activated_at IS NULL").bind(Date.now(), r.ghl_id).run();
+      await ghlAddTag(env, r.ghl_id, add);
+      await ghlRemoveTag(env, r.ghl_id, rm);
+      await ghlSetOwnerEmail(env, r.ghl_id, em);
+      const c = await ghlGetContact(env, r.ghl_id);
+      if (c) {
+        const lower = t => String(t).trim().toLowerCase();
+        await insertOne(env, DB, r.ghl_id, { ...c, tags: [ ...new Set([ ...(c.tags || []).map(lower).filter(t => !rm.map(lower).includes(t)), ...add.map(lower) ]) ] });
+      }
+      await DB.prepare("UPDATE businesses SET claimed_at=?1 WHERE ghl_id=?2 AND claimed_at IS NULL").bind(Date.now(), r.ghl_id).run();
+      await ghlNote(env, r.ghl_id, `The owner (${em}) signed in for the first time on ${new Date().toISOString().slice(0, 10)}. The listing now counts as claimed${r.tier === "verified" ? "" : " (" + r.tier + ")"}.`);
+      n++;
+    } catch (e) {
+      console.log("activateOwner failed for " + r.ghl_id + ": " + e.message);
+    }
+  }
+  return n;
 }
 
 let C = {
@@ -3516,6 +3610,7 @@ async function pendingEmailInviteBatch(env, DB, maxUpdates) {
       if (wasSent) {
         await DB.prepare("UPDATE businesses SET claim_invited_at=?1 WHERE ghl_id=?2").bind(Date.now(), biz.ghl_id).run();
         await DB.prepare("DELETE FROM pending_email_invites WHERE ghl_id=?1").bind(biz.ghl_id).run();
+        await DB.prepare("UPDATE owner_pending SET email=?1 WHERE ghl_id=?2 AND activated_at IS NULL AND email=''").bind(NRM(biz.email), biz.ghl_id).run().catch(() => {});
         try {
           await ghlRemoveTag(env, biz.ghl_id, [ "no-email-for-invite" ]);
         } catch (e) {
@@ -4158,6 +4253,20 @@ async function bvHourly(env, DB) {
 async function autoHourly(env, DB) {
   const out = { closed: 0, invited: 0, dev: 0 };
   const now = Date.now();
+  // Owners invited after a rep's Verified who haven't signed in after 3 days get one reminder.
+  try {
+    const rows = (await DB.prepare("SELECT p.ghl_id, p.email, b.name FROM owner_pending p JOIN businesses b ON b.ghl_id=p.ghl_id WHERE p.activated_at IS NULL AND p.reminded_at IS NULL AND p.email<>'' AND p.created_at<?1 LIMIT 30").bind(now - 3 * 864e5).all()).results || [];
+    for (const r of rows) {
+      await DB.prepare("UPDATE owner_pending SET reminded_at=?1 WHERE ghl_id=?2").bind(now, r.ghl_id).run();
+      if (await sendTplEmail(env, DB, r.email, "claim_invite_reminder", {
+        business: r.name || "your business",
+        brand: S.brand,
+        email: r.email
+      }, CLAIMLINK({ owner_email: r.email }), undefined, r.ghl_id)) out.reminded = (out.reminded || 0) + 1;
+    }
+  } catch (e) {
+    console.log("auto: owner reminders failed: " + e.message);
+  }
   const close = async (r, status, why) => {
     const ch = await DB.prepare("UPDATE claims SET status=?1, decided_at=?2, notes=trim(coalesce(notes,'') || ?3) WHERE id=?4 AND status=?5").bind(status, now, "\n[closed: " + why + "]", r.id, r.status).run();
     if (ch.meta && ch.meta.changes) out.closed++;
@@ -5034,6 +5143,11 @@ async function startSession(env, email, name) {
   }), {
     expirationTtl: AUTH.SESSION_DAYS * 86400
   });
+  try {
+    await activateOwner(env, email);
+  } catch (e) {
+    console.log("activateOwner: " + e.message);
+  }
   return mkCookie(env, sid);
 }
 
@@ -5245,7 +5359,18 @@ const EMAIL_TEMPLATES = {
     body: "<p style=\"margin:0 0 12px\">Your business was recently added to {{brand}}, the largest local directory in {{city}}, so local customers in {{city}} can find you, which means more business for you.</p><p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> is live. Create your free account in 30 seconds to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
     btn: "Manage my listing →",
     noExpiry: true
+  },  claim_invite_reminder: {
+    label: "Reminder: claim your verified listing (3 days later)",
+    description: "Sent once, 3 days after the claim invite, when a listing a sales rep marked Verified hasn't been signed into yet.",
+    vars: [ "business", "brand", "email" ],
+    subject: "Reminder: {{business}} is waiting for you on {{brand}}",
+    badge: "✓ VERIFIED ON {{brand}}",
+    title: "Your listing is ready — it takes 30 seconds",
+    body: "<p style=\"margin:0 0 12px\">Your business was recently added to {{brand}}, the largest local directory in {{city}}, so local customers in {{city}} can find you, which means more business for you.</p><p style=\"margin:0 0 12px\">Your free listing for <b>{{business}}</b> is live. Create your free account in 30 seconds to update it any time:</p><table role=\"presentation\" style=\"border-collapse:collapse;font-size:14.5px;color:#1B2A3A\"><tr><td style=\"width:26px;padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Add your logo, photos and opening hours</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Get customer messages straight to your inbox</td></tr><tr><td style=\"padding:5px 0;color:#2E8B8B;font-weight:bold\">✓</td><td style=\"padding:5px 0\">Keep your services and details up to date</td></tr></table><div style=\"background:#FBF5EA;border-radius:12px;padding:12px 14px;font-size:13px;color:#42556B;margin-top:16px\">Use this email to sign in: <b style=\"color:#12263F\">{{email}}</b><br>Already set a password? Just log in with the same email.</div>",
+    btn: "Manage my listing →",
+    noExpiry: true
   },
+
   claim_confirm: {
     label: "Confirm your email (new claim)",
     description: "Sent immediately after someone submits a claim request, before admin review.",
@@ -8386,7 +8511,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.74-shared";
+const BUILD = "v16.75-shared";
 
 const APP_COOKIE = "gl_app";
 
