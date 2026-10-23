@@ -5051,6 +5051,42 @@ async function resolveDisplayName(env, email, fallbackName) {
   return lp ? TC(lp).split(/\s+/)[0] : "there";
 }
 
+// The Owner Name sales entered on the owner's listing in GHL (Eric, 23 Oct: greet "Dana", not "Dev1 Ncdemo Owner").
+// Cached per email for a day; "" when there is none.
+async function ownerNameFor(env, DB, email) {
+  const em = NRM(email || "");
+  if (!em) return "";
+  const KV = KVOF(env), key = "oname:" + em;
+  try {
+    const hit = KV ? await KV.get(key) : null;
+    if (hit !== null && hit !== undefined) return hit;
+  } catch {}
+  let nm = "";
+  try {
+    const ids = await ownedIds(env, em);
+    if (ids.length) {
+      const m = await fields(env);
+      for (const id of ids.slice(0, 3)) {
+        const c = await ghlGetContact(env, id);
+        nm = c ? String(P(cv(c, m), "owner name") || "").trim() : "";
+        if (nm && !PLACEHOLDER_NAME.test(nm)) break;
+        nm = "";
+      }
+    }
+  } catch {}
+  try {
+    if (KV) await KV.put(key, nm, { expirationTtl: 86400 });
+  } catch {}
+  return nm;
+}
+
+// True when a display name is just made from the email address (e.g. "Dev1 Ncdemo Owner" from dev1+ncdemo-owner@).
+const NAME_FROM_EMAIL = (name, email) => {
+  const lp = TC(String(email || "").split("@")[0].replace(/[._+-]+/g, " ").trim());
+  const n = String(name || "").trim();
+  return !n || n === lp || n === lp.split(/\s+/)[0] || PLACEHOLDER_NAME.test(n);
+};
+
 function timeGreeting() {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
@@ -8350,7 +8386,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.73-shared";
+const BUILD = "v16.74-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11447,7 +11483,9 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           console.log("account stats (" + key + ") failed: " + e.message);
         }
       }
-      return R2(ACCOUNT(d, s.email, s.name, businesses, follows, reviews, {
+      let showName = s.name;
+      if (businesses.length && NAME_FROM_EMAIL(showName, s.email)) showName = (await ownerNameFor(env, DB, s.email)).split(/\s+/)[0] || showName;
+      return R2(ACCOUNT(d, s.email, showName, businesses, follows, reviews, {
         hasPw: hasPw,
         stats: stats
       }));
