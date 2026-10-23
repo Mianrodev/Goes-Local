@@ -2717,6 +2717,7 @@ async function dedupeListings(DB) {
 async function refreshOne(env, DB, ghlId, expect) {
   if (!DB || !ghlId) return false;
   await loadCatMap(DB);
+  await loadHoods(DB); // without this a single insert/refresh files the listing under no neighbourhood/town
   let m = {};
   try {
     m = await fields(env);
@@ -2765,6 +2766,7 @@ async function refreshOne(env, DB, ghlId, expect) {
 async function insertOne(env, DB, ghlId, pre) {
   if (!DB || !ghlId) return false;
   await loadCatMap(DB);
+  await loadHoods(DB); // without this a single insert/refresh files the listing under no neighbourhood/town
   let m = {};
   try {
     m = await fields(env);
@@ -8224,7 +8226,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.68-shared";
+const BUILD = "v16.69-shared";
 
 const APP_COOKIE = "gl_app";
 
