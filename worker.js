@@ -3869,8 +3869,10 @@ async function sendEmail(env, to, subject, html, text, contactId, opts) {
     let r = await post(cid);
     if (!r.ok && rs) {
       const why = await r.clone().text().catch(() => "");
-      // "Contact has no email" is handled below and isn't the rep's fault; anything else, retry from the site address.
-      if (!/no email/i.test(why)) {
+      // "Contact has no email" and "emailTo is not under contact's … emails" (Owner Email differs from the business
+      // contact's email, the usual cold-call case) are handled below by sending through the recipient's own contact,
+      // still as the rep; anything else, retry from the site address.
+      if (!/no email|INVALID_EMAILTO|not under contact/i.test(why)) {
         console.log("ghl email from rep failed (" + r.status + " " + why.slice(0, 160) + ") — sending from the site address");
         rs = null;
         r = await post(cid);
@@ -8511,7 +8513,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.75-shared";
+const BUILD = "v16.76-shared";
 
 const APP_COOKIE = "gl_app";
 
