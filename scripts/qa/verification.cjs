@@ -251,10 +251,12 @@ const claim = (id, email, ip) => post("/api/claim", { id, email, name: "QA Perso
   ok(ed.status === 302 && !/Business%20email/i.test(edLoc), "T19 business email = sign-in email no longer blocks the save (local copy has no GHL, so only the CRM step fails)", ed.status + " " + edLoc);
   // T20 colleague access to the account: sign in as colleague via a fresh email code on QA8? use ownedIds through /manage/edit GET
   sql("UPDATE businesses SET owner_email='owner@qaeight.com' WHERE ghl_id='QA8'");
-  const pg20 = await F(BASE + "/manage/edit?id=QA8", { headers: { cookie: ownerCookie } });
-  ok(pg20.status === 200 && /Services you offer/.test(await pg20.text()), "T20 owner can open the edit page");
+  const pg20 = await F(BASE + "/manage/hub?id=QA8", { headers: { cookie: ownerCookie } });
+  ok(pg20.status === 200 && /Services you offer/.test(await pg20.text()), "T20 owner can open the edit form (Your listing tab of Manage listing)");
+  const ed20 = await F(BASE + "/manage/edit?id=QA8&ok=1&err=x", { redirect: "manual", headers: { cookie: ownerCookie } });
+  ok(ed20.status === 302 && /\/manage\/hub\?id=QA8&lerr=x&lok=1$/.test(ed20.headers.get("location") || ""), "T20 old Edit links open the one Manage listing page", ed20.status + " " + ed20.headers.get("location"));
   // T21 team access: a colleague on the listing's own website domain gets in; a shared corporate domain does not
-  const canEdit = async id => (await F(BASE + "/manage/edit?id=" + id, { redirect: "manual", headers: { cookie: ownerCookie } })).status === 200;
+  const canEdit = async id => (await F(BASE + "/manage/hub?id=" + id, { redirect: "manual", headers: { cookie: ownerCookie } })).status === 200;
   sql("UPDATE businesses SET claimed=1, owner_email='boss@qaeight.com', web='https://qaeight.com' WHERE ghl_id='QA9'");
   ok(await canEdit("QA9"), "T21 colleague at the business's own website domain can manage it");
   sql("UPDATE businesses SET web='https://www.qaeight.com/agents/boss' WHERE ghl_id='QA9'");

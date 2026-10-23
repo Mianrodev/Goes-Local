@@ -5741,6 +5741,28 @@ h1.brag-h1 span{color:var(--coral)}
 @media(max-width:760px){.mh-card{flex-wrap:wrap;padding:16px}.mh-ph{width:60px;height:60px}.mh-card h1{font-size:23px}.mh-ac{margin:4px 0 0;width:100%}.mh-ac a{flex:1}
 .mh-ug{grid-template-columns:1fr}.mh-ug>div+div{border-left:0;border-top:1px solid rgba(255,255,255,.14)}.mh-ug>div{padding:14px 16px}.mh-ug span{display:none}
 .mh-tb{width:100%;top:0}.mh-tb a{flex:1;padding:9px 6px;font-size:13px}.mh-tb small{margin-left:4px;padding:1px 5px}.mh-del #delListingBtn{margin-left:0}}
+.ml-cols{display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
+.ml-side{position:sticky;top:70px}.ml-side a{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;font-size:14px;color:var(--body);margin-bottom:2px}.ml-side a:hover{background:#fff}
+.ml-side a b{font-weight:800;color:var(--teal)}.ml-side a b.no{color:var(--coral)}
+.ml-prog{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;font-size:13px}.ml-prog .bar{height:6px;background:var(--sand);border-radius:99px;overflow:hidden;margin:8px 0}.ml-prog .bar i{display:block;height:100%;background:var(--teal)}
+.ml-sec{scroll-margin-top:84px}.mh-page .ml-cols h2{font-size:18px;margin-bottom:12px}.ml-sec textarea{width:100%}#sec-photos div{min-width:0}#sec-photos input[type=file]{max-width:100%!important;min-width:0}
+.ml-save{position:sticky;bottom:10px;z-index:6;display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--navy);color:#fff;border-radius:16px;padding:10px 12px 10px 18px;margin:4px 0 18px;box-shadow:0 8px 24px rgba(18,38,63,.25)}
+.ml-save span{font-size:13.5px;opacity:.8}.ml-save.dirty span{opacity:1;font-weight:700}.ml-save .btn{border:0}
+.ml-same{display:flex!important;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--navy);margin:0 0 6px;cursor:pointer}.ml-same input{width:auto!important;margin:0}.ml-hide{display:none!important}
+.ac-hint{display:flex;gap:14px;align-items:center;background:#F1F8F7;border:1px solid #CFE6E3;border-radius:16px;padding:14px 16px;margin:4px 0 22px}
+.ac-hint .ic{width:40px;height:40px;border-radius:12px;background:#fff;border:1px solid #CFE6E3;display:grid;place-items:center;font-size:19px;flex-shrink:0}
+.ac-hint b{color:var(--navy)}.ac-hint p{font-size:13.5px;margin:2px 0 0;color:var(--body)}.ac-hint .x{font-size:13px;color:var(--muted);text-decoration:underline;background:none;border:0;cursor:pointer;padding:4px}
+.ac-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px;align-items:start}
+.ac-biz{display:flex;gap:16px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:16px;margin-top:14px;background:#fff}
+.ac-th{width:68px;height:68px;border-radius:14px;overflow:hidden;background:var(--sand);flex-shrink:0;display:block}.ac-th img,.ac-th .fill{width:100%;height:100%;object-fit:cover;display:grid;place-items:center}
+.ac-bm{flex:1;min-width:0}.ac-bm h3{font-size:18px;margin:5px 0 2px;overflow-wrap:anywhere}.ac-bm h3 a{color:var(--navy)}
+.ac-bar{height:6px;background:var(--sand);border-radius:99px;overflow:hidden;margin:8px 0 4px;max-width:240px}.ac-bar i{display:block;height:100%;background:var(--teal)}
+.ac-todo{font-size:12.5px;font-weight:700;color:var(--coral)}.ac-done{font-size:12.5px;font-weight:700;color:var(--teal)}
+.ac-ba{display:flex;flex-direction:column;gap:8px;flex-shrink:0}.ac-st{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:10px}.ac-st b{color:var(--navy)}
+.ac-set a{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);color:var(--navy);font-weight:700;font-size:14px}.ac-set a:last-child{border-bottom:0}
+.ac-set a span{color:var(--muted);font-weight:400;font-size:13px;text-align:right}.ac-set em{font-style:normal;font-size:11px;font-weight:800;background:#FFF1D6;color:#8A5A00;border-radius:99px;padding:2px 8px;margin-right:6px}
+@media(max-width:860px){.ml-cols{grid-template-columns:1fr}.ml-side{position:static;display:flex;flex-wrap:wrap;gap:6px}.ml-side a{background:#fff;border:1px solid var(--line);padding:7px 12px;font-size:13px;margin:0}.ml-prog{width:100%;margin-top:4px}
+#sec-photos img{width:76px!important}.ac-grid{grid-template-columns:1fr}.ac-biz{flex-wrap:wrap}.ac-ba{width:100%}.ac-ba .btn{width:100%;justify-content:center}.ac-hint{flex-wrap:wrap}}
 .lpx-hero{position:relative;padding:54px 24px 70px;background:var(--navy) center/cover;color:#fff}
 .lpx-hero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(18,38,63,.97) 0%,rgba(18,38,63,.88) 48%,rgba(18,38,63,.55) 100%)}
 .lpx-in{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) 440px;grid-template-areas:'t c' 'b c';column-gap:48px;align-content:center;max-width:1180px;margin:0 auto}
@@ -7094,7 +7116,7 @@ const PASSWORDPAGE = (d, email, msg, err) => PAGE(d, {
   title: `Set a password | ${S.brand}`,
   desc: "Set or change the password you sign in with.",
   can: S.dom + "/manage/password",
-  body: `<div class="wrap" style="max-width:420px;padding:60px 24px">\n<nav class="crumb"><a href="/manage">Your listings</a> / Set a password</nav>\n<h1 style="margin:14px 0 6px">Set a password</h1>\n<p style="color:${T.muted};margin-bottom:20px">Sign in with ${E(email)} and this password. You can always use a one-time code by email or text instead.</p>\n${msg ? `<div class="note note-ok">${E(msg)}</div>` : ""}\n${err ? `<div class="note note-err">${E(err)}</div>` : ""}\n<form method="POST" action="/manage/password">\n<div class="fld2"><label for="np">New password</label><input id="np" name="password" type="password" required minlength="8"></div>\n<div class="fld2"><label for="np2">Confirm new password</label><input id="np2" name="password2" type="password" required minlength="8"></div>\n<button class="btn btn-p btn-w">Save password</button>\n<script>(function(){var f=document.currentScript.closest("form");\nf.addEventListener("submit",function(e){\nvar a=f.querySelector('[name="password"]').value,b=f.querySelector('[name="password2"]').value;\nif(a!==b){e.preventDefault();var m=f.querySelector(".pwmismatch");\nif(!m){m=document.createElement("p");m.className="pwmismatch";m.style.cssText="color:#B3261E;font-size:12.5px;margin-top:-8px;margin-bottom:10px";f.querySelector('[name="password2"]').closest(".fld2").after(m)}\nm.textContent="Passwords don't match — check both boxes."}\n});})();<\/script>\n</form></div>`
+  body: `<div class="wrap" style="max-width:420px;padding:60px 24px">\n<nav class="crumb"><a href="/account">Your profile</a> / Password</nav>\n<h1 style="margin:14px 0 6px">Set a password</h1>\n<p style="color:${T.muted};margin-bottom:20px">Sign in with ${E(email)} and this password, with no waiting for an email code. You can still use a one-time code by email or text whenever you like.</p>\n${msg ? `<div class="note note-ok">${E(msg)}</div>` : ""}\n${err ? `<div class="note note-err">${E(err)}</div>` : ""}\n<form method="POST" action="/manage/password">\n<div class="fld2"><label for="np">New password</label><input id="np" name="password" type="password" required minlength="8"></div>\n<div class="fld2"><label for="np2">Confirm new password</label><input id="np2" name="password2" type="password" required minlength="8"></div>\n<button class="btn btn-p btn-w">Save password</button>\n<script>(function(){var f=document.currentScript.closest("form");\nf.addEventListener("submit",function(e){\nvar a=f.querySelector('[name="password"]').value,b=f.querySelector('[name="password2"]').value;\nif(a!==b){e.preventDefault();var m=f.querySelector(".pwmismatch");\nif(!m){m=document.createElement("p");m.className="pwmismatch";m.style.cssText="color:#B3261E;font-size:12.5px;margin-top:-8px;margin-bottom:10px";f.querySelector('[name="password2"]').closest(".fld2").after(m)}\nm.textContent="Passwords don't match — check both boxes."}\n});})();<\/script>\n</form></div>`
 });
 
 const SIGNUP = (d, err) => PAGE(d, {
@@ -7124,31 +7146,140 @@ ${c.items.map(([k, label, ok, add]) => ok ? `<div style="display:flex;align-item
 </div>`;
 };
 
-const ACCOUNT = (d, email, name, businesses, follows, reviews) => PAGE(d, {
-  title: `My Profile | ${S.brand}`,
-  desc: "Your businesses, followed businesses, and reviews.",
-  can: S.dom + "/account",
-  body: `<div class="wrap"><nav class="crumb"><a href="/">Home</a> / My Profile</nav>\n<div style="padding:14px 0 26px"><div class="kicker">Your profile</div>\n<h1>${E(timeGreeting())}, ${E(name || "there")} 👋</h1>\n<p style="color:${T.muted};margin-top:8px">Signed in as ${E(email)}</p></div>\n${businesses.length ? `<div class="blk" style="margin-bottom:26px"><h2>Your businesses</h2>
-<div class="grid g2" style="margin-top:14px">${businesses.map(b => `<article class="card">
-<div class="card-img">${PHOTO(b)}${b.plus ? `<span class="pin l">${BDG("bdg-plus", "PRO")}</span>` : b.premium ? `<span class="pin l">${BDG("bdg-feat", "PLUS")}</span>` : ""}</div>
-<div class="card-b"><div class="tagrow">${BDG("bdg-cat", b.cat)}${b.claimed ? BDG("bdg-ver", "Verified", ICO.check) : ""}</div>
-<h3><a href="/${E(b.cs)}/${E(b.slug)}">${E(b.name)}</a></h3>
-${b.addr ? `<p style="font-size:12.5px;color:${T.muted};margin:2px 0 0">${E(b.addr)}</p>` : ""}
-${CHECKLIST(b, false)}
-<div class="card-acts" style="flex-direction:column;align-items:stretch;gap:8px">
-<a class="btn btn-p" href="/manage/edit?id=${encodeURIComponent(b.id)}">Edit hours, services &amp; photos</a>
-<a class="btn btn-o" href="/manage/hub?id=${encodeURIComponent(b.id)}">Reviews, updates &amp; more</a>
-</div></article>`).join("")}</div>
-<div style="margin-top:16px;padding:14px 16px;border:1px dashed ${T.line};border-radius:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-<div><b style="color:${T.navy}">Have another location?</b><p style="font-size:13px;color:${T.muted};margin:2px 0 0">Add it and it shows up here too, under the same sign-in.</p></div>
-<a class="btn btn-o" href="/add?email=${encodeURIComponent(email)}">＋ Add another location</a></div>
-</div>` : `<div class="blk" style="margin-bottom:26px"><h2>Your businesses</h2>
-<div style="margin-top:12px;padding:16px;border-radius:14px;background:#FFF7E8;border:1px solid #F3DFB5">
+// Owner area (Eric, 23 Oct): one compact row per business, a soft nudge to set a password, an Account box.
+const ACCOUNT = (d, email, name, businesses, follows, reviews, x) => {
+  x = x || {};
+  const st = x.stats || {};
+  const PL = (n, w) => `<b>${NUM(n || 0)}</b> ${w}${n === 1 ? "" : "s"}`;
+  const bizRow = b => {
+    const c = LISTCHECK(b), id = encodeURIComponent(b.id), todo = c.items.find(i => !i[2]), s = st[b.id] || {};
+    return `<div class="ac-biz"><a class="ac-th" href="/manage/hub?id=${id}">${PHOTO(b)}</a>
+<div class="ac-bm"><div class="mh-bd">${b.claimed ? `<span>✓ Verified</span>` : ""}<span class="g">${b.plus ? "Pro plan" : b.premium ? "Plus plan" : "Free plan"}</span></div>
+<h3><a href="/manage/hub?id=${id}">${E(b.name)}</a></h3>
+<div style="font-size:12.5px;color:${T.muted}">${E([ b.sub || b.cat, b.addr ].filter(Boolean).join(" · "))}</div>
+<div class="ac-bar"><i style="width:${Math.round(c.done / c.items.length * 100)}%"></i></div>
+${todo ? `<a class="ac-todo" href="/manage/hub?id=${id}#sec-${todo[0]}">${c.done} of ${c.items.length} done · ${E(todo[3])} →</a>` : `<span class="ac-done">✓ Your listing is complete</span>`}
+<div class="ac-st"><span>${PL(s.pending, "review")} waiting</span><span>${PL(s.views, "page view")} this week</span><span>${PL(s.followers, "follower")}</span></div></div>
+<div class="ac-ba"><a class="btn btn-p" href="/manage/hub?id=${id}">Manage listing →</a><a class="btn btn-o btn-sm" href="/${E(b.cs)}/${E(b.slug)}" target="_blank" rel="noopener">View page ↗</a></div></div>`;
+  };
+  const hint = x.hasPw === false ? `<div class="ac-hint" id="pwHint"><div class="ic">🔑</div>
+<div style="flex:1;min-width:220px"><b>Set a password to sign in faster next time</b>
+<p>Right now you sign in with a code we email you. With a password you can sign in straight away from any device, even when email is slow. It takes 20 seconds.</p></div>
+<a class="btn btn-p btn-sm" href="/manage/password">Set a password</a><button type="button" class="x" id="pwLater">Not now</button></div>
+<script>(function(){var h=document.getElementById("pwHint");try{if(+localStorage.getItem("gl_pwlater")>Date.now())h.style.display="none"}catch(e){}
+document.getElementById("pwLater").addEventListener("click",function(){h.style.display="none";try{localStorage.setItem("gl_pwlater",String(Date.now()+30*864e5))}catch(e){}})})();<\/script>` : "";
+  return PAGE(d, {
+    title: `My Profile | ${S.brand}`,
+    desc: "Your businesses, followed businesses, and reviews.",
+    can: S.dom + "/account",
+    body: `<div class="wrap" style="padding-bottom:40px"><nav class="crumb"><a href="/">Home</a> / Your profile</nav>
+<div style="padding:14px 0 18px"><h1>${E(timeGreeting())}, ${E(name || "there")} 👋</h1>
+<p style="color:${T.muted};margin-top:6px">Signed in as ${E(email)}</p></div>
+${hint}
+<div class="ac-grid"><div class="blk" style="margin:0">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Your businesses</h2>${businesses.length ? `<a class="btn btn-o btn-sm" href="/add?email=${encodeURIComponent(email)}">＋ Add another location</a>` : ""}</div>
+${businesses.length ? businesses.map(bizRow).join("") : `<div style="margin-top:12px;padding:16px;border-radius:14px;background:#FFF7E8;border:1px solid #F3DFB5">
 <b style="color:${T.navy}">Don't see your business here?</b>
 <p style="font-size:14px;color:${T.body};margin:6px 0 0">You're signed in as <b>${E(email)}</b>. If you claimed your business with a different email, sign out and sign in with that one. Otherwise, claim it or add it now — it takes 30 seconds.</p>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><a class="btn btn-p" href="/claim">Claim my business</a><a class="btn btn-o" href="/add?email=${encodeURIComponent(email)}">Add a new business</a><a class="btn btn-o" href="/logout">Sign in with another email</a></div>
-</div></div>`}\n<div class="blk" style="margin-bottom:26px"><h2>Your profile</h2>\n<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding-bottom:20px;border-bottom:1px solid ${T.line}">\n<a class="btn btn-o btn-sm" href="/account/profile">Edit profile</a>\n<a class="btn btn-o btn-sm" href="/manage/password">Set a password</a>\n<a class="btn btn-o btn-sm" href="/logout">Sign out</a>\n</div>\n<div style="margin-top:20px"><h3 style="font-size:15px;margin-bottom:8px">Businesses you follow</h3>\n${follows.length ? `<div class="grid g2" style="margin-top:14px">${follows.map(b => `<article class="card">\n<div class="card-img">${PHOTO(b)}</div><div class="card-b"><div class="tagrow">${BDG("bdg-cat", b.cat)}</div>\n<h3><a href="/${E(b.cs)}/${E(b.slug)}">${E(b.name)}</a></h3></div></article>`).join("")}</div>` : `<p style="color:${T.muted};margin-top:10px">You're not following any businesses yet — visit a listing page and tap Follow.</p>`}\n</div>\n<div style="margin-top:26px"><h3 style="font-size:15px;margin-bottom:8px">Your reviews</h3>\n${reviews.length ? `<div class="rows" style="margin-top:14px">${reviews.map(r => `<div class="row" style="padding:14px 0;border-bottom:1px solid ${T.line}">\n<b><a href="/${E(r.biz_cs)}/${E(r.biz_slug)}">${E(r.biz_name)}</a></b> — <span style="display:inline-flex;gap:1px;vertical-align:-3px">${STARROW(r.rating)}</span>\n<span class="bdg" style="margin-left:8px;background:${r.status === "approved" ? "#E6F4EA" : r.status === "rejected" ? "#FDECEA" : "#FFF3E0"};\ncolor:${r.status === "approved" ? "#1E7E34" : r.status === "rejected" ? "#B3261E" : "#B25000"}">${E(r.status)}</span>\n${r.body ? `<p style="margin-top:6px;color:${T.body}">${E(r.body)}</p>` : ""}\n${r.reply ? `<p style="margin-top:6px;font-size:13px;color:${T.body};padding-left:10px;border-left:3px solid ${T.coral}"><b style="color:${T.navy}">${E(r.biz_name)} replied:</b> ${E(r.reply)}</p>` : ""}</div>`).join("")}</div>` : `<p style="color:${T.muted};margin-top:10px">You haven't left any reviews yet.</p>`}\n</div>\n</div>\n</div>`
-});
+</div>`}
+</div>
+<div><div class="blk ac-set" style="margin:0"><h2 style="margin-bottom:6px">Account</h2>
+<a href="/account/profile">Your details <span>Name, phone, address →</span></a>
+<a href="/manage/password">Password <span>${x.hasPw === false ? "<em>Not set</em>Set one →" : "Change →"}</span></a>
+<a href="/logout">Sign out <span>→</span></a></div>
+<div class="blk" style="margin:16px 0 0"><h2 style="font-size:17px;margin-bottom:8px">Following</h2>
+${follows.length ? follows.map(b => `<a href="/${E(b.cs)}/${E(b.slug)}" style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid ${T.line};color:${T.navy};font-weight:600;font-size:14px"><span class="ac-th" style="width:36px;height:36px;border-radius:10px">${PHOTO(b)}</span>${E(b.name)}</a>`).join("") : `<p style="color:${T.muted};font-size:13.5px">No businesses yet. Tap Follow on any listing.</p>`}
+<h2 style="font-size:17px;margin:20px 0 4px">Your reviews</h2>
+${reviews.length ? `<div class="rows" style="margin-top:14px">${reviews.map(r => `<div class="row" style="padding:14px 0;border-bottom:1px solid ${T.line}">\n<b><a href="/${E(r.biz_cs)}/${E(r.biz_slug)}">${E(r.biz_name)}</a></b> — <span style="display:inline-flex;gap:1px;vertical-align:-3px">${STARROW(r.rating)}</span>\n<span class="bdg" style="margin-left:8px;background:${r.status === "approved" ? "#E6F4EA" : r.status === "rejected" ? "#FDECEA" : "#FFF3E0"};\ncolor:${r.status === "approved" ? "#1E7E34" : r.status === "rejected" ? "#B3261E" : "#B25000"}">${E(r.status)}</span>\n${r.body ? `<p style="margin-top:6px;color:${T.body}">${E(r.body)}</p>` : ""}\n${r.reply ? `<p style="margin-top:6px;font-size:13px;color:${T.body};padding-left:10px;border-left:3px solid ${T.coral}"><b style="color:${T.navy}">${E(r.biz_name)} replied:</b> ${E(r.reply)}</p>` : ""}</div>`).join("")}</div>` : `<p style="color:${T.muted};margin-top:10px">You haven't left any reviews yet.</p>`}
+</div></div></div></div>`
+  });
+};
+
+// The listing editor, shown as the first tab of the one Manage listing page.
+const EDITPANE = (b, err, ok, warn, note) => {
+  const c = LISTCHECK(b), has = Object.fromEntries(c.items.map(i => [ i[0], i[2] ]));
+  const nav = [ [ "basics", "Basics", has.descr ], [ "contact", "Contact", has.phone ], [ "hours", "Opening hours", has.hours ], [ "services", "Services", has.services ], [ "photos", "Photos & logo", has.photos ] ];
+  return `<div class="ml-cols"><aside class="ml-side">${nav.map(([ k, l, done ]) => `<a href="#sec-${k}">${E(l)}<b class="${done ? "" : "no"}">${done ? "✓" : "＋"}</b></a>`).join("")}
+<div class="ml-prog"><b style="color:${T.navy}">${c.done} of ${c.items.length} done</b><div class="bar"><i style="width:${Math.round(c.done / c.items.length * 100)}%"></i></div><span style="color:${T.muted}">${c.done === c.items.length ? "Your listing is complete. Nice work." : "Complete listings get more calls and clicks."}</span></div></aside>
+<div style="min-width:0">
+${ok ? `<div class="note note-ok">Saved. Your listing has been updated.</div>` : ""}
+${err ? `<div class="note note-err">${E(err)}</div>` : ""}
+${note ? `<div class="note note-ok">${E(note)}</div>` : ""}
+${warn ? `<div class="note note-warn">Saved. A couple of extra details (${E(warn)}) couldn't be stored yet — no need to do anything, our team will sort it.</div>` : ""}
+<form method="POST" action="/manage/edit" id="lsForm">
+<input type="hidden" name="id" value="${E(b.id)}">
+<div class="blk ml-sec" id="sec-basics"><h2>Basics</h2><div class="fgrid">
+<div class="fld2 full"><label for="ebn">Business name</label><input id="ebn" name="bizname" required value="${E(b.name || "")}"></div>\n<div class="fld2 full"><label for="eaddr">Address</label><input id="eaddr" name="address" value="${E(b.addr || "")}" placeholder="Street address, city, state, zip"></div>\n<div class="fld2"><label for="ecat">Category</label><select id="ecat" name="category">\n${[ ...MAINS, ...(b.cat && b.cat !== "Other" && !MAINS.includes(b.cat) ? [b.cat] : []), "Other" ].map(c => `<option${c === b.cat ? " selected" : ""}>${E(c)}</option>`).join("")}</select></div>\n<div class="fld2"><label for="esub">Sub-category</label><input id="esub" name="subcategory" value="${E(b.sub || "")}" placeholder="e.g. Family dentist"></div>\n${TAGFIELDS(b.labels, "ownerTag")}\n<div class="fld2"><label for="eyr">Year established</label><input id="eyr" name="yrs" type="number" min="1800" max="${(new Date).getFullYear()}" value="${E(b.yrs || "")}" placeholder="e.g. 2015"></div>\n<div class="fld2 full"><label for="ed">Short description</label>\n<textarea id="ed" name="descr" maxlength="600" placeholder="A sentence or two about what you do">${E(b.desc || "")}</textarea></div>\n
+</div></div>
+<div class="blk ml-sec" id="sec-contact"><h2>Contact</h2><div class="fgrid">
+<div class="fld2"><label for="ep">Phone</label><input id="ep" name="phone" value="${E(b.ph || "")}"></div>\n<div class="fld2"><label for="ew">Website</label><input id="ew" name="website" value="${E(b.web || "")}" placeholder="yourbusiness.com"></div>\n<div class="fld2"><label for="egm">Google Maps URL</label><input id="egm" name="map" value="${E(b.map || "")}" placeholder="https://maps.google.com/...">\n<p style="font-size:11px;color:${T.faint};margin-top:4px">Powers the "See on Google" and "Directions" links on your page.</p></div>\n<div class="fld2"><label for="eem">Business email</label><input id="eem" name="bizemail" type="email" value="${E(b.email || "")}" placeholder="hello@yourbusiness.com">\n<p style="font-size:11px;color:${T.faint};margin-top:4px">Customers see this on your page. It's fine if it's the same email you sign in with.</p></div>\n
+</div></div>
+<div class="blk ml-sec" id="sec-hours"><h2>Opening hours</h2>
+<p style="font-size:12px;color:${T.faint};margin:0 0 10px">Tick "Closed" for any day you're not open. Leave a day blank (no times chosen) and it's treated as closed too — half-filled days are never guessed at.</p>
+<label class="ml-same"><input type="checkbox" id="sameWk"> Same hours Monday to Friday</label>
+${HOURSFIELDS(b.hrs2)}
+</div>
+<div class="blk ml-sec" id="sec-services"><h2>Services you offer</h2>
+<textarea id="es" name="services" rows="3" placeholder="e.g. Dry cleaning, Tailoring and alterations, Laundry">${E((b.svc || []).join(", "))}</textarea>
+<p style="font-size:11.5px;color:${T.faint};margin-top:4px">Type each service with a comma between them. They show as a list on your page.</p></div>
+<div class="ml-save" id="lsSave"><span id="lsState">Make your changes, then save.</span><button class="btn btn-p">Save changes</button></div>
+</form>
+<div class="blk ml-sec" id="sec-photos">
+<h2 style="margin-bottom:6px">Your photos</h2>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:16px">${b.claimed ? "Free listings can set a profile photo and a cover photo. Featured unlocks a logo, extra photos of your store and location, and a full photo gallery." : "Claim this listing to upload your own photos — until then, visitors see a generic placeholder."}</p>\n${b.claimed ? `${DEMO_PHOTOS ? `<div class="note note-warn" style="margin-bottom:14px">Preview mode is on, so empty slots below are filled with stock pictures on your public page. They are not saved anywhere and disappear the moment you upload your own.</div>` : ""}\n${PHOTO_SLOTS_FREE.map(sl => {
+    const cur = (b.slots || {})[sl.k] || "";
+    return `<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid ${T.lineSoft}">\n<img src="${E(cur || DEFAULT_LISTING_IMG)}" alt="" style="width:110px;aspect-ratio:4/3;object-fit:cover;border-radius:${T.r};flex-shrink:0;${cur ? "" : "opacity:.4"}">\n<div style="flex:1">\n<b style="font-size:14px">${E(sl.label)}</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">${E(sl.hint)}</p>\n<form method="POST" action="/manage/edit/slot" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input name="photo" type="file" accept="image/*" required style="max-width:230px">\n<button class="btn btn-o btn-sm">${cur ? "Replace" : "Upload"}</button></form>\n${cur ? `<form method="POST" action="/manage/edit/slot" style="margin-top:6px" onsubmit="return confirm('Remove this photo?')">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input type="hidden" name="clear" value="1">\n<button class="btn btn-o btn-sm">Remove</button></form>` : ""}\n</div></div>`;
+  }).join("")}\n</div>` : ""}\n\n${b.premium ? `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${T.line}">\n<h2 style="margin-bottom:6px">More photos <span class="bdg bdg-feat" style="margin-left:4px">FEATURED</span></h2>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:16px">Logo, store and location photos, plus up to 6 extra shots for the photo strip on your page.</p>\n${PHOTO_SLOTS_PREMIUM.map(sl => {
+    const cur = sl.k === "logo" ? b.slots && b.slots.logo || b.logo || "" : (b.slots || {})[sl.k] || "";
+    return `<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid ${T.lineSoft}">\n<img src="${E(cur || DEFAULT_LISTING_IMG)}" alt="" style="width:110px;aspect-ratio:4/3;object-fit:cover;border-radius:${T.r};flex-shrink:0;${cur ? "" : "opacity:.4"}">\n<div style="flex:1">\n<b style="font-size:14px">${E(sl.label)}</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">${E(sl.hint)}</p>\n<form method="POST" action="/manage/edit/slot" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input name="photo" type="file" accept="image/*" required style="max-width:230px">\n<button class="btn btn-o btn-sm">${cur ? "Replace" : "Upload"}</button></form>\n${cur ? `<form method="POST" action="/manage/edit/slot" style="margin-top:6px" onsubmit="return confirm('Remove this photo?')">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input type="hidden" name="clear" value="1">\n<button class="btn btn-o btn-sm">Remove</button></form>` : ""}\n</div></div>`;
+  }).join("")}\n<div style="padding:12px 0">\n<b style="font-size:14px">Additional photos (optional)</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">Anything else you'd like to show, up to 6. These appear in the photo strip on your page. Entirely optional — your listing works fine with none.</p>\n${((b.slots || {}).extra || []).length ? `<div class="slotgrid" style="margin-bottom:10px">\n${((b.slots || {}).extra || []).map(u2 => `<figure><img src="${E(u2)}" alt="${E(b.name)}" loading="lazy">\n<form method="POST" action="/manage/edit/slot" style="margin-top:5px">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="extra">\n<input type="hidden" name="remove" value="${E(u2)}">\n<button class="btn btn-o btn-sm btn-w">Remove</button></form></figure>`).join("")}</div>` : ""}\n${((b.slots || {}).extra || []).length >= 6 ? `<p style="color:${T.muted};font-size:12.5px">That's the maximum of 6 — remove one to add another.</p>` : `<form method="POST" action="/manage/edit/slot" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="extra">\n<input name="photo" type="file" accept="image/*" required style="max-width:230px">\n<button class="btn btn-o btn-sm">Add photo</button></form>`}\n</div>\n${(b.photos || []).length ? `<div style="padding:12px 0;border-top:1px solid ${T.lineSoft}">\n<b style="font-size:14px">Photo gallery</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">An older gallery slider from before — still shown on your page. Use "Additional photos" above for anything new.</p>\n<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px">\n${b.photos.map(p => `<label style="position:relative;display:block;cursor:pointer">\n<img src="${E(p)}" alt="" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:${T.r}">\n<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);border-radius:6px;padding:2px 5px;display:flex;align-items:center;gap:4px">\n<input type="checkbox" form="galform" name="remove" value="${E(p)}" style="margin:0"><span style="color:#fff;font-size:10.5px">Remove</span></span>\n</label>`).join("")}\n</div>\n<form id="galform" method="POST" action="/manage/edit/photos" enctype="multipart/form-data" style="margin-top:8px">\n<input type="hidden" name="id" value="${E(b.id)}">\n<button class="btn btn-o btn-sm">Remove checked</button>\n</form></div>` : ""}\n</div>` : b.claimed ? `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${T.line};background:${T.sand};border-radius:${T.r};padding:16px">\n<h2 style="margin-bottom:6px">More photos <span style="color:${T.coral};font-weight:600;font-size:13px">— Featured only</span></h2>\n<p style="color:${T.muted};font-size:13.5px">A logo, store and location photos, and up to 6 extra shots — all part of Featured. <a href="/manage/upgrade?id=${encodeURIComponent(b.id)}">Get featured</a> to unlock them.</p></div>` : ""}
+</div></div></div>
+<script>(function(){var f=document.getElementById("lsForm");if(!f)return;var st=document.getElementById("lsState"),bar=document.getElementById("lsSave"),dirty=false;
+function mark(){if(dirty)return;dirty=true;bar.classList.add("dirty");st.textContent="You have unsaved changes"}
+f.addEventListener("input",mark);f.addEventListener("change",mark);
+window.addEventListener("beforeunload",function(e){if(dirty){e.preventDefault();e.returnValue=""}});
+var wk=["tue","wed","thu","fri"],same=document.getElementById("sameWk");
+function el(n,k){return f.querySelector('[name="'+n+'_'+k+'"]')}
+function row(k){var s=el("hopen",k);return s?s.closest("div").parentElement:null}
+function eq(k){return el("hopen",k).value===el("hopen","mon").value&&el("hclose",k).value===el("hclose","mon").value&&el("hoff",k).checked===el("hoff","mon").checked}
+function sync(){if(!same.checked)return;wk.forEach(function(k){var o=el("hoff",k);el("hopen",k).value=el("hopen","mon").value;el("hclose",k).value=el("hclose","mon").value;o.checked=el("hoff","mon").checked;el("hopen",k).disabled=el("hclose",k).disabled=o.checked})}
+function show(){wk.forEach(function(k){var r=row(k);if(r)r.classList.toggle("ml-hide",same.checked)});var t=row("mon").querySelector("span");if(t)t.textContent=same.checked?"Monday – Friday":"Monday"}
+f.addEventListener("submit",function(){dirty=false;if(same&&row("mon"))sync()});
+if(same&&row("mon")&&wk.every(function(k){return row(k)})){same.checked=wk.every(eq);show();same.addEventListener("change",function(){sync();show()});["hopen_mon","hclose_mon","hoff_mon"].forEach(function(n){var x=f.querySelector('[name="'+n+'"]');if(x)x.addEventListener("change",sync)})}else if(same){same.parentElement.style.display="none"}
+})();<\/script>`;
+};
+
+// Whether this person has set a password (GHL "Owner Credentials"), remembered in KV so /account doesn't ask GHL each time.
+async function hasPassword(env, email) {
+  const KV = KVOF(env), k = "haspw:" + NRM(email);
+  try {
+    const v = KV && await KV.get(k);
+    if (v === "1") return true;
+    if (v === "0") return false;
+  } catch {}
+  let has;
+  try {
+    const cid = await ghlFindContactByEmail(env, email);
+    const c = cid ? await ghlGetContact(env, cid) : null;
+    if (!c) return true;
+    has = !!P(cv(c, await fields(env)), "owner credentials", "owner_credentials");
+  } catch {
+    return true;
+  }
+  try {
+    if (KV) await KV.put(k, has ? "1" : "0", has ? {} : {
+      expirationTtl: 600
+    });
+  } catch {}
+  return has;
+}
+
+const markPw = async (env, email) => {
+  try {
+    const KV = KVOF(env);
+    if (KV) await KV.put("haspw:" + NRM(email), "1");
+  } catch {}
+};
 
 const PROFILEPAGE = (d, email, firstName, lastName, birthdate, gender, phone, address, city, zip, err, ok, warn) => PAGE(d, {
   title: `Edit profile | ${S.brand}`,
@@ -7202,22 +7333,24 @@ const MANAGEUPDATES = (d, biz, list, followerCount, err) => PAGE(d, {
 // Owner "Manage" page (Eric approved v2, 6 Oct 2026): business card on top, one slim upgrade strip,
 // Reviews / Photos / Updates as real tabs (one panel at a time; all show without JS), paid extras as a
 // small "Unlock" line, plan/delete as quiet links at the bottom. Same sections and forms as before.
-const MANAGEHUB = (d, biz, reviews, photos, updates) => {
+const MANAGEHUB = (d, biz, reviews, photos, updates, edit) => {
+  edit = edit || {};
   const id = encodeURIComponent(biz.id);
   const plan = biz.plus ? "Pro plan" : biz.premium ? "Plus plan" : "Free plan";
-  const tabs = [ [ "reviews", "Reviews", reviews.pending.length ? `${reviews.pending.length} to review` : "" ], [ "photos", "Photos", photos.pending.length ? `${photos.pending.length} to review` : "" ], [ "updates", "Updates", "" ] ];
+  const tabs = [ [ "listing", "Your listing", "" ], [ "reviews", "Reviews", reviews.pending.length ? `${reviews.pending.length} to review` : "" ], [ "photos", "Photos", photos.pending.length ? `${photos.pending.length} to review` : "" ], [ "updates", "Updates & offers", "" ] ];
   const up = !biz.premium ? `<div><i>⭐</i><div><b>Get featured</b><span>Top of your category, logo &amp; extra photos — from $29/mo</span></div><a class="c" href="/manage/upgrade?id=${id}">Upgrade</a></div>`
     : !biz.plus ? `<div><i>🚀</i><div><b>Go Pro</b><span>Above every Plus listing, instant text alerts, an account manager</span></div><a class="c" href="/manage/upgrade?id=${id}">Go Pro</a></div>` : "";
   return PAGE(d, {
     title: `Manage — ${biz.name} | ${S.brand}`,
     desc: "Reviews, photos and updates for your listing, all in one place.",
     can: S.dom + "/manage/hub",
-    body: `<div class="wrap mh-page"><nav class="crumb"><a href="/manage">Your listings</a> / Manage</nav>
+    body: `<div class="wrap mh-page"><nav class="crumb"><a href="/account">Your profile</a> / ${E(biz.name)}</nav>
 <div class="mh-card"><span class="mh-ph">${PHOTO(biz)}</span><div class="mh-t"><div class="mh-k">Owner dashboard</div><h1>${E(biz.name)}</h1>
 <div class="mh-bd">${biz.claimed ? `<span>✓ Verified</span>` : ""}<span class="g">${plan}</span></div></div>
-<div class="mh-ac"><a class="o" href="/${E(biz.cs)}/${E(biz.slug)}" target="_blank" rel="noopener">View page ↗</a><a class="p" href="/manage/edit?id=${id}">Edit listing</a></div></div>
+<div class="mh-ac"><a class="o" href="/${E(biz.cs)}/${E(biz.slug)}" target="_blank" rel="noopener">View page ↗</a></div></div>
 <div class="mh-ug${up ? "" : " one"}">${up}<div><i>📣</i><div><b>Advertise this business</b><span>Sponsored slot at the front of category pages — any plan</span></div><a class="y" href="/manage/advertise?id=${id}">Advertise</a></div></div>
 <div class="mh-tb" role="tablist">${tabs.map(([t, label, note], i) => `<a href="#${t}" data-tab="${t}" role="tab"${i ? "" : ' class="on"'}>${label}${note ? `<small>${note}</small>` : ""}</a>`).join("")}</div>
+<section class="mh-pn" id="listing" data-pane="listing">${EDITPANE(biz, edit.err, edit.ok, edit.warn, edit.note)}</section>
 <section class="mh-pn" id="reviews" data-pane="reviews">${REVIEWSSECTION(biz, reviews.pending, reviews.decided, reviews.reqs, reviews.rq)}</section>
 <section class="mh-pn" id="photos" data-pane="photos">${PHOTOSSECTION(biz, photos.pending, photos.approved)}</section>
 <section class="mh-pn" id="updates" data-pane="updates">${biz.premium ? UPDATESSECTION(biz, updates.list, updates.followerCount, updates.err) : `<div class="blk"><h2>Post an offer or event</h2>${S.freeOnly ? "" : `<div class="note note-warn">📣 Share promotions and events on your page <a href="/manage/upgrade?id=${id}"><em>PLUS</em>Unlock</a></div>`}</div>`}</section>
@@ -7225,9 +7358,10 @@ const MANAGEHUB = (d, biz, reviews, photos, updates) => {
 <script>(function(){var tb=document.querySelectorAll(".mh-tb a"),pn=document.querySelectorAll(".mh-pn");if(!tb.length)return;
 document.documentElement.classList.add("mh-js");
 function show(t){var ok=false;for(var i=0;i<pn.length;i++){var on=pn[i].getAttribute("data-pane")===t;pn[i].hidden=!on;ok=ok||on}
-if(!ok)return show("reviews");for(var j=0;j<tb.length;j++)tb[j].classList.toggle("on",tb[j].getAttribute("data-tab")===t)}
+if(!ok)return show("listing");for(var j=0;j<tb.length;j++)tb[j].classList.toggle("on",tb[j].getAttribute("data-tab")===t)}
 for(var k=0;k<tb.length;k++)tb[k].addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("data-tab");show(t);try{history.replaceState(null,"","#"+t)}catch(x){}});
-var h=(location.hash||"").slice(1);show(/^(reviews|photos|updates)$/.test(h)?h:"reviews");
+var h=(location.hash||"").slice(1);show(/^(listing|reviews|photos|updates)$/.test(h)?h:h==="request"?"reviews":"listing");
+if(/^sec-/.test(h)){var se=document.getElementById(h);if(se)setTimeout(function(){se.scrollIntoView()},60)}
 var dl=document.querySelector(".mh-del-link");if(dl)dl.addEventListener("click",function(e){e.preventDefault();var b=document.getElementById("delListingBtn");if(b)b.click()});})();<\/script>
 </div>`
   });
@@ -7422,18 +7556,6 @@ const UPSELLBANNER = b => S.freeOnly ? "" : `${!b.premium ? `<div class="blk" st
 
 const DELETESECTION = b => `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${T.line}">\n<h2 style="margin-bottom:14px">Manage your plan and listing</h2>\n${b.premium || b.plus ? `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid ${T.lineSoft}">\n<h3 style="font-size:15px;margin-bottom:6px">Cancel your plan</h3>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:14px">This sends a request to our team — it is not instant, and your listing itself is never removed. You keep everything until it is processed.</p>\n<a class="btn btn-o btn-w" href="/manage/cancel?id=${encodeURIComponent(b.id)}">Cancel my plan</a>\n</div>` : ""}\n<h3 style="font-size:15px;color:#B3261E;margin-bottom:6px">Delete this listing</h3>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:16px">This sends a request to our team — it's not instant, and nothing is removed until it's reviewed.</p>\n<button type="button" id="delListingBtn" class="btn btn-o btn-w" style="border-color:#B3261E;color:#B3261E">Delete listing</button>\n</div>\n\n\n<div id="delModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,20,20,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">\n<div style="background:var(--card);border-radius:var(--r-lg);box-shadow:var(--sh-lg);max-width:420px;width:100%;padding:30px;text-align:center">\n<h3 style="margin-bottom:10px">Delete "${E(b.name)}"?</h3>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:20px;line-height:1.5">This queues a request for our team — your listing stays live until it's reviewed and approved.</p>\n<form method="POST" action="/manage/delete" style="text-align:left">\n<input type="hidden" name="id" value="${E(b.id)}">\n<div class="fld2" style="margin-bottom:16px"><label for="delReason">Why are you deleting this listing?</label>\n<select id="delReason" name="reason" required>\n<option value="">Choose a reason…</option>\n<option>Business closed</option>\n<option>Duplicate listing</option>\n<option>Listed by mistake</option>\n<option>Moving to a different platform</option>\n<option>Other</option>\n</select></div>\n<div style="display:flex;gap:10px;justify-content:center">\n<button type="button" id="delModalCancel" class="btn btn-o">Cancel</button>\n<button class="btn" style="background:#B3261E;color:#fff;border:1px solid #B3261E">Request deletion</button>\n</div>\n</form>\n</div>\n</div>\n<script>(function(){\nvar btn=document.getElementById("delListingBtn"),ov=document.getElementById("delModalOverlay"),cancel=document.getElementById("delModalCancel");\nif(!btn||!ov)return;\nbtn.addEventListener("click",function(){ov.style.display="flex"});\ncancel.addEventListener("click",function(){ov.style.display="none"});\nov.addEventListener("click",function(e){if(e.target===ov)ov.style.display="none"});\ndocument.addEventListener("keydown",function(e){if(e.key==="Escape")ov.style.display="none"});\n})();<\/script>`;
 
-const EDIT = (d, b, err, ok, warn, note) => PAGE(d, {
-  title: `Edit ${b.name} | ${S.brand}`,
-  desc: `Edit your listing.`,
-  can: S.dom + "/manage",
-  body: `<div class="wrap">\n<nav class="crumb"><a href="/">Home</a> / <a href="/manage">Your listings</a> / Edit</nav>\n<div style="padding:14px 0 26px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">\n<div><h1>Edit ${E(b.name)}</h1>\n<p style="color:${T.muted};margin-top:8px">Changes are saved to your listing and checked before this page confirms them.</p></div>\n<a class="btn btn-p" style="flex-shrink:0" href="/manage/hub?id=${encodeURIComponent(b.id)}">Click here to manage your business →</a>\n</div>\n${UPSELLBANNER(b)}\n<div class="blk" style="max-width:760px;margin:0 auto 18px">\n${ok ? `<div class="note note-ok">Saved. Your listing has been updated.</div>` : ""}\n${err ? `<div class="note note-err">${E(err)}</div>` : ""}\n${note ? `<div class="note note-ok">${E(note)}</div>` : ""}\n${warn ? `<div class="note note-warn">Saved. A couple of extra details (${E(warn)}) couldn't be stored yet — no need to do anything, our team will sort it.</div>` : ""}\n${CHECKLIST(b, true)}\n<form method="POST" action="/manage/edit">\n<input type="hidden" name="id" value="${E(b.id)}">\n<div class="fgrid">\n<div class="fld2 full"><label for="ebn">Business name</label><input id="ebn" name="bizname" required value="${E(b.name || "")}"></div>\n<div class="fld2 full"><label for="eaddr">Address</label><input id="eaddr" name="address" value="${E(b.addr || "")}" placeholder="Street address, city, state, zip"></div>\n<div class="fld2"><label for="ecat">Category</label><select id="ecat" name="category">\n${[ ...MAINS, ...(b.cat && b.cat !== "Other" && !MAINS.includes(b.cat) ? [b.cat] : []), "Other" ].map(c => `<option${c === b.cat ? " selected" : ""}>${E(c)}</option>`).join("")}</select></div>\n<div class="fld2"><label for="esub">Sub-category</label><input id="esub" name="subcategory" value="${E(b.sub || "")}" placeholder="e.g. Family dentist"></div>\n${TAGFIELDS(b.labels, "ownerTag")}\n<div class="fld2"><label for="eyr">Year established</label><input id="eyr" name="yrs" type="number" min="1800" max="${(new Date).getFullYear()}" value="${E(b.yrs || "")}" placeholder="e.g. 2015"></div>\n<div class="fld2 full" id="sec-descr"><label for="ed">Short description</label>\n<textarea id="ed" name="descr" maxlength="600" placeholder="A sentence or two about what you do">${E(b.desc || "")}</textarea></div>\n<div class="fld2 full" id="sec-services"><label for="es">Services you offer</label>\n<textarea id="es" name="services" rows="2" placeholder="e.g. Dry cleaning, Tailoring and alterations, Laundry">${E((b.svc || []).join(", "))}</textarea>\n<p style="font-size:11.5px;color:${T.faint};margin-top:4px">Type each service with a comma between them. They show as a list on your page.</p></div>\n<div class="fld2" id="sec-phone"><label for="ep">Phone</label><input id="ep" name="phone" value="${E(b.ph || "")}"></div>\n<div class="fld2"><label for="ew">Website</label><input id="ew" name="website" value="${E(b.web || "")}" placeholder="yourbusiness.com"></div>\n<div class="fld2"><label for="egm">Google Maps URL</label><input id="egm" name="map" value="${E(b.map || "")}" placeholder="https://maps.google.com/...">\n<p style="font-size:11px;color:${T.faint};margin-top:4px">Powers the "See on Google" and "Directions" links on your page.</p></div>\n<div class="fld2"><label for="eem">Business email</label><input id="eem" name="bizemail" type="email" value="${E(b.email || "")}" placeholder="hello@yourbusiness.com">\n<p style="font-size:11px;color:${T.faint};margin-top:4px">Customers see this on your page. It's fine if it's the same email you sign in with.</p></div>\n<div class="fld2 full" id="sec-hours"><label>Opening hours</label>\n<p style="font-size:11px;color:${T.faint};margin:0 0 8px">Tick "Closed" for any day you're not open. Leave a day blank (no times chosen) and it's treated as closed too — half-filled days are never guessed at.</p>\n${HOURSFIELDS(b.hrs2)}\n</div>\n</div>\n<div style="position:sticky;bottom:0;background:${T.cream};padding:12px 0;margin-top:6px;border-top:1px solid ${T.line};z-index:5"><button class="btn btn-p btn-lg">Save changes</button>\n<a class="btn btn-o btn-lg" style="margin-left:8px" href="/manage">Cancel</a></div>\n</form>\n\n<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${T.line}">\n<h2 style="margin-bottom:6px" id="sec-photos">Your photos</h2>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:16px">${b.claimed ? "Free listings can set a profile photo and a cover photo. Featured unlocks a logo, extra photos of your store and location, and a full photo gallery." : "Claim this listing to upload your own photos — until then, visitors see a generic placeholder."}</p>\n${b.claimed ? `${DEMO_PHOTOS ? `<div class="note note-warn" style="margin-bottom:14px">Preview mode is on, so empty slots below are filled with stock pictures on your public page. They are not saved anywhere and disappear the moment you upload your own.</div>` : ""}\n${PHOTO_SLOTS_FREE.map(sl => {
-    const cur = (b.slots || {})[sl.k] || "";
-    return `<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid ${T.lineSoft}">\n<img src="${E(cur || DEFAULT_LISTING_IMG)}" alt="" style="width:110px;aspect-ratio:4/3;object-fit:cover;border-radius:${T.r};flex-shrink:0;${cur ? "" : "opacity:.4"}">\n<div style="flex:1">\n<b style="font-size:14px">${E(sl.label)}</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">${E(sl.hint)}</p>\n<form method="POST" action="/manage/edit/slot" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input name="photo" type="file" accept="image/*" required style="max-width:230px">\n<button class="btn btn-o btn-sm">${cur ? "Replace" : "Upload"}</button></form>\n${cur ? `<form method="POST" action="/manage/edit/slot" style="margin-top:6px" onsubmit="return confirm('Remove this photo?')">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input type="hidden" name="clear" value="1">\n<button class="btn btn-o btn-sm">Remove</button></form>` : ""}\n</div></div>`;
-  }).join("")}\n</div>` : ""}\n\n${b.premium ? `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${T.line}">\n<h2 style="margin-bottom:6px">More photos <span class="bdg bdg-feat" style="margin-left:4px">FEATURED</span></h2>\n<p style="color:${T.muted};font-size:13.5px;margin-bottom:16px">Logo, store and location photos, plus up to 6 extra shots for the photo strip on your page.</p>\n${PHOTO_SLOTS_PREMIUM.map(sl => {
-    const cur = sl.k === "logo" ? b.slots && b.slots.logo || b.logo || "" : (b.slots || {})[sl.k] || "";
-    return `<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid ${T.lineSoft}">\n<img src="${E(cur || DEFAULT_LISTING_IMG)}" alt="" style="width:110px;aspect-ratio:4/3;object-fit:cover;border-radius:${T.r};flex-shrink:0;${cur ? "" : "opacity:.4"}">\n<div style="flex:1">\n<b style="font-size:14px">${E(sl.label)}</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">${E(sl.hint)}</p>\n<form method="POST" action="/manage/edit/slot" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input name="photo" type="file" accept="image/*" required style="max-width:230px">\n<button class="btn btn-o btn-sm">${cur ? "Replace" : "Upload"}</button></form>\n${cur ? `<form method="POST" action="/manage/edit/slot" style="margin-top:6px" onsubmit="return confirm('Remove this photo?')">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="${E(sl.k)}">\n<input type="hidden" name="clear" value="1">\n<button class="btn btn-o btn-sm">Remove</button></form>` : ""}\n</div></div>`;
-  }).join("")}\n<div style="padding:12px 0">\n<b style="font-size:14px">Additional photos (optional)</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">Anything else you'd like to show, up to 6. These appear in the photo strip on your page. Entirely optional — your listing works fine with none.</p>\n${((b.slots || {}).extra || []).length ? `<div class="slotgrid" style="margin-bottom:10px">\n${((b.slots || {}).extra || []).map(u2 => `<figure><img src="${E(u2)}" alt="${E(b.name)}" loading="lazy">\n<form method="POST" action="/manage/edit/slot" style="margin-top:5px">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="extra">\n<input type="hidden" name="remove" value="${E(u2)}">\n<button class="btn btn-o btn-sm btn-w">Remove</button></form></figure>`).join("")}</div>` : ""}\n${((b.slots || {}).extra || []).length >= 6 ? `<p style="color:${T.muted};font-size:12.5px">That's the maximum of 6 — remove one to add another.</p>` : `<form method="POST" action="/manage/edit/slot" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">\n<input type="hidden" name="id" value="${E(b.id)}"><input type="hidden" name="slot" value="extra">\n<input name="photo" type="file" accept="image/*" required style="max-width:230px">\n<button class="btn btn-o btn-sm">Add photo</button></form>`}\n</div>\n${(b.photos || []).length ? `<div style="padding:12px 0;border-top:1px solid ${T.lineSoft}">\n<b style="font-size:14px">Photo gallery</b>\n<p style="color:${T.muted};font-size:12.5px;margin:2px 0 8px">An older gallery slider from before — still shown on your page. Use "Additional photos" above for anything new.</p>\n<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px">\n${b.photos.map(p => `<label style="position:relative;display:block;cursor:pointer">\n<img src="${E(p)}" alt="" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:${T.r}">\n<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);border-radius:6px;padding:2px 5px;display:flex;align-items:center;gap:4px">\n<input type="checkbox" form="galform" name="remove" value="${E(p)}" style="margin:0"><span style="color:#fff;font-size:10.5px">Remove</span></span>\n</label>`).join("")}\n</div>\n<form id="galform" method="POST" action="/manage/edit/photos" enctype="multipart/form-data" style="margin-top:8px">\n<input type="hidden" name="id" value="${E(b.id)}">\n<button class="btn btn-o btn-sm">Remove checked</button>\n</form></div>` : ""}\n</div>` : b.claimed ? `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${T.line};background:${T.sand};border-radius:${T.r};padding:16px">\n<h2 style="margin-bottom:6px">More photos <span style="color:${T.coral};font-weight:600;font-size:13px">— Featured only</span></h2>\n<p style="color:${T.muted};font-size:13.5px">A logo, store and location photos, and up to 6 extra shots — all part of Featured. <a href="/manage/upgrade?id=${encodeURIComponent(b.id)}">Get featured</a> to unlock them.</p></div>` : ""}\n\n\n</div></div>`
-});
 
 const CLAIMROW = (c, key) => `<div class="row" style="grid-template-columns:1fr 220px">\n<div class="rc"><h3 style="font-size:15px">${E(c.business)}</h3>\n<p style="font-size:12.5px;color:${T.muted};margin:2px 0 8px">\n${E(c.name)} · ${E(c.role)} · ${E(c.email)}${c.phone ? " · " + E(c.phone) : ""}</p>\n<p style="font-size:12.5px;color:${T.body}">${E(c.verify)}${c.notes ? " — " + E(c.notes) : ""}</p>\n<p style="font-size:11px;color:${T.faint};margin-top:6px">Submitted ${new Date(c.created_at).toLocaleString()}</p></div>\n<div class="acts">\n<form method="POST" action="/admin/claims/approve" style="display:flex;flex-direction:column;gap:6px">\n<input type="hidden" name="claimId" value="${c.id}">\n<input type="hidden" name="ghlId" value="${E(c.ghl_id)}">\n<input type="hidden" name="email" value="${E(c.email)}">\n<button class="btn btn-p btn-sm">Approve</button></form>\n<form method="POST" action="/admin/claims/reject" style="margin-top:6px">\n<input type="hidden" name="claimId" value="${c.id}">\n<button class="btn btn-o btn-sm btn-w">Reject</button></form>\n</div></div>`;
 
@@ -8226,7 +8348,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.70-shared";
+const BUILD = "v16.71-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -11016,6 +11138,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const ip = req.headers.get("cf-connecting-ip") || "0";
       if (!await rateOk(env, "loginpw:" + ip, AUTH.LOGIN_RATE_PER_HOUR) || !await rateOk(env, "loginpw:" + email, AUTH.LOGIN_RATE_PER_HOUR)) return Response.redirect(AUTH.SITE_URL + "/login?err=" + encodeURIComponent("Too many attempts. Wait an hour and try again") + nextQ, 302);
       const ok = await ghlCheckPassword(env, email, password);
+      if (ok) await markPw(env, email);
       if (!ok) return Response.redirect(AUTH.SITE_URL + "/login?err=" + encodeURIComponent("Wrong email or password") + nextQ, 302);
       const cookie = await startSession(env, email, await resolveDisplayName(env, email));
       if (!cookie) return Response.redirect(AUTH.SITE_URL + "/login?err=" + encodeURIComponent("Sign-in unavailable. Try again shortly") + nextQ, 302);
@@ -11312,8 +11435,20 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         const qs = ownIds.map((_, i) => "?" + (i + 1)).join(",");
         businesses = ((await DB.prepare(`SELECT * FROM businesses WHERE ghl_id IN (${qs})`).bind(...ownIds).all()).results || []).map(ROWOF);
       }
-      const [follows, reviews] = await Promise.all([ followedBiz(DB, s.email), myReviews(DB, s.email) ]);
-      return R2(ACCOUNT(d, s.email, s.name, businesses, follows, reviews));
+      const [follows, reviews, hasPw] = await Promise.all([ followedBiz(DB, s.email), myReviews(DB, s.email), hasPassword(env, s.email) ]);
+      const stats = {};
+      if (DB && businesses.length) {
+        const ids = businesses.map(b => b.id), qs = ids.map((_, i) => "?" + (i + 2)).join(",");
+        for (const [ key, q ] of [ [ "pending", `SELECT ghl_id k, COUNT(*) n FROM reviews WHERE status='pending' AND ?1=?1 AND ghl_id IN (${qs}) GROUP BY ghl_id` ], [ "views", `SELECT ghl_id k, COUNT(*) n FROM events WHERE kind='view' AND at>?1 AND ghl_id IN (${qs}) GROUP BY ghl_id` ], [ "followers", `SELECT ghl_id k, COUNT(*) n FROM follows WHERE ?1=?1 AND ghl_id IN (${qs}) GROUP BY ghl_id` ] ]) try {
+          for (const r of (await DB.prepare(q).bind(Date.now() - 7 * 864e5, ...ids).all()).results || []) (stats[r.k] = stats[r.k] || {})[key] = r.n;
+        } catch (e) {
+          console.log("account stats (" + key + ") failed: " + e.message);
+        }
+      }
+      return R2(ACCOUNT(d, s.email, s.name, businesses, follows, reviews, {
+        hasPw: hasPw,
+        stats: stats
+      }));
     }
     if (u.pathname === "/account/profile" && req.method === "GET") {
       const s = await session(env, req);
@@ -11449,6 +11584,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (password !== String(f.get("password2") || "")) return Response.redirect(AUTH.SITE_URL + "/manage/password?err=" + encodeURIComponent("Those two passwords don't match — try again"), 302);
       const cid = await ghlFindOrCreateContact(env, s.email, {});
       const ok = cid ? await ghlSetPassword(env, cid, password) : false;
+      if (ok) await markPw(env, s.email);
       return Response.redirect(AUTH.SITE_URL + "/manage/password" + (ok ? "?ok=1" : "?err=" + encodeURIComponent("Couldn't save — try again")), 302);
     }
     if (u.pathname === "/manage/reviews" && req.method === "GET") {
@@ -11666,6 +11802,11 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         list: updList,
         followerCount: updFollowers.length,
         err: u.searchParams.get("err") || ""
+      }, {
+        err: u.searchParams.get("lerr") || "",
+        ok: u.searchParams.has("lok"),
+        warn: u.searchParams.get("lwarn") || "",
+        note: u.searchParams.get("lnote") || ""
       }));
     }
     if (u.pathname === "/manage/updates" && req.method === "POST") {
@@ -11741,7 +11882,10 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (!ids.includes(id)) return R2(NOTICE(d, "Not your listing", "You don't have edit access to that listing.", "Back to your listings", "/manage"), 403);
       const r = DB ? await DB.prepare("SELECT * FROM businesses WHERE ghl_id=?1").bind(id).first() : null;
       if (!r) return R2(NOTICE(d, "Listing not found", "", "Back", "/manage"), 404);
-      return R2(EDIT(d, ROWOF(r), u.searchParams.get("err") || "", u.searchParams.has("ok"), u.searchParams.get("warn") || "", u.searchParams.get("note") || ""));
+      // Edit and Manage are one page now (Eric, 23 Oct); the browser keeps any #sec-… anchor across this redirect.
+      const q = new URLSearchParams({ id: id });
+      for (const [ a, b ] of [ [ "err", "lerr" ], [ "ok", "lok" ], [ "warn", "lwarn" ], [ "note", "lnote" ] ]) if (u.searchParams.has(a)) q.set(b, u.searchParams.get(a) || "1");
+      return Response.redirect(AUTH.SITE_URL + "/manage/hub?" + q, 302);
     }
     if (u.pathname === "/manage/delete" && req.method === "POST") {
       const s = await session(env, req);
@@ -11872,7 +12016,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         status: 403
       });
       const row = DB ? await DB.prepare("SELECT premium,photos FROM businesses WHERE ghl_id=?1").bind(id).first() : null;
-      if (!row || !row.premium) return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}&err=` + encodeURIComponent("Photo gallery is a Featured perk — upgrade to add photos."), 302);
+      if (!row || !row.premium) return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}&err=` + encodeURIComponent("Photo gallery is a Featured perk — upgrade to add photos.") + "#sec-photos", 302);
       let photos = [];
       try {
         photos = JSON.parse(row.photos || "[]");
@@ -11892,7 +12036,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       if (res.ok) confirmed = await refreshOne(env, DB, id, {});
       let q = "&ok=1";
       if (uploadErr) q = "&err=" + encodeURIComponent("Upload failed: " + uploadErr); else if (!res.ok) q = "&err=" + encodeURIComponent("We couldn't save that just now — nothing was lost. Please try again in a minute, and if it keeps happening just reply to any of our emails."); else if (!confirmed) q = "&err=" + encodeURIComponent("Saved, but the change hasn't reached the site yet. Reload in a minute."); else if (photos.length > 20) q = "&ok=1&warn=" + encodeURIComponent(`That's ${photos.length} photos — most listings perform best with 10–15. Consider trimming.`);
-      return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q}`, 302);
+      return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q}#sec-photos`, 302);
     }
     if (u.pathname === "/manage/edit/businessphoto" && req.method === "POST") {
       const s = await session(env, req);
@@ -11917,7 +12061,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
           }
         } else q = "&err=" + encodeURIComponent("Upload failed: " + (up.err || "unknown error"));
       }
-      return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q}`, 302);
+      return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q}#sec-photos`, 302);
     }
     if (u.pathname === "/manage/edit/logo" && req.method === "POST") {
       const s = await session(env, req);
@@ -11929,9 +12073,9 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         status: 403
       });
       const row = DB ? await DB.prepare("SELECT claimed FROM businesses WHERE ghl_id=?1").bind(id).first() : null;
-      if (!row || !row.claimed) return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}&err=` + encodeURIComponent("Claim this listing first to set your own photo."), 302);
+      if (!row || !row.claimed) return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}&err=` + encodeURIComponent("Claim this listing first to set your own photo.") + "#sec-photos", 302);
       const file = f.get("photo");
-      if (!file || typeof file !== "object" || !file.size) return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}&err=` + encodeURIComponent("Choose a photo first."), 302);
+      if (!file || typeof file !== "object" || !file.size) return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}&err=` + encodeURIComponent("Choose a photo first.") + "#sec-photos", 302);
       const up = await ghlUploadMedia(env, file);
       let q2 = "&ok=1";
       if (!up.ok) q2 = "&err=" + encodeURIComponent("Upload failed: " + up.err); else {
@@ -11944,7 +12088,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         });
         if (!res.ok) q2 = "&err=" + encodeURIComponent("We couldn't save that just now — nothing was lost. Please try again in a minute, and if it keeps happening just reply to any of our emails."); else if (!confirmed) q2 = "&err=" + encodeURIComponent("Saved, but the change hasn't reached the site yet. Reload in a minute.");
       }
-      return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q2}`, 302);
+      return Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q2}#sec-photos`, 302);
     }
     if (u.pathname === "/manage/edit/slot" && req.method === "POST") {
       const s = await session(env, req);
@@ -11952,7 +12096,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
       const f = await req.formData();
       const id = String(f.get("id") || "");
       const slot = String(f.get("slot") || "");
-      const back = q => Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q}`, 302);
+      const back = q => Response.redirect(AUTH.SITE_URL + `/manage/edit?id=${encodeURIComponent(id)}${q}#sec-photos`, 302);
       const VALID = PHOTO_SLOTS.map(x => x.k).concat([ "extra" ]);
       if (!VALID.includes(slot)) return back("&err=" + encodeURIComponent("Unknown photo slot."));
       const ids = await ownedIds(env, s.email);
