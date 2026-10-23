@@ -8226,7 +8226,7 @@ function BESTCTA(idx, slug, hood) {
   return `<div class="best-cta"><div><b>See the top 10 ${E(BEST_NOUN(t.n))} in ${E(inHood ? hoodName(hood) : S.city)}</b><br><span style="font-size:13px;color:${T.muted}">Ranked by Google rating and number of reviews</span></div><a class="btn btn-p btn-sm" href="/best/${E(t.s)}${inHood ? "/" + E(hood) : ""}">View the list</a></div>`;
 }
 
-const BUILD = "v16.69-shared";
+const BUILD = "v16.70-shared";
 
 const APP_COOKIE = "gl_app";
 
@@ -8926,7 +8926,9 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         const c = id ? await ghlGetContact(env, id) : null;
         if (!isQa(c)) return TXT("not a qa-test contact");
         if (act === "msg") {
-          const r = await fetch(`${API}/conversations/messages/${encodeURIComponent(String(f.get("msg") || ""))}`, { headers: H(env) });
+          const mid = encodeURIComponent(String(f.get("msg") || ""));
+          let r = await fetch(`${API}/conversations/messages/email/${mid}`, { headers: H(env) });
+          if (!r.ok) r = await fetch(`${API}/conversations/messages/${mid}`, { headers: H(env) });
           return TXT(r.status + " " + (await r.text()).slice(0, 1500));
         }
         if (act === "native") {
@@ -8937,7 +8939,7 @@ ${Object.entries(NOTIFY_KINDS).map(([ kind, label ]) => `<div style="display:fle
         }
         if (act === "get") {
           const m = await fields(env);
-          return TXT(JSON.stringify({ id: c.id, name: c.companyName || c.firstName, email: c.email, tags: c.tags, fields: (c.customFields || []).map(x => [ m[x.id] || x.id, x.value ]) }, null, 1));
+          return TXT(JSON.stringify({ id: c.id, name: c.companyName || c.firstName, email: c.email, assignedTo: c.assignedTo || "", tags: c.tags, fields: (c.customFields || []).map(x => [ m[x.id] || x.id, x.value ]) }, null, 1));
         }
         if (act === "set") {
           const m = await fields(env);
